@@ -1,0 +1,249 @@
+/* Custom Utilities & Overrides for Tailwind */
+
+/* Custom Scrollbar for modern look */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+/* Hide scrollbar entirely but allow scroll */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+/* Modal states */
+.modal-open {
+    display: flex !important;
+}
+
+/* Base Body Styles for Dark Mode Background */
+body {
+    background-color: #f8fafc; /* slate-50 */
+    color: #1e293b; /* slate-800 */
+    transition: background-color 0.2s, color 0.2s;
+}
+
+/* Deep Dark Mode Overrides */
+.dark body, .dark .view-section {
+    background-color: #0f172a !important; /* slate-900 */
+    color: #f1f5f9 !important; /* slate-100 */
+}
+.dark .bg-white {
+    background-color: #1e293b !important; /* slate-800 */
+    color: #f1f5f9 !important;
+}
+.dark .bg-slate-50, .dark .bg-slate-100, .dark .bg-slate-200 {
+    background-color: #0f172a !important; /* slate-900 */
+    border-color: #334155 !important;
+}
+.dark .text-slate-800, .dark .text-slate-700 {
+    color: #f8fafc !important; 
+}
+.dark .text-slate-600, .dark .text-slate-500 {
+    color: #94a3b8 !important; /* slate-400 */
+}
+.dark input, .dark select {
+    background-color: #0f172a !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300 {
+    border-color: #334155 !important;
+}
+.dark table th, .dark thead tr {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+/* Hidden in screen, visible in print */
+#print-ticket-container {
+    display: none;
+}
+
+/* Definitive Print Styles */
+@media print {
+    @page { 
+        margin: 0; 
+        size: 80mm auto; 
+    }
+    
+    /* Hide UI elements but not the print containers */
+    aside, 
+    main,
+    .modal,
+    button:not(#confirm-payment-btn) {
+        display: none !important;
+    }
+    
+    #print-ticket-container, 
+    #print-ticket-container *,
+    #z-report-template,
+    #z-report-template * {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    #print-ticket-container {
+        display: block !important;
+        width: 72mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        color: black !important;
+        font-family: 'Courier New', Courier, monospace !important;
+        font-size: var(--ticket-font-size, 10px) !important;
+        font-weight: 900 !important;
+        line-height: 1.1 !important;
+    }
+
+    #print-ticket-container * {
+        color: black !important;
+        background: transparent !important;
+        margin: 0 !important;
+    }
+
+    #print-ticket-brand {
+        font-size: 13px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+    }
+
+    #print-ticket-container table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        table-layout: fixed !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    #print-ticket-container tr {
+        display: table-row !important;
+    }
+    
+    #print-ticket-container td, 
+    #print-ticket-container th {
+        display: table-cell !important;
+        word-wrap: break-word !important;
+        padding: 0 !important;
+        vertical-align: middle !important;
+        font-size: var(--ticket-font-size, 10px) !important;
+        font-weight: 900 !important;
+    }
+
+    #print-ticket-container th:first-child, 
+    #print-ticket-container td:first-child {
+        text-align: left !important;
+    }
+
+    #print-ticket-container th {
+        border-bottom: 1px solid black !important;
+    }
+
+    .hidden { 
+        display: none !important; 
+    }
+}
+
+.modal-fade-in {
+    opacity: 1 !important;
+}
+.modal-scale-in {
+    transform: scale(1) !important;
+}
+
+/* Animations */
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-fade-in {
+    animation: fade-in-up 0.4s ease-out forwards;
+}
+
+/* Category Button active styling */
+.category-btn {
+    color: #64748b;
+    background-color: white;
+    border: 1px solid #e2e8f0;
+}
+.category-btn:hover {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+}
+.category-btn.active {
+    background-color: #3b82f6; /* brand-500 */
+    color: white;
+    border-color: #3b82f6;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+/* Hide number input spinners globally */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type=number] {
+    -moz-appearance: textfield; /* Firefox */
+}
+
+/* Cart item transition */
+.cart-item-enter {
+    animation: fade-in-up 0.2s ease-out forwards;
+}
+
+/* Sidebar Nav active indicator */
+.nav-item.active {
+    background-color: #eff6ff; /* brand-50 */
+    color: #2563eb; /* brand-600 */
+}
+
+/* Mobile Orders Panel */
+.orders-panel-open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+}
+
+.order-badge-pulse {
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Glassmorphism for Server Card */
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-card {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zona Fresh - Pedidos</title>
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Zona Fresh">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+        
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .category-scroll::-webkit-scrollbar { display: none; }
+        
+        .product-card {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .product-card:active {
+            transform: scale(0.95);
+        }
+
+        .cart-badge {
+            animation: bounce 0.4s ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* Dark mode aesthetics */
+        .dark-theme {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="glass-nav sticky top-0 z-30 px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
+        <div>
+            <h1 class="text-xl font-extrabold text-blue-600 tracking-tight">ZONA FRESH</h1>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">App de Pedidos v40</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="sync-qr-btn" class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg active:scale-90 transition-transform" title="Vincular con Caja">
+                <i class="fas fa-qrcode"></i>
+            </button>
+            <div class="relative" id="cart-trigger">
+                <button class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl shadow-sm active:scale-90 transition-transform">
+                    <i class="fas fa-shopping-basket"></i>
+                </button>
+                <span id="cart-count" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white cart-badge">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Categories -->
+    <div class="px-6 py-4 overflow-x-auto category-scroll flex gap-3 bg-white border-b border-gray-50 shrink-0">
+        <button class="cat-btn active px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-bold shadow-md whitespace-nowrap" data-category="Todos">Todos</button>
+        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Gaseosas">Gaseosas</button>
+        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Aguas">Aguas</button>
+        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Jugos">Jugos</button>
+        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Energizantes">Energizantes</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6" id="main-content">
+        <!-- New: Featured Products Section -->
+        <div id="featured-section" class="mb-8 hidden">
+            <div class="flex items-center gap-2 mb-4">
+                <i class="fas fa-fire text-amber-500 text-xl"></i>
+                <h2 class="text-xl font-black text-slate-800">Destacados</h2>
+            </div>
+            <!-- Horizontal scroll container -->
+            <div id="featured-list" class="flex gap-4 overflow-x-auto pb-4 category-scroll snap-x">
+                <!-- Featured cards injected here -->
+            </div>
+        </div>
+
+        <h3 class="font-bold text-slate-400 uppercase tracking-widest text-xs mb-4" id="category-title">Todos los Productos</h3>
+        <!-- Products Grid -->
+        <div id="product-list">
+            <div class="flex flex-col items-center justify-center h-full text-center py-20">
+                <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-400 font-bold">Conectando con Servidor...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Cart Modal (Slide Up) -->
+    <div id="cart-modal" class="fixed inset-0 z-50 invisible">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="cart-overlay"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl h-[85vh] transform translate-y-full transition-transform duration-500 flex flex-col" id="cart-content">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-6"></div>
+            
+            <div class="px-8 flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-gray-800">Tu Pedido</h2>
+                <button id="close-cart" class="text-gray-400 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-8 space-y-4" id="cart-items">
+                <!-- Products in cart -->
+            </div>
+
+            <div class="p-8 bg-gray-50 rounded-t-[40px] border-t border-gray-100">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <p class="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Monto a Pagar</p>
+                        <h3 class="text-3xl font-black text-gray-800" id="cart-total">Bs 0.00</h3>
+                    </div>
+                    <p class="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-xl" id="cart-total-usd">$0.00</p>
+                </div>
+                
+                <button id="checkout-trigger" class="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-500/30 text-lg flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
+                    CONTINUAR AL PAGO <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal (Slide Up) -->
+    <div id="payment-modal" class="fixed inset-0 z-[60] invisible">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="payment-overlay"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl h-[92vh] transform translate-y-full transition-transform duration-500 flex flex-col" id="payment-content">
+            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-6"></div>
+            
+            <div class="px-8 flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-gray-800">Método de Pago</h2>
+                <button id="close-payment" class="text-gray-400 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-8 space-y-6">
+                <!-- Payment Tabs -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button class="pay-method-btn active p-4 rounded-3xl border-2 border-blue-600 bg-blue-50 flex flex-col items-center gap-2 transition-all" data-method="pago_movil">
+                        <i class="fas fa-mobile-alt text-2xl text-blue-600"></i>
+                        <span class="text-[10px] font-black uppercase text-blue-700">Pago Móvil</span>
+                    </button>
+                    <button class="pay-method-btn p-4 rounded-3xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center gap-2 transition-all" data-method="divisas">
+                        <i class="fas fa-dollar-sign text-2xl text-gray-400"></i>
+                        <span class="text-[10px] font-black uppercase text-gray-400">Efectivo $$$</span>
+                    </button>
+                    <button class="pay-method-btn p-4 rounded-3xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center gap-2 transition-all" data-method="efectivo_bs">
+                        <i class="fas fa-money-bill-wave text-2xl text-gray-400"></i>
+                        <span class="text-[10px] font-black uppercase text-gray-400">Efectivo Bs</span>
+                    </button>
+                </div>
+
+                <!-- Pago Movil Details (Destino) -->
+                <div id="pago-movil-details" class="space-y-4">
+                    <div class="bg-blue-600 rounded-[32px] p-6 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-8 opacity-10 rotate-12 scale-150">
+                            <i class="fas fa-university text-8xl"></i>
+                        </div>
+                        <p class="text-[10px] font-black uppercase tracking-widest opacity-70 mb-4">Datos de Pago (BANESCO)</p>
+                        <div class="space-y-3 relative z-10">
+                            <div class="flex justify-between border-b border-white/10 pb-2">
+                                <span class="text-xs font-bold opacity-80">Teléfono:</span>
+                                <span class="font-black">04142497920</span>
+                            </div>
+                            <div class="flex justify-between border-b border-white/10 pb-2">
+                                <span class="text-xs font-bold opacity-80">C.I:</span>
+                                <span class="font-black">32447974</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-xs font-bold opacity-80">Banco:</span>
+                                <span class="font-black">Banesco (0134)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Origin Form -->
+                    <div class="space-y-4 pt-2">
+                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-widest border-l-4 border-blue-600 pl-3">Datos de tu Pago</h4>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Tu Teléfono (Origen)</label>
+                                <input type="number" id="origin-phone" placeholder="0412..." class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Tu C.I (Origen)</label>
+                                <input type="number" id="origin-ci" placeholder="V-..." class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1 leading-tight">Monto de la Transferencia</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-blue-600">Bs</span>
+                                <input type="number" id="payment-amount" class="w-full bg-blue-50 border-2 border-blue-100 rounded-2xl p-4 pl-10 text-lg font-black text-blue-800 outline-none" readonly>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Últimos 4 dígitos de Referencia</label>
+                            <input type="number" id="origin-ref" placeholder="1234" maxlength="4" class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="other-methods-details" class="hidden text-center py-10 space-y-4">
+                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-3xl mx-auto">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-gray-800 uppercase text-sm">Pago en Caja</h4>
+                        <p class="text-xs text-gray-500 font-medium px-10">Envía el pedido y procede a pagar en efectivo directamente en la taquilla.</p>
+                    </div>
+                </div>
+
+                <!-- Datos del Cliente (Obligatorios) -->
+                <div class="pt-6 mt-6 border-t-2 border-amber-100 bg-amber-50/30 -mx-8 px-8 pb-8 space-y-5 rounded-b-[40px]">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-black">!</div>
+                        <h4 class="text-sm font-black text-slate-800 uppercase tracking-widest">Datos para Facturar Orden</h4>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">📍 Nombre Completo (NUEVO CLIENTE) *</label>
+                        <input type="text" id="origin-name" placeholder="Juan Pérez" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all shadow-sm" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">📞 Número de Teléfono *</label>
+                        <input type="tel" id="origin-phone-global" placeholder="04XX-XXXXXXX" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all shadow-sm" required>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">🕒 ¿A qué hora lo buscas?</label>
+                            <input type="time" id="pickup-time" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">💬 Observaciones / Notas Especiales</label>
+                        <textarea id="origin-observations" rows="2" placeholder="Ej: Sin sal, bien frío..." class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all resize-none shadow-sm"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-8">
+                <button id="send-order" class="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-500/30 text-lg flex items-center justify-center gap-3 active:scale-95 transition-transform">
+                    <i class="fas fa-check-circle"></i> CONFIRMAR Y ENVIAR
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- QR Scan Modal -->
+    <div id="qr-modal" class="fixed inset-0 z-[100] invisible">
+        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md opacity-0 transition-opacity duration-300" id="qr-overlay"></div>
+        <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 bg-white rounded-[40px] shadow-2xl p-8 transform scale-90 opacity-0 transition-all duration-300" id="qr-content">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center text-2xl mx-auto mb-4">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <h2 class="text-xl font-black text-slate-800">Vincular con Caja</h2>
+                <p class="text-xs text-slate-500 font-medium px-4 mt-2">Apunta la cámara al código QR que aparece en la pantalla de la computadora.</p>
+            </div>
+            
+            <div id="reader" class="overflow-hidden rounded-3xl border-4 border-slate-100 bg-slate-50 aspect-square mb-6"></div>
+            
+            <button id="close-qr" class="w-full py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-sm uppercase tracking-widest active:scale-95 transition-transform">
+                CANCELAR
+            </button>
+        </div>
+    </div>
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('[PWA] Service Worker registrado:', reg.scope))
+                .catch(err => console.warn('[PWA] Error registrando SW:', err));
+        }
+
+        // Capture install prompt for later use
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install banner
+            const banner = document.createElement('div');
+            banner.id = 'install-banner';
+            banner.className = 'fixed bottom-0 left-0 right-0 bg-indigo-600 text-white p-4 flex items-center justify-between z-[100] shadow-2xl';
+            banner.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-download text-xl"></i>
+                    <div>
+                        <p class="font-black text-sm">Instalar Zona Fresh</p>
+                        <p class="text-[10px] opacity-80">Acceso directo permanente</p>
+                    </div>
+                </div>
+                <button id="install-btn" class="bg-white text-indigo-600 font-black px-5 py-2 rounded-xl text-sm">INSTALAR</button>
+            `;
+            document.body.appendChild(banner);
+            document.getElementById('install-btn').onclick = async () => {
+                deferredPrompt.prompt();
+                const result = await deferredPrompt.userChoice;
+                if (result.outcome === 'accepted') banner.remove();
+                deferredPrompt = null;
+            };
+        });
+
+        window.addEventListener('appinstalled', () => {
+            const banner = document.getElementById('install-banner');
+            if (banner) banner.remove();
+            console.log('[PWA] App instalada exitosamente');
+        });
+    </script>
+    <script src="app.js?v=40.8"></script>
+</body>
+</html>
