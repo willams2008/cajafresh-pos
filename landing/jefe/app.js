@@ -139,17 +139,19 @@ async function loadDashboard() {
         tomorrow.setDate(tomorrow.getDate() + 1);
         const nextDay = tomorrow.toISOString().split('T')[0];
 
-        const [stores, snapshots, alerts, sales] = await Promise.all([
+        const [stores, snapshots, alerts, sales, expenses] = await Promise.all([
             sbGet('stores', '?order=name.asc'),
             sbGet('store_snapshots', `?date=eq.${today}&order=timestamp.desc`),
             sbGet('store_alerts', '?order=created_at.desc'),
-            sbGet('store_sales', `?date=gte.${today}&date=lt.${nextDay}`)
+            sbGet('store_sales', `?date=gte.${today}&date=lt.${nextDay}`),
+            sbGet('store_expenses', `?date=eq.${today}`)
         ]);
 
         allStores = Array.isArray(stores) ? stores : [];
         allSnapshots = Array.isArray(snapshots) ? snapshots : [];
         allAlerts = Array.isArray(alerts) ? alerts : [];
         window.allSalesToday = Array.isArray(sales) ? sales : [];
+        window.allExpensesToday = Array.isArray(expenses) ? expenses : [];
 
         // Update Currency Bar with latest data from stores
         if (allStores.length > 0) {
@@ -202,11 +204,13 @@ function renderStores(storesToRender = allStores) {
         
         // CALCULAR MÉTRICAS EN TIEMPO REAL DESDE store_sales
         const storeSales = (window.allSalesToday || []).filter(s => s.store_id === store.id);
+        const storeExpenses = (window.allExpensesToday || []).filter(e => e.store_id === store.id);
         const totalUSD = storeSales.reduce((acc, s) => acc + (Number(s.total_usd) || 0), 0);
+        const totalExpUSD = storeExpenses.reduce((acc, e) => acc + (Number(e.amount_usd) || 0), 0);
         const tickets = storeSales.length;
-        // Margen = Total - Costo
+        // Margen = Total - Costo - Gastos
         const totalCost = storeSales.reduce((acc, s) => acc + (Number(s.total_cost_usd) || 0), 0);
-        const profit = totalUSD - totalCost;
+        const profit = totalUSD - totalCost - totalExpUSD;
 
         return `
         <div class="card" style="padding:16px; margin-bottom:12px; position:relative;" onclick="openDetail('${store.id}')">
@@ -260,7 +264,10 @@ function renderGlobal() {
     // CALCULAR TOTALES GLOBALES DESDE store_sales PARA TIEMPO REAL
     const totalUSD = (window.allSalesToday || []).reduce((acc, s) => acc + (Number(s.total_usd) || 0), 0);
     const totalTickets = (window.allSalesToday || []).length;
-    const totalProfit = (window.allSalesToday || []).reduce((acc, s) => acc + (Number(s.total_usd) || 0) - (Number(s.total_cost_usd) || 0), 0);
+    
+    const totalSalesProfit = (window.allSalesToday || []).reduce((acc, s) => acc + (Number(s.total_usd) || 0) - (Number(s.total_cost_usd) || 0), 0);
+    const totalExpenses = (window.allExpensesToday || []).reduce((acc, e) => acc + (Number(e.amount_usd) || 0), 0);
+    const totalProfit = totalSalesProfit - totalExpenses;
     const avgTicket = totalTickets > 0 ? totalUSD / totalTickets : 0;
 
     // Desglose de pagos basado en allSalesToday
@@ -764,12 +771,34 @@ async function setTab(tab) {
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
                         <div>
+                            <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Método de Pago</label>
+                            <select id="expense-method" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;">
+                                <option value="efectivo">💵 Efectivo USD</option>
+                                <option value="efectivo-bs">💵 Efectivo Bs</option>
+                                <option value="pago-movil">📱 Pago Móvil</option>
+                                <option value="zelle">⚡ Zelle</option>
+                                <option value="transferencia">🏦 Transferencia</option>
+                                <option value="tarjeta">💳 Punto de Venta</option>
+                                <option value="otro">📌 Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Nro. Referencia (Opcional)</label>
+                            <input id="expense-ref" type="text" placeholder="Ej: 123456" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Responsable / Autorizado por</label>
+                        <input id="expense-resp" type="text" placeholder="Ej: Carlos" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                        <div>
                             <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Monto USD</label>
-                            <input id="expense-usd" type="number" step="0.01" placeholder="0.00" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
+                            <input id="expense-usd" type="number" step="0.01" max="9999999" placeholder="0.00" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
                         </div>
                         <div>
                             <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Monto Bs</label>
-                            <input id="expense-ves" type="number" step="1" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
+                            <input id="expense-ves" type="number" step="1" max="99999999" placeholder="0" style="width:100%;padding:10px;border:1px solid var(--outline);border-radius:8px;font-size:14px;font-family:inherit;">
                         </div>
                     </div>
                     <div style="display:flex;gap:8px;">
@@ -1102,7 +1131,11 @@ async function loadExpenses(storeId) {
                 <span style="font-size:18px;">${typeEmojis[e.expense_type] || '📌'}</span>
                 <div>
                     <div style="font-size:13px;font-weight:700;">${e.description || e.expense_type}</div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:capitalize;">${e.expense_type}</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:capitalize;">
+                        ${e.expense_type} &bull; ${e.payment_method || 'efectivo'}
+                        ${e.responsible_name ? `&bull; Resp: ${e.responsible_name}` : ''}
+                    </div>
+                    ${e.reference_number ? `<div style="font-size:9px;color:var(--text-muted);">Ref: ${e.reference_number}</div>` : ''}
                 </div>
             </div>
             <div style="text-align:right;display:flex;align-items:center;gap:10px;">
@@ -1121,11 +1154,24 @@ async function loadExpenses(storeId) {
 async function saveExpense(storeId) {
     const type = document.getElementById('expense-type')?.value;
     const desc = document.getElementById('expense-desc')?.value.trim();
+    const method = document.getElementById('expense-method')?.value;
+    const ref = document.getElementById('expense-ref')?.value.trim();
+    const resp = document.getElementById('expense-resp')?.value.trim();
     const usd = parseFloat(document.getElementById('expense-usd')?.value) || 0;
     const ves = parseFloat(document.getElementById('expense-ves')?.value) || 0;
 
     if (!type || (usd === 0 && ves === 0)) {
         alert('Ingresa al menos un monto para el gasto.');
+        return;
+    }
+
+    if (usd > 9999999 || ves > 99999999) {
+        alert('El monto ingresado es demasiado alto. Por favor, verifica e intenta de nuevo.');
+        return;
+    }
+
+    if (!resp) {
+        alert('Por favor, ingresa el nombre de la persona responsable o autorizada para este gasto.');
         return;
     }
 
@@ -1135,6 +1181,9 @@ async function saveExpense(storeId) {
         description: desc || type,
         amount_usd: usd,
         amount_ves: ves,
+        payment_method: method,
+        reference_number: ref,
+        responsible_name: resp,
         date: new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString()
     };
@@ -1168,9 +1217,14 @@ async function saveExpense(storeId) {
         document.getElementById('expense-desc').value = '';
         document.getElementById('expense-usd').value = '';
         document.getElementById('expense-ves').value = '';
+        if (document.getElementById('expense-ref')) document.getElementById('expense-ref').value = '';
+        if (document.getElementById('expense-resp')) document.getElementById('expense-resp').value = '';
+        
         document.getElementById('expense-form').style.display = 'none';
 
+        // Actualizar datos
         loadExpenses(storeId);
+        loadDashboard(); // Recargar el dashboard completo para actualizar el margen global
     } catch(e) {
         alert('Error de red: ' + e.message);
     }
