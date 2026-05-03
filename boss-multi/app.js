@@ -582,9 +582,10 @@ async function setTab(tab) {
         content.innerHTML = datePickerHtml + htmlStr;
     } else if (tab === 'performance') {
 
-        const [snaps, sales] = await Promise.all([
+        const [snaps, sales, expenses] = await Promise.all([
             sbGet('store_snapshots', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}&order=timestamp.desc&limit=1`),
-            sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`)
+            sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`),
+            sbGet('store_expenses', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`)
         ]);
 
         const snap = snaps[0] || {};
@@ -623,6 +624,15 @@ async function setTab(tab) {
         const avgTicket = sales.length > 0 ? (totalUSD / sales.length) : 0;
         const peakHourEntry = Object.entries(hoursMap).sort((a,b) => b[1]-a[1])[0];
         const peakHourLabel = peakHourEntry ? `${peakHourEntry[0]}:00` : '--:--';
+
+        const totalExpUSD = Array.isArray(expenses) ? expenses.reduce((acc, e) => acc + (Number(e.amount_usd) || 0), 0) : 0;
+        const totalSalesCost = sales.reduce((acc, s) => acc + (Number(s.total_cost_usd) || 0), 0);
+        // El beneficio real se calcula restando el costo de las ventas y los gastos.
+        // Se hace un max con snap.profit_usd por si el costo en las ventas en vivo falta, 
+        // pero idealmente es totalUSD - totalSalesCost - totalExpUSD.
+        let calcProfit = totalUSD - totalSalesCost;
+        if (calcProfit <= 0 && snap.profit_usd) calcProfit = snap.profit_usd;
+        const realProfit = calcProfit - totalExpUSD;
 
         // Gráfica de barras por hora (6am - 10pm)
         const hours = Array.from({length: 17}, (_, i) => i + 6); // 6 a 22
@@ -692,7 +702,7 @@ async function setTab(tab) {
                 </div>
                 <div style="background:#f8fafc;border:1px solid var(--outline);border-radius:14px;padding:14px;text-align:center;">
                     <div style="font-size:9px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Ganancia Est.</div>
-                    <div style="font-size:22px;font-weight:900;color:var(--text);margin:4px 0;">${fmtUSD(snap.profit_usd || 0)}</div>
+                    <div style="font-size:22px;font-weight:900;color:var(--text);margin:4px 0;">${fmtUSD(realProfit)}</div>
                     <div style="font-size:10px;color:var(--text-muted);">Ticket prom. ${fmtUSD(avgTicket)}</div>
                 </div>
             </div>

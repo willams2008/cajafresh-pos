@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boss-multi-v4';
+const CACHE_NAME = 'boss-multi-v5';
 const ASSETS = ['index.html', 'app.js'];
 
 self.addEventListener('install', e => {
