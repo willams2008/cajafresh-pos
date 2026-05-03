@@ -14,6 +14,7 @@ const QRCode = require('qrcode');
 const { spawn, execSync } = require('child_process');
 const https = require('https');
 const { initDatabase, api: dbApi } = require('./database');
+const CloudSync = require('./cloud-sync');
 
 // --- STARTUP DIAGNOSTIC LOG ---
 const startupLogPath = path.join(app.getPath('userData'), 'startup_debug.log');
@@ -60,6 +61,9 @@ let isStartingTunnel = false; // Flag para evitar ejecuciones concurrentes
 let lastSyncedProducts = null; // CACHE: Guardar última versión de productos para carga instantánea
 const serverPort = 3000;
 
+// --- CLOUD SYNC (Multi-Sucursal) ---
+let cloudSync = null;
+
 // These will be initialized in initWhatsApp() after app is ready
 let logPath = null;
 let whatsappClient = null;
@@ -68,8 +72,31 @@ let lastWhatsappStatus = { status: 'starting', message: 'Iniciando motor...' };
 
 // --- DATABASE IPC HANDLERS ---
 ipcMain.handle('db-get-products', async () => dbApi.getProducts());
-ipcMain.handle('db-save-product', async (e, p) => dbApi.saveProduct(p));
-ipcMain.handle('db-delete-product', async (e, id) => dbApi.deleteProduct(id));
+
+async function syncCatalogToCloud() {
+    if (cloudSync && cloudSync.enabled) {
+        try {
+            const allProducts = await dbApi.getProducts();
+            await cloudSync.pushCatalog(allProducts);
+        } catch(e) { console.error('Error syncing catalog', e); }
+    }
+}
+
+ipcMain.handle('db-save-product', async (e, p) => {
+    const res = await dbApi.saveProduct(p);
+    syncCatalogToCloud();
+    return res;
+});
+ipcMain.handle('db-save-products-bulk', async (e, p) => {
+    const res = await dbApi.saveProductsBulk(p);
+    syncCatalogToCloud();
+    return res;
+});
+ipcMain.handle('db-delete-product', async (e, id) => {
+    const res = await dbApi.deleteProduct(id);
+    syncCatalogToCloud();
+    return res;
+});
 
 ipcMain.handle('db-get-clients', async () => dbApi.getClients());
 ipcMain.handle('db-save-client', async (e, c) => dbApi.saveClient(c));
@@ -167,12 +194,12 @@ async function initWhatsApp() {
         authStrategy: new LocalAuth({
             dataPath: path.join(app.getPath('userData'), 'wwebjs_session')
         }),
-        authTimeoutMs: 0, // Inhabilitar timeout de autenticación para cuentas grandes
-        qrMaxRetries: 5,
+        authTimeoutMs: 0, 
+        qrMaxRetries: 30,
         puppeteer: {
             headless: true,
             executablePath: chromePath,
-            timeout: 0, // Desactivar timeout de navegación de Puppeteer
+            timeout: 0, 
             args: [
                 '--no-sandbox', 
                 '--disable-setuid-sandbox',
@@ -182,7 +209,10 @@ async function initWhatsApp() {
                 '--no-first-run',
                 '--no-zygote',
                 '--single-process',
-                '--disable-web-security'
+                '--disable-web-security',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
+                '--disable-accelerated-2d-canvas',
+                '--disable-features=IsolateOrigins,site-per-process'
             ],
             handleSIGINT: false,
             handleSIGTERM: false,
@@ -684,6 +714,11 @@ function startServer() {
     // ==========================================
     serverApp.use('/boss', express.static(path.join(__dirname, 'boss')));
 
+    // ==========================================
+    // BOSS MULTI-SUCURSAL — Panel del Jefe
+    // ==========================================
+    serverApp.use('/jefe', express.static(path.join(__dirname, 'boss-multi')));
+
     // DASHBOARD API: Datos en tiempo real
     let lastDashboardData = null;
     serverApp.get('/api/dashboard-data', (req, res) => {
@@ -770,6 +805,23 @@ function startServer() {
     ipcMain.on('dashboard-data', (event, data) => {
         lastDashboardData = data;
         if (io) io.emit('dashboard-update', data);
+
+        // CLOUD SYNC: Enviar snapshot a Supabase
+        if (cloudSync && cloudSync.enabled && data.today) {
+            cloudSync.pushSnapshot({
+                totalVES: data.today.totalVES || 0,
+                totalUSD: data.today.totalUSD || 0,
+                tickets: data.today.tickets || 0,
+                itemsSold: data.today.items || 0,
+                totalCostUSD: data.today.totalCostUSD || 0,
+                exchangeRate: data.exchangeRate || 0,
+                productsCount: data.inventory?.total || 0,
+                lowStockCount: (data.alerts?.lowStock || []).length,
+                outOfStockCount: (data.alerts?.outOfStock || []).length,
+                pendingCredits: data.credits?.pending || 0,
+                recentSales: data.recentSales || []
+            }).catch(e => console.error('[CLOUD-SYNC] Snapshot error:', e.message));
+        }
     });
 
     const server = http.createServer(serverApp);
@@ -873,24 +925,51 @@ function notifyTunnel(url, provider) {
 }
 
 
-// ──── MÉTODO 1: CLOUDFLARE (sin contraseña, preferido) ────
+// ──── MÉTODO 1: CLOUDFLARE (Auth Tunnel o Quick Tunnel) ────
 async function tryCloudflare() {
     return new Promise((resolve) => {
-        console.log('☁️  Intentando Cloudflare...');
-        const cf = spawn(bin, ['tunnel', '--url', `http://127.0.0.1:${serverPort}`], {
-            env: cleanEnv(),
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
-        tunnelProcess = cf;
+        const userSettings = getPersistentSettings();
+        const cfToken = userSettings.cloudflareToken;
 
-        let found = false;
-        const timeout = setTimeout(() => {
-            if (!found) {
-                console.log('⏳ Cloudflare no respondió a tiempo.');
-                cf.kill();
-                resolve(false);
-            }
-        }, 35000);
+        if (cfToken) {
+            console.log('☁️  Iniciando Cloudflare Tunnel Autenticado (Dominio Propio)...');
+            const cf = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${serverPort}`, 'run', '--token', cfToken], {
+                env: cleanEnv(),
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            tunnelProcess = cf;
+
+            // Al ser autenticado, asumimos que el dominio configurado por el usuario es el target
+            const domain = userSettings.cloudflareDomain || 'puntopila.emprende.ve';
+            const url = `https://${domain}`;
+            
+            // Damos unos segundos para que conecte y notificamos
+            setTimeout(() => {
+                notifyTunnel(url, 'cloudflare-auth');
+                resolve(true);
+            }, 6000);
+
+            cf.on('close', (code) => {
+                console.log(`🔌 Túnel Cloudflare Autenticado cerrado (Código: ${code}).`);
+                currentTunnelUrl = null;
+                setTimeout(startTunnelChain, 5000);
+            });
+        } else {
+            console.log('☁️  Intentando Cloudflare Quick Tunnel (URL Aleatoria)...');
+            const cf = spawn(bin, ['tunnel', '--url', `http://127.0.0.1:${serverPort}`], {
+                env: cleanEnv(),
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            tunnelProcess = cf;
+
+            let found = false;
+            const timeout = setTimeout(() => {
+                if (!found) {
+                    console.log('⏳ Cloudflare Quick Tunnel no respondió a tiempo.');
+                    cf.kill();
+                    resolve(false);
+                }
+            }, 35000);
 
         const check = (data) => {
             const text = data.toString();
@@ -922,6 +1001,7 @@ async function tryCloudflare() {
                 setTimeout(startTunnelChain, 5000); // Esperar 5s antes de reintentar
             }
         });
+        }
     });
 }
 
@@ -1019,7 +1099,7 @@ async function tryNgrok() {
         try {
             const userSettings = getPersistentSettings();
             const token = userSettings.ngrokAuthToken;
-            const domain = userSettings.ngrokDomain;
+            const domain = userSettings.ngrokDomain || 'puntopila.emprende.ve';
 
             if (!token) {
                 console.log('⚠️ Ngrok no configurado (falta token).');
@@ -1459,6 +1539,10 @@ ipcMain.on('request-discovery-update', () => {
     updateDiscovery(getLocalIP(), currentTunnelUrl);
 });
 
+ipcMain.on('request-tunnel-info', (event) => {
+    event.reply('tunnel-info', { url: currentTunnelUrl, localIP: getLocalIP() });
+});
+
 ipcMain.on('restart-tunnels', async () => {
     console.log('🔄 Reinicio de túneles solicitado...');
     try {
@@ -1533,3 +1617,153 @@ ipcMain.handle('print-ticket', async (event) => {
         return { success: false, error: error.message };
     }
 });
+
+let cloudflareProcess = null;
+
+function startCloudflareTunnel(inputToken) {
+    if (!inputToken) return;
+    
+    // Extraer token si pegaron el comando completo
+    let token = inputToken.trim();
+    if (token.includes(' ')) {
+        const parts = token.split(' ');
+        token = parts[parts.length - 1]; // El token suele ser la última parte
+    }
+    
+    if (cloudflareProcess) {
+        try { cloudflareProcess.kill(); } catch(e) {}
+    }
+    // Matar procesos zombies de Cloudflare para evitar conflictos de túnel
+    try { execSync('taskkill /F /IM cloudflared.exe', { stdio: 'ignore' }); } catch(e) {}
+
+    const cloudflaredPath = path.join(process.resourcesPath, 'bin', 'cloudflared.exe');
+    const localPath = path.join(__dirname, 'cloudflared.exe');
+    const exePath = fs.existsSync(cloudflaredPath) ? cloudflaredPath : (fs.existsSync(localPath) ? localPath : null);
+
+    if (!exePath) {
+        console.error('[CLOUDFLARE] ❌ No se encontró cloudflared.exe en ' + localPath);
+        if (mainWindow) {
+            mainWindow.webContents.send('cloud-sync-error', 'No se encontró cloudflared.exe. Por favor, descárgalo y ponlo en la carpeta del programa.');
+        }
+        return;
+    }
+
+    console.log(`[CLOUDFLARE] ☁️ Iniciando túnel con token: ${token.substring(0, 10)}...`);
+    
+    try {
+        const { spawn } = require('child_process');
+        // Protocolo 'https' (Legacy) para saltar firewalls de universidades/corporativos
+        const batPath = path.join(__dirname, 'lanzar_tunel.bat');
+        logStartup('🚀 Lanzando Túnel vía BAT: ' + batPath);
+        
+        cloudflareProcess = spawn('cmd.exe', ['/c', batPath, token], {
+            env: cleanEnv(),
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        cloudflareProcess.stdout.on('data', (data) => console.log(`[CLOUDFLARE] ${data}`));
+        cloudflareProcess.stderr.on('data', (data) => {
+            const msg = data.toString();
+            console.error(`[CLOUDFLARE-ERR] ${msg}`);
+            if (msg.includes('Registered tunnel connector')) {
+                console.log('✅ [CLOUDFLARE] Túnel registrado y activo');
+            }
+        });
+
+        cloudflareProcess.on('close', (code) => {
+            console.log(`[CLOUDFLARE] Túnel cerrado con código ${code}`);
+            cloudflareProcess = null;
+        });
+    } catch (e) {
+        console.error('[CLOUDFLARE] Error al iniciar el proceso:', e);
+    }
+}
+
+ipcMain.handle('cloud-sync-configure', async (event, cfg) => {
+    try {
+        const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+        let settings = {};
+        try {
+            if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        } catch(e) {}
+        
+        settings.supabaseUrl = cfg.supabaseUrl;
+        settings.supabaseKey = cfg.supabaseKey;
+        settings.storeId = cfg.storeId;
+        settings.storeName = cfg.storeName;
+        settings.brandName = cfg.brandName;
+        settings.cloudflareToken = cfg.cloudflareToken;
+        settings.cloudflareDomain = cfg.cloudflareDomain;
+        
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+        if (cloudSync) {
+            cloudSync.configure(cfg);
+            await cloudSync.registerStore();
+            syncCatalogToCloud();
+        }
+
+        if (cfg.cloudflareToken) {
+            startCloudflareTunnel(cfg.cloudflareToken);
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('cloud-sync-status', async () => {
+    return cloudSync ? cloudSync.getStatus() : { enabled: false };
+});
+
+ipcMain.handle('cloud-sync-push-sale', async (event, saleData) => {
+    if (cloudSync && cloudSync.enabled) {
+        await cloudSync.pushSale(saleData);
+    }
+});
+
+ipcMain.handle('cloud-sync-push-alerts', async (event, products) => {
+    if (cloudSync && cloudSync.enabled) {
+        await cloudSync.pushAlerts(products);
+    }
+});
+
+ipcMain.handle('cloud-sync-push-live', async (event, cart, totals, view) => {
+    if (cloudSync && cloudSync.enabled) {
+        await cloudSync.pushLiveState(cart, totals, view);
+    }
+});
+
+// Initialize cloud sync on startup
+function initCloudSync() {
+    const settings = getPersistentSettings();
+    cloudSync = new CloudSync({
+        supabaseUrl: settings.supabaseUrl || '',
+        supabaseKey: settings.supabaseKey || '',
+        storeId: settings.storeId || '',
+        storeName: settings.storeName || 'Mi Tienda',
+        brandName: settings.brandName || 'Caja Fresh',
+        queuePath: app.getPath('userData'),
+        onStatusChange: (status) => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('cloud-sync-status', status);
+            }
+        }
+    });
+
+    if (cloudSync.enabled) {
+        cloudSync.registerStore();
+        syncCatalogToCloud();
+        console.log('[CLOUD-SYNC] 🚀 Iniciado correctamente');
+    } else {
+        console.log('[CLOUD-SYNC] ⏸️ No configurado — el POS funciona en modo local');
+    }
+
+    if (settings.cloudflareToken) {
+        startCloudflareTunnel(settings.cloudflareToken);
+    }
+}
+
+// Call initCloudSync after app is ready and server starts
+setTimeout(initCloudSync, 3000);

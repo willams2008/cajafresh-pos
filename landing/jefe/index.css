@@ -1,0 +1,589 @@
+/* boss-multi/index.css */
+:root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --primary: #10b981;
+    --primary-light: #d1fae5;
+    --secondary: #1e293b;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --outline: #e2e8f0;
+    --error: #ef4444;
+    --error-light: #fee2e2;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --info: #3b82f6;
+    --info-light: #dbeafe;
+    
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+/* Currency Bar */
+.currency-bar {
+    background: #fff;
+    border-bottom: 1px solid var(--outline);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.currency-bar span b {
+    color: var(--text);
+}
+
+/* Top App Header (Sticky) */
+.app-header {
+    background: #ffffff;
+    color: var(--text);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--outline);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.app-header .brand {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+}
+.app-header .header-btn {
+    background: var(--primary-light);
+    color: var(--primary);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Pulso Blue Banner Component */
+.pulso-banner {
+    background: linear-gradient(135deg, var(--secondary) 0%, #1e3a8a 100%);
+    color: #fff;
+    padding: 28px 24px;
+    border-radius: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(30, 64, 175, 0.3);
+}
+.pulso-banner .title {
+    font-size: 26px;
+    font-weight: 900;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+}
+.pulso-banner .subtitle {
+    font-size: 14px;
+    opacity: 0.9;
+    font-weight: 500;
+}
+
+/* Main Container */
+#app {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px 16px;
+}
+
+
+
+/* Cards & Components */
+.card {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--outline);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.card:active {
+    transform: scale(0.99);
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.card-title .badge-count {
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+}
+
+
+
+/* Animations */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-view {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--outline);
+    border-radius: 10px;
+}
+
+/* --- Edit Modal Styles --- */
+.edit-modal {
+    width: 95%;
+    max-width: 480px;
+    padding: 0;
+    overflow: hidden;
+}
+.edit-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--outline);
+}
+.edit-modal-header h2 {
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 75%;
+}
+.close-x {
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+/* Stock Badge Row */
+.stock-badge-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--outline);
+}
+.stock-badge {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--outline);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+}
+.sb-val {
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--primary);
+    line-height: 1.2;
+}
+.sb-lbl {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Price Config Box */
+.price-config-box {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--outline);
+}
+.price-config-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.price-trio {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.price-field-wrap label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 5px;
+}
+.price-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1.5px solid var(--outline);
+    border-radius: 10px;
+    padding: 0 10px;
+    transition: border-color 0.2s;
+}
+.price-input-row:focus-within {
+    border-color: var(--primary);
+}
+.price-prefix {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+.price-input-row input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 11px 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+    width: 100%;
+}
+.auto-calc-btn {
+    background: var(--primary-light);
+    border: none;
+    border-radius: 6px;
+    color: var(--primary);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+.conversion-hint {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--primary-light);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+    text-align: center;
+}
+.promo-row {
+    margin-top: 12px;
+}
+.promo-row label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* Edit Field Row */
+.edit-field-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--outline);
+}
+.edit-field {
+    flex: 1;
+}
+.edit-field label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.edit-field input {
+    width: 100%;
+    padding: 11px 12px;
+    background: var(--bg);
+    border: 1.5px solid var(--outline);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.edit-field input:focus {
+    border-color: var(--primary);
+}
+.edit-full {
+    flex: 2;
+}
+
+/* Edit Actions */
+.edit-actions {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg);
+}
+.edit-actions .btn-cancel,
+.edit-actions .btn-save {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Store Cards */
+.stores-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.store-card {
+    background: var(--surface);
+    border: 1px solid var(--outline);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.store-card:active { transform: scale(0.98); }
+.store-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.store-name {
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--text);
+}
+.config-trigger {
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.store-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.metric-item .v {
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--text);
+}
+.metric-item .l {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* Empty State */
+.empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 32px 16px;
+}
+
+/* Brand Title in Detail View */
+.brand-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--text);
+}
+
+/* Section Header */
+.section-header {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+/* --- Missing Core Styles --- */
+.loading-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 9999;
+}
+.spinner {
+    width: 40px; height: 40px; border: 4px solid var(--outline); border-top: 4px solid var(--primary);
+    border-radius: 50%; animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+#login-screen {
+    height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg);
+}
+.pin-dots { display: flex; gap: 15px; margin: 30px 0 50px; }
+.pin-dot {
+    width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--outline); transition: all 0.2s;
+}
+.pin-dot.active { background: var(--primary); border-color: var(--primary); }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 280px; }
+.key {
+    background: var(--surface); border: 1px solid var(--outline); border-radius: 50%; width: 70px; height: 70px;
+    display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: 800;
+    cursor: pointer; box-shadow: var(--shadow-sm); margin: 0 auto; transition: transform 0.1s;
+}
+.key:active { transform: scale(0.9); background: var(--outline); }
+.key.del { background: transparent; border: none; box-shadow: none; color: var(--text-muted); }
+
+.modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 2000; opacity: 0; pointer-events: none; transition: 0.3s;
+}
+.modal.active { opacity: 1; pointer-events: auto; }
+.modal-content {
+    background: var(--surface); width: 90%; max-width: 400px; border-radius: 20px; padding: 24px;
+    transform: translateY(20px); transition: 0.3s; max-height: 90vh; overflow-y: auto;
+}
+.modal.active .modal-content { transform: translateY(0); }
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+.field input, .edit-field input { width: 100%; padding: 12px; border: 1px solid var(--outline); border-radius: 10px; font-family: inherit; font-size: 14px; background: var(--bg); }
+
+.btn-action, .btn-save { padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 800; cursor: pointer; }
+.btn-cancel { padding: 14px; background: var(--outline); color: var(--text); border: none; border-radius: 12px; font-size: 14px; font-weight: 800; cursor: pointer; }
+
+#detail-view {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1500;
+    transform: translateX(100%); transition: 0.3s; display: flex; flex-direction: column;
+}
+#detail-view.active { transform: translateX(0); }
+.detail-header { background: var(--surface); padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--outline); }
+.back-btn { font-size: 18px; cursor: pointer; color: var(--text); }
+.detail-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--outline); }
+.tab-btn { flex: 1; text-align: center; padding: 12px 0; font-size: 13px; font-weight: 700; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.detail-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+
+/* --- Bottom Navigation --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0 24px; /* Extra padding for iPhone notches */
+    border-top: 1px solid var(--outline);
+    z-index: 1400;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 20%;
+}
+
+.nav-item i {
+    font-size: 20px;
+}
+
+.nav-item span {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.nav-item.active {
+    color: var(--primary);
+}
+
+.nav-item.active i {
+    transform: translateY(-2px);
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}
+
+/* Add padding to the main app container to account for the bottom nav */
+#app {
+    padding-bottom: 90px !important;
+}

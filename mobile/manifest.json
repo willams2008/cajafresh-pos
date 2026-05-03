@@ -1,13 +1,17 @@
 {
-    "name": "Zona Fresh - Pedidos",
-    "short_name": "Zona Fresh",
-    "description": "App de pedidos Zona Fresh - Bebidas",
-    "start_url": "/mobile/",
-    "scope": "/mobile/",
+    "name": "Punto Pila POS",
+    "short_name": "Punto Pila",
+    "description": "Sistema Inteligente de Punto de Venta y Gestión Comercial",
+    "start_url": "./",
+    "scope": "./",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#ffffff",
-    "theme_color": "#4f46e5",
+    "theme_color": "#2563eb",
+    "categories": ["business", "productivity"],
+    "lang": "es",
+    "dir": "ltr",
+    "id": "com.puntopila.pos.mobile",
     "icons": [
         {
             "src": "icon-192.png",
@@ -21,5 +25,23 @@
             "type": "image/png",
             "purpose": "any maskable"
         }
+    ],
+    "screenshots": [
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Homescreen"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Homescreen Mobile"
+        }
     ]
+
 }
+

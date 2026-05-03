@@ -21,9 +21,13 @@ mkdir "temp_app"
 copy /Y "index.html" "temp_app\"
 copy /Y "app.js"     "temp_app\"
 copy /Y "main.js"    "temp_app\"
+copy /Y "license.js" "temp_app\"
+copy /Y "theme.js"   "temp_app\"
 copy /Y "preload.js" "temp_app\"
 copy /Y "style.css"  "temp_app\"
-copy /Y "download.html" "temp_app\"
+copy /Y "activation.html" "temp_app\"
+copy /Y "download.html"   "temp_app\"
+copy /Y "icon.png"   "temp_app\"
 mkdir "temp_app\mobile"
 copy /Y "mobile\index.html" "temp_app\mobile\"
 copy /Y "mobile\app.js"     "temp_app\mobile\"
@@ -38,13 +42,13 @@ copy /Y "mobile\icon-512.png" "temp_app\mobile\"
   echo   "version": "48.1.0",
   echo   "main": "main.js",
   echo   "dependencies": {
-
   echo     "express": "^5.2.1",
   echo     "socket.io": "^4.8.3",
   echo     "qrcode": "^1.5.4",
   echo     "cors": "^2.8.6",
   echo     "cloudflared": "^0.7.1",
   echo     "localtunnel": "^2.0.2",
+  echo     "ngrok": "^5.0.0-beta.2",
   echo     "whatsapp-web.js": "^1.34.6"
   echo   }
   echo }

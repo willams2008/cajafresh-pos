@@ -167,19 +167,78 @@ body {
     transform: scale(1) !important;
 }
 
-/* Animations */
+/* Entrance Animations */
 @keyframes fade-in-up {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
-.animate-fade-in {
-    animation: fade-in-up 0.4s ease-out forwards;
+
+@keyframes fade-in-down {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes logo-pulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3)); }
+}
+
+@keyframes splash-exit {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(1.1); pointer-events: none; }
+}
+
+.animate-entrance {
+    animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-entrance-down {
+    animation: fade-in-down 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-logo-pulse {
+    animation: logo-pulse 2s infinite ease-in-out;
+}
+
+.splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: radial-gradient(circle at center, #ffffff 0%, #f8fafc 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.dark .splash-screen {
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+}
+
+.splash-exit {
+    animation: splash-exit 0.8s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+
+.initial-hidden {
+    opacity: 0;
 }
 
 /* Category Button active styling */
@@ -193,10 +252,10 @@ body {
     border-color: #cbd5e1;
 }
 .category-btn.active {
-    background-color: #3b82f6; /* brand-500 */
+    background-color: var(--brand-500); /* brand-500 */
     color: white;
-    border-color: #3b82f6;
-    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    border-color: var(--brand-500);
+    box-shadow: 0 4px 6px -1px var(--brand-alpha);
 }
 
 /* Hide number input spinners globally */

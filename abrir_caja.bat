@@ -1,9 +1,7 @@
 @echo off
+pushd "%~dp0"
 set ELECTRON_RUN_AS_NODE=
-echo ==========================================
-echo    INICIANDO CAJA FRESH POS (v40.3)
-echo ==========================================
-echo Sincronizando coordenadas en la nube...
+echo Lanzando Punto Pila POS...
 start "" "node_modules\electron\dist\electron.exe" .
-echo App lanzada en proceso separado.
-timeout /t 5
+popd
+exit

@@ -1,12 +1,13 @@
-const CACHE_NAME = 'zona-fresh-v6'; // Forzando Corrección de Variables JS
+const CACHE_NAME = 'punto-pila-v2';
 const ASSETS_TO_CACHE = [
-    '/mobile/',
-    '/mobile/index.html',
-    '/mobile/app.js',
+    './',
+    './index.html',
+    './app.js?v=41.4',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
     'https://cdn.tailwindcss.com',
     'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap'
 ];
+
 
 // Install: cache app shell
 self.addEventListener('install', (event) => {
@@ -58,8 +59,12 @@ self.addEventListener('fetch', (event) => {
                     if (cached) return cached;
                     // Fallback to main page for navigation
                     if (event.request.mode === 'navigate') {
-                        return caches.match('/mobile/index.html');
+                        return caches.match('./index.html').then(navCache => {
+                            return navCache || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+                        });
                     }
+                    // Prevent "Returned response is null" error on Safari
+                    return new Response('', { status: 404, statusText: 'Not Found' });
                 });
             })
     );

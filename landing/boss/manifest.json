@@ -1,0 +1,14 @@
+{
+  "name": "Mi Negocio — Control",
+  "short_name": "Control",
+  "description": "Panel de control remoto para el dueño del negocio",
+  "start_url": "/boss/",
+  "display": "standalone",
+  "background_color": "#060b18",
+  "theme_color": "#060b18",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "../mobile/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "../mobile/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

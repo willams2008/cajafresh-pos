@@ -3,16 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zona Fresh - Pedidos</title>
+    <title>Punto Pila - Pedidos</title>
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Zona Fresh">
+    <meta name="apple-mobile-web-app-title" content="Punto Pila">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <link rel="apple-touch-icon" href="icon-192.png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
@@ -20,7 +26,15 @@
         body { 
             font-family: 'Outfit', sans-serif; 
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior-y: contain;
         }
+
+        /* Hide Scrollbars */
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        ::-webkit-scrollbar { display: none; }
+
 
         .category-scroll::-webkit-scrollbar { display: none; }
         
@@ -58,9 +72,10 @@
     <!-- Header -->
     <header class="glass-nav sticky top-0 z-30 px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
         <div>
-            <h1 class="text-xl font-extrabold text-blue-600 tracking-tight">ZONA FRESH</h1>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">App de Pedidos v40</p>
+            <h1 id="mobile-header-title" class="text-xl font-extrabold text-blue-600 tracking-tight">PUNTO PILA</h1>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">SISTEMA POS PROFESIONAL</p>
         </div>
+
         <div class="flex items-center gap-2">
             <button id="sync-qr-btn" class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg active:scale-90 transition-transform" title="Vincular con Caja">
                 <i class="fas fa-qrcode"></i>
@@ -287,7 +302,13 @@
         </div>
     </div>
     <!-- Scripts -->
-    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Depuración inmediata: si hay un error fatal antes de que cargue app.js, mostrarlo.
+        window.onerror = function(msg, url, line, col, error) {
+            alert("Error Crítico: " + msg + "\nEn: " + url + ":" + line);
+            return false;
+        };
+    </script>
     <script>
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
@@ -309,7 +330,7 @@
                 <div class="flex items-center gap-3">
                     <i class="fas fa-download text-xl"></i>
                     <div>
-                        <p class="font-black text-sm">Instalar Zona Fresh</p>
+                        <p class="font-black text-sm">Instalar Punto Pila</p>
                         <p class="text-[10px] opacity-80">Acceso directo permanente</p>
                     </div>
                 </div>
@@ -330,6 +351,6 @@
             console.log('[PWA] App instalada exitosamente');
         });
     </script>
-    <script src="app.js?v=40.8"></script>
+    <script src="app.js?v=41.4"></script>
 </body>
 </html>

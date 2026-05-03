@@ -1,6 +1,6 @@
 // Smart server URL management
 const businessId = 'eb60443d3b66474b7c6c';
-const permanentUrl = 'https://zonafresh-pos-caja.loca.lt';
+const permanentUrl = 'https://puntopila.emprende.ve';
 let savedServerUrl = localStorage.getItem('pos_server_url') || permanentUrl;
 
 let socket = null;
@@ -20,19 +20,29 @@ document.body.insertBefore(statusBanner, document.body.firstChild);
 
 function updateStatus(text, colorClass, hideAfter = 0) {
     statusBanner.style.display = '';
-    statusBanner.className = `bg-${colorClass}-500 text-white text-xs font-bold text-center py-1.5 transition-all duration-300 flex items-center justify-center gap-2`;
-    statusBanner.innerHTML = `<div class="w-2 h-2 rounded-full bg-white animate-pulse"></div> ${text}`;
+    statusBanner.className = `bg-${colorClass}-500 text-white text-[10px] font-black text-center py-2 transition-all duration-300 flex items-center justify-center gap-2 uppercase tracking-tighter`;
+    statusBanner.innerHTML = `<i class="fas fa-signal animate-pulse"></i> ${text}`;
     if (hideAfter > 0) {
         setTimeout(() => { statusBanner.style.display = 'none'; }, hideAfter);
     }
 }
 
 async function initConnection() {
-    // 1. Mostrar estado amigable
+    // 1. Prioridad: Revisar si hay una URL en el hash (desde ntfy.sh / QR nuevo)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const urlOverride = hashParams.get('url');
+    if (urlOverride && urlOverride.startsWith('http')) {
+        console.log('🚀 Sobreescritura de URL detectada:', urlOverride);
+        savedServerUrl = urlOverride;
+        localStorage.setItem('pos_server_url', urlOverride);
+    }
+
+    // 2. Mostrar estado amigable
     updateStatus('CONECTANDO...', 'amber');
 
     // Múltiples vectores de ataque para encontrar la caja
     const candidates = [
+        window.location.origin, // Bala de plata: conectar siempre al dominio actual
         savedServerUrl, 
         permanentUrl,
         `http://DESKTOP-DMAJ5AF.local:3000`, // DNS Directo (La más infalible en WiFi)
@@ -42,24 +52,28 @@ async function initConnection() {
     ].filter(u => u && u.length > 5);
 
     // 2. Descubrimiento silencioso en nube vía NTFY
-    fetch(`https://ntfy.sh/zonafresh_caja_pos_tunnel_url_secret_eb6044/json?poll=1`, { signal: AbortSignal.timeout(3500) })
+    fetch(`https://ntfy.sh/cajafresh_pos_v2_778899_remote/json?poll=1&since=12h`, { signal: AbortSignal.timeout(3500) })
         .then(res => res.text())
         .then(text => {
             const lines = text.trim().split('\n');
-            const lastLine = lines[lines.length - 1];
-            if (lastLine) {
-                const data = JSON.parse(lastLine);
-                if (data.message) {
-                    try {
-                        const parsed = JSON.parse(data.message);
-                        console.log('📡 NTFY reporta:', parsed);
-                        if (parsed.tunnelUrl && !candidates.includes(parsed.tunnelUrl)) tryConnect(parsed.tunnelUrl);
-                        if (parsed.localIP) {
-                            const url = `http://${parsed.localIP}:3000`;
-                            if (!candidates.includes(url)) tryConnect(url);
+            let foundUrl = null;
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                try {
+                    const data = JSON.parse(line);
+                    if (data.message) {
+                        const match = data.message.match(/(https?:\/\/[^\s,]+)/);
+                        if (match) {
+                            foundUrl = match[1];
+                            break;
                         }
-                    } catch(e) {}
-                }
+                    }
+                } catch(e) {}
+            }
+            if (foundUrl && savedServerUrl !== foundUrl) {
+                console.log('🚀 Forzando cambio a nueva URL remota encontrada vía NTFY:', foundUrl);
+                tryConnect(foundUrl);
             }
         }).catch(() => {});
 
@@ -72,11 +86,14 @@ let connectionLock = false;
 function tryConnect(url) {
     if (connectionLock) return;
     
-    console.log('⚡ Probando:', url);
+    const isTunnel = url.includes('cloudflare') || url.includes('loca.lt');
+    console.log(`⚡ Probando (${isTunnel ? 'TUNNEL' : 'LOCAL'}):`, url);
+    
     const testSocket = io(url, {
-        timeout: 4000,
-        transports: ['websocket', 'polling'], // Priorizar websocket saltará el Preflight OPTIONS y hace todo ultra rápido
-        reconnection: false
+        timeout: 8000,
+        transports: ['polling', 'websocket'], // Fallback seguro para evitar CORS y WSS errors en iOS
+        reconnection: true,
+        reconnectionAttempts: 5
     });
 
     testSocket.on('connect', () => {
@@ -90,16 +107,22 @@ function tryConnect(url) {
         savedServerUrl = url;
         localStorage.setItem('pos_server_url', url);
         
-        updateStatus('CAJA CONECTADA', 'emerald', 2000);
+        updateStatus(`CONECTADO: ${url.replace('https://','').split('/')[0]}`, 'emerald', 4000);
         setupSocketEvents();
     });
 
-    setTimeout(() => { if (!connectionLock) testSocket.close(); }, 5000);
+    // Debug de errores
+    testSocket.on('connect_error', (err) => {
+        console.warn(`❌ Error en ${url}:`, err.message);
+    });
+
+    setTimeout(() => { if (!connectionLock) testSocket.close(); }, 12000); // Dar suficiente tiempo para túneles lentos
 }
 
 function setupSocketEvents() {
     socket.on('connect', () => {
-        updateStatus('Conectado a Zona Fresh', 'emerald', 3000);
+        const shortUrl = savedServerUrl.replace('https://', '').replace('http://', '').split('/')[0];
+        updateStatus(`CONECTADO: ${shortUrl}`, 'emerald', 5000);
         isOffline = false;
         saveToHistory(savedServerUrl);
         console.log('✅ Socket conectado:', savedServerUrl);
@@ -108,18 +131,105 @@ function setupSocketEvents() {
     socket.on('disconnect', () => {
         updateStatus('Sin conexión - Reintentando...', 'rose');
         isOffline = true;
+        
+        // Mostrar pantalla de bloqueo para forzar recarga si el túnel cambió
+        if (!document.getElementById('disconnect-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'disconnect-overlay';
+            overlay.className = 'fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[1000] flex flex-col items-center justify-center p-8 text-center animate-fade-in';
+            overlay.innerHTML = `
+                <div class="w-20 h-20 bg-rose-500 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-rose-500/40">
+                    <i class="fas fa-plug text-3xl text-white animate-pulse"></i>
+                </div>
+                <h2 class="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Conexión Perdida</h2>
+                <p class="text-slate-300 font-medium mb-8">El servidor de la caja se desconectó o la dirección cambió.</p>
+                <button onclick="window.location.reload()" class="w-full py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                    Refrescar Conexión
+                </button>
+                <p class="mt-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-loose">Si el problema persiste,<br>escanea el código QR de nuevo.</p>
+            `;
+            document.body.appendChild(overlay);
+        }
     });
 
     // Solicitar menú completo al servidor (Pull Activo)
     socket.emit('request-sync');
+    
+    // Timeout para dar feedback si la caja no responde
+    setTimeout(() => {
+        if (products.length === 0) {
+            const list = document.getElementById('product-list');
+            if (list && list.innerHTML.includes('Conectando')) {
+                list.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-center py-20 px-6">
+                        <i class="fas fa-exclamation-triangle text-4xl text-amber-500 mb-4 animate-pulse"></i>
+                        <h3 class="text-xl font-black text-slate-800 mb-2">Conexión Lenta</h3>
+                        <p class="text-gray-500 font-medium mb-6">El servidor está conectado, pero no ha enviado los productos. Asegúrate de que el POS en la PC esté abierto.</p>
+                        <button onclick="socket.emit('request-sync');" class="px-6 py-3 bg-amber-50 text-amber-600 rounded-xl font-bold uppercase tracking-wider active:scale-95 transition-all mb-3 w-full">Reintentar</button>
+                        <button onclick="window.location.reload()" class="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold uppercase tracking-wider active:scale-95 transition-all w-full">Refrescar App</button>
+                    </div>
+                `;
+            }
+        }
+    }, 8000);
 
     socket.on('reconnect_attempt', (attempt) => {
-        statusBanner.innerHTML = `<div class="w-2 h-2 rounded-full bg-white animate-pulse"></div> Reintentando (${attempt})... <button onclick="showServerConfig()" class="ml-2 underline text-[10px]">Cambiar URL</button>`;
+        const urlToTry = savedServerUrl.replace('https://', '').replace('http://', '').split('/')[0];
+        statusBanner.innerHTML = `<i class="fas fa-sync fa-spin"></i> Reintentando (${attempt}) a ${urlToTry}... <button onclick="showServerConfig()" class="ml-2 underline text-[10px]">Cambiar</button>`;
     });
 
     socket.on('products-updated', (data) => {
         products = data.products;
         exchangeRate = data.exchangeRate;
+        
+        // Dynamic Branding update
+        const displayTitle = data.mobileTitle || data.companyName || 'PUNTO PILA';
+        document.title = displayTitle;
+        const headerTitle = document.getElementById('mobile-header-title');
+        if (headerTitle) headerTitle.textContent = displayTitle.toUpperCase();
+        
+        // Color de Marca y Detalles
+        if (data.mobileColor) {
+            const themeColor = data.mobileColor;
+            let styleTag = document.getElementById('dynamic-theme-style');
+            if (!styleTag) {
+                styleTag = document.createElement('style');
+                styleTag.id = 'dynamic-theme-style';
+                document.head.appendChild(styleTag);
+            }
+            // Inyectar CSS que sobreescribe Tailwind para los elementos clave
+            styleTag.innerHTML = `
+                :root { --brand-color: ${themeColor}; }
+                .text-blue-600 { color: ${themeColor} !important; }
+                .bg-blue-600 { background-color: ${themeColor} !important; }
+                .border-blue-600 { border-color: ${themeColor} !important; }
+                .bg-blue-50 { background-color: ${themeColor}15 !important; } /* Opacidad 15 hex aprox */
+                .cat-btn.active { background-color: ${themeColor} !important; box-shadow: 0 4px 12px ${themeColor}40; }
+                #send-order { background-color: ${themeColor} !important; box-shadow: 0 10px 20px ${themeColor}30; }
+                #mobile-header-title { text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+            `;
+        }
+
+        // Imagen de Fondo con controles dinámicos
+        if (data.mobileBg) {
+            const opacity = (data.mobileBgOpacity !== undefined) ? (1 - (data.mobileBgOpacity / 100)) : 0.1;
+            const blur = (data.mobileBgBlur !== undefined) ? data.mobileBgBlur : 0;
+            
+            document.body.style.backgroundImage = `linear-gradient(rgba(0,0,0,${opacity}), rgba(0,0,0,${opacity})), url('${data.mobileBg}')`;
+            document.body.style.backgroundSize = 'cover';
+            document.body.style.backgroundPosition = 'center';
+            document.body.style.backgroundAttachment = 'fixed';
+            
+            // Ajuste de legibilidad Dinámico
+            const mainContent = document.getElementById('main-content');
+            if (mainContent) {
+                mainContent.className = mainContent.className.replace(/bg-white\/\d+/, ''); // Limpiar opacidades previas
+                mainContent.classList.add('bg-white/50');
+                mainContent.style.backdropFilter = `blur(${blur}px)`;
+                mainContent.style.webkitBackdropFilter = `blur(${blur}px)`; // Soporte iOS
+            }
+        }
+
         localStorage.setItem('pos_mobile_products', JSON.stringify(products));
         localStorage.setItem('pos_mobile_rate', exchangeRate.toString());
         if (typeof renderFeaturedProducts === 'function') renderFeaturedProducts();
@@ -140,13 +250,16 @@ function saveToHistory(url) {
 }
 
 window.addEventListener('load', initConnection);
-window.addEventListener('online', () => { if (socket) socket.connect(); });
-window.addEventListener('offline', () => { isOffline = true; });
+window.addEventListener('online', () => { if (socket && !socket.connected) socket.connect(); });
+window.addEventListener('offline', () => { 
+    isOffline = true; 
+    updateStatus('SIN INTERNET EN EL MOVIL', 'rose');
+});
 
 // Manual server URL configuration
 window.showServerConfig = () => {
     const currentUrl = localStorage.getItem('pos_server_url') || '';
-    const newUrl = prompt('URL del servidor Zona Fresh:', currentUrl);
+    const newUrl = prompt('URL del servidor Punto Pila:', currentUrl);
     if (newUrl && newUrl.trim()) {
         localStorage.setItem('pos_server_url', newUrl.trim());
         window.location.reload();
@@ -210,7 +323,7 @@ async function onScanSuccess(decodedText) {
             window.location.href = cleanUrl + '/mobile';
         }, 500);
     } else {
-        alert('❌ El código escaneado no es un link de Zona Fresh válido.');
+        alert('❌ El código escaneado no es un link de Punto Pila válido.');
     }
 }
 
@@ -563,13 +676,20 @@ document.getElementById('send-order').onclick = () => {
         timestamp: new Date().toISOString()
     };
 
-    if (isOffline) {
-        alert("⚠️ No tienes conexión. El pedido no se puede enviar en modo offline.");
+    if (isOffline || !socket || !socket.connected) {
+        alert("⚠️ No tienes conexión con la caja. Por favor, verifica que la computadora esté encendida con la app abierta.");
         isSendingOrder = false;
         return;
     }
 
-    socket.emit('new-order', orderData);
+    try {
+        socket.emit('new-order', orderData);
+    } catch (err) {
+        console.error('Error enviando pedido:', err);
+        alert('❌ Error crítico al enviar: ' + err.message);
+        isSendingOrder = false;
+        return;
+    }
     
     // Alerta visual de éxito actualizada (a petición del usuario)
     alert(`✅ ¡Usted es la orden N° ${orderData.id}!\n\nSu pedido y pago han sido enviados a la caja con éxito.`);
