@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/conectar", "destination": "/conectar.html" },
+    { "source": "/descargar", "destination": "/descargar.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

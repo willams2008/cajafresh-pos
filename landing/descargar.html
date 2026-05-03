@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto Pila POS · Descargas y Links</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #fafafa;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .halo-border {
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            transition: all 0.2s ease;
+        }
+
+        .link-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #0f172a;
+        }
+
+        .link-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            background-color: #f8fafc;
+        }
+
+        .btn-primary {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 16px 20px;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary:hover {
+            background-color: #1e293b;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+
+    <div class="max-w-sm w-full">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-slate-900 rounded-xl mx-auto mb-4 flex items-center justify-center shadow-sm">
+                <i class="fas fa-cube text-white text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Punto Pila</h1>
+            <p class="text-sm text-slate-500 mt-1 font-medium">Software POS & PWA</p>
+        </div>
+
+        <!-- Main Action -->
+        <a href="https://wa.me/584123633283?text=Hola,%20necesito%20la%20App%20M%C3%B3vil" class="btn-primary w-full mb-8 shadow-sm">
+            <i class="fas fa-download opacity-80"></i>
+            Solicitar App (.APK)
+        </a>
+
+        <!-- Links -->
+        <div class="space-y-3 mb-10">
+            <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 pl-1">Enlaces Oficiales</h2>
+            
+            <a href="https://wa.me/584123633283?text=Hola,%20tengo%20una%20consulta%20sobre%20Punto%20Pila" class="halo-border link-card">
+                <div class="w-8 h-8 rounded-md bg-green-50 text-green-600 flex items-center justify-center">
+                    <i class="fab fa-whatsapp"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold">WhatsApp</h3>
+                    <p class="text-xs text-slate-500">Atención al cliente</p>
+                </div>
+            </a>
+
+            <a href="/" class="halo-border link-card">
+                <div class="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <i class="fas fa-home"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold">Web Principal</h3>
+                    <p class="text-xs text-slate-500">Volver al inicio</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Installation Instructions -->
+        <div class="pt-6 border-t border-slate-200">
+            <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Instrucciones</h2>
+            <ol class="list-decimal list-outside ml-4 space-y-2 text-sm text-slate-600">
+                <li>Contacta a soporte para recibir el enlace de descarga directo.</li>
+                <li>Si Android muestra un aviso, selecciona "Instalar de todos modos".</li>
+                <li>Inicia la aplicación y permite los permisos de conexión.</li>
+            </ol>
+        </div>
+
+        <div class="text-center mt-10">
+            <p class="text-[10px] text-slate-400 font-medium tracking-wide">Punto Pila POS &copy; 2026</p>
+        </div>
+    </div>
+
+</body>
+</html>
