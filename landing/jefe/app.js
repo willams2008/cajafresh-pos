@@ -22,7 +22,18 @@ let euroRate = parseFloat(localStorage.getItem('boss_euro_rate')) || 1.08;
 let enteredPin = '';
 const pinDots = document.querySelectorAll('.pin-dot');
 
-function init() {
+async function init() {
+    try {
+        const res = await fetch('/api/boss/config');
+        const cfg = await res.json();
+        if (cfg.supabaseUrl && cfg.supabaseKey) {
+            supabaseUrl = cfg.supabaseUrl;
+            supabaseKey = cfg.supabaseKey;
+            localStorage.setItem('sb_url', supabaseUrl);
+            localStorage.setItem('sb_key', supabaseKey);
+        }
+    } catch(e) {}
+
     if (!supabaseUrl || !supabaseKey) {
         document.getElementById('loading').style.display = 'none';
         toggleConfig();
@@ -236,6 +247,14 @@ function renderStores(storesToRender = allStores) {
                     <div style="font-size:8px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Margen</div>
                 </div>
             </div>
+            ${totalExpUSD > 0 ? `
+            <div style="margin-top:10px;padding:8px 10px;background:#fff5f5;border-radius:8px;border-left:3px solid var(--error);display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-receipt" style="font-size:10px;color:var(--error);"></i>
+                    <span style="font-size:10px;font-weight:700;color:var(--error);">${storeExpenses.length} gasto${storeExpenses.length !== 1 ? 's' : ''} hoy</span>
+                </div>
+                <span style="font-size:11px;font-weight:900;color:var(--error);">- ${fmtUSD(totalExpUSD)}</span>
+            </div>` : ''}
         </div>
         `;
     }).join('');
@@ -515,13 +534,14 @@ async function setTab(tab) {
     currentTab = tab;
     document.getElementById('tab-sales').classList.toggle('active', tab === 'sales');
     document.getElementById('tab-inventory').classList.toggle('active', tab === 'inventory');
+    document.getElementById('tab-expenses').classList.toggle('active', tab === 'expenses');
     const perfTab = document.getElementById('tab-performance');
     if (perfTab) perfTab.classList.toggle('active', tab === 'performance');
     
     const content = document.getElementById('detail-content');
     content.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
 
-    const datePickerHtml = (tab === 'sales' || tab === 'performance') ? `
+    const datePickerHtml = (tab === 'sales' || tab === 'performance' || tab === 'expenses') ? `
         <div style="margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--outline);">
             <div style="font-size: 13px; font-weight: 800; color: var(--text-muted);">
                 <i class="fas fa-calendar-alt" style="margin-right: 6px;"></i> Fecha:
@@ -533,10 +553,15 @@ async function setTab(tab) {
     ` : '';
 
     if (tab === 'sales') {
-        const sales = await sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}&order=timestamp.desc`);
+        const nextDay = new Date(currentDetailDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDateStr = nextDay.toISOString().split('T')[0];
+        
+        const rawSales = await sbGet('store_sales', `?date=gte.${currentDetailDate}&date=lt.${nextDateStr}`);
+        const sales = Array.isArray(rawSales) ? rawSales.filter(s => String(s.store_id).trim() == String(currentStoreId).trim()) : [];
         let htmlStr = '';
-        if (!Array.isArray(sales) || sales.length === 0) {
-            htmlStr = '<div class="empty">No hay ventas registradas en esta fecha.</div>';
+        if (sales.length === 0) {
+            htmlStr = `<div class="empty">No hay ventas registradas (Store: ${currentStoreId}, Hoy: ${Array.isArray(rawSales) ? rawSales.length : 'Err'}).</div>`;
         } else {
             htmlStr = sales.map(s => {
                 let itemsList = s.items_json;
@@ -580,13 +605,59 @@ async function setTab(tab) {
             `}).join('');
         }
         content.innerHTML = datePickerHtml + htmlStr;
+    } else if (tab === 'expenses') {
+        const nextDay = new Date(currentDetailDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDateStr = nextDay.toISOString().split('T')[0];
+        const rawExpenses = await sbGet('store_expenses', `?date=gte.${currentDetailDate}&date=lt.${nextDateStr}&order=timestamp.desc`);
+        const expenses = rawExpenses.filter(e => e.store_id === currentStoreId);
+        let htmlStr = '';
+        if (!Array.isArray(expenses) || expenses.length === 0) {
+            htmlStr = '<div class="empty">No hay gastos registrados en esta fecha.</div>';
+        } else {
+            const totalExp = expenses.reduce((a, e) => a + (Number(e.amount_usd) || 0), 0);
+            htmlStr = `
+                <div style="background: #fff1f2; border: 1px solid #fecaca; padding: 16px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 11px; font-weight: 800; color: #b91c1c; text-transform: uppercase;">Total Gastos Día</div>
+                    <div style="font-size: 20px; font-weight: 900; color: #e11d48;">${fmtUSD(totalExp)}</div>
+                </div>
+            `;
+            htmlStr += expenses.map(e => `
+                <div class="card" style="padding:16px; margin-bottom:12px; border-left: 4px solid #e11d48;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:var(--text);">${e.description}</div>
+                            <div style="display:flex; gap:6px; margin-top:8px;">
+                                <span style="font-size:9px; font-weight:800; background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:6px; text-transform:uppercase;">${e.responsible_name || 'N/A'}</span>
+                                <span style="font-size:9px; font-weight:800; background:#fff1f2; color:#e11d48; padding:2px 8px; border-radius:6px; text-transform:uppercase;">${e.payment_method || 'Efectivo'}</span>
+                            </div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:6px;">
+                                <i class="fas fa-clock"></i> ${new Date(e.timestamp || e.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                ${e.reference_number ? ` • <i class="fas fa-hashtag"></i> Ref: ${e.reference_number}` : ''}
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:18px; font-weight:900; color:#e11d48;">${fmtUSD(e.amount_usd)}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        content.innerHTML = datePickerHtml + htmlStr;
     } else if (tab === 'performance') {
+        const nextDay = new Date(currentDetailDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const nextDateStr = nextDay.toISOString().split('T')[0];
 
-        const [snaps, sales, expenses] = await Promise.all([
-            sbGet('store_snapshots', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}&order=timestamp.desc&limit=1`),
-            sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`),
-            sbGet('store_expenses', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`)
+        const [rawSnaps, rawSales, rawExpenses] = await Promise.all([
+            sbGet('store_snapshots', `?date=gte.${currentDetailDate}&date=lt.${nextDateStr}&order=timestamp.desc`),
+            sbGet('store_sales', `?date=gte.${currentDetailDate}&date=lt.${nextDateStr}`),
+            sbGet('store_expenses', `?date=gte.${currentDetailDate}&date=lt.${nextDateStr}`)
         ]);
+
+        const snaps = Array.isArray(rawSnaps) ? rawSnaps.filter(s => String(s.store_id).trim() == String(currentStoreId).trim()) : [];
+        const sales = Array.isArray(rawSales) ? rawSales.filter(s => String(s.store_id).trim() == String(currentStoreId).trim()) : [];
+        const expenses = Array.isArray(rawExpenses) ? rawExpenses.filter(e => String(e.store_id).trim() == String(currentStoreId).trim()) : [];
 
         const snap = snaps[0] || {};
 
@@ -901,7 +972,10 @@ function filterInventory(query) {
 }
 
 function openEditModal(productId) {
-    const product = currentProducts.find(p => p.product_id === productId);
+    let product = (window.currentProducts || []).find(p => p.product_id === productId);
+    if (!product && window.allGlobalProducts) {
+        product = window.allGlobalProducts.find(p => p.product_id === productId);
+    }
     if (!product) return;
 
     document.getElementById('edit-product-id').value = productId;
@@ -988,11 +1062,15 @@ async function saveProductEdits() {
     btn.innerText = 'Guardando...';
     btn.disabled = true;
 
+    const product = currentProducts.find(p => p.product_id === productId);
+
     const cmd = {
         store_id: currentStoreId,
         command_type: 'UPDATE_PRODUCT_FULL',
         payload: { 
             product_id: productId, 
+            new_name: product ? product.name : 'Producto',
+            new_category: product ? product.category : 'General',
             new_price_usd: priceUSD,
             new_price_ves: priceVES,
             new_price_eur: priceEUR,
@@ -1106,6 +1184,54 @@ setInterval(() => {
 }, 30000); // 30 seconds
 
 // ==========================================
+// TOAST NOTIFICATION
+// ==========================================
+function showToast(message, duration = 3000) {
+    // Eliminar toast anterior si existe
+    const existing = document.getElementById('app-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: #1e293b;
+        color: #f1f5f9;
+        padding: 12px 20px;
+        border-radius: 14px;
+        font-size: 13px;
+        font-weight: 700;
+        font-family: inherit;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+        z-index: 9999;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        max-width: 300px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+        white-space: nowrap;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Animar entrada
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+    });
+
+    // Animar salida y eliminar
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ==========================================
 // GASTOS
 // ==========================================
 function showExpenseForm() {
@@ -1131,31 +1257,43 @@ async function loadExpenses(storeId) {
     const totalGastosUSD = expenses.reduce((a, e) => a + (Number(e.amount_usd) || 0), 0);
 
     el.innerHTML = `
-        <div style="margin-bottom:12px;padding:10px;background:#fff5f5;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:11px;font-weight:700;color:var(--error);">Total Gastos Hoy</span>
-            <span style="font-size:16px;font-weight:900;color:var(--error);">${fmtUSD(totalGastosUSD)}</span>
+        <div style="margin-bottom:12px;padding:12px;background:linear-gradient(135deg,#fff5f5,#fff0f0);border-radius:12px;border:1px solid #fecaca;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div style="font-size:10px;font-weight:800;color:var(--error);text-transform:uppercase;letter-spacing:0.5px;">Total Gastos Hoy</div>
+                <div style="font-size:18px;font-weight:900;color:var(--error);">${fmtUSD(totalGastosUSD)}</div>
+            </div>
+            <div style="font-size:24px;">💸</div>
         </div>
         ${expenses.map(e => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--outline);">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:18px;">${typeEmojis[e.expense_type] || '📌'}</span>
-                <div>
-                    <div style="font-size:13px;font-weight:700;">${e.description || e.expense_type}</div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:capitalize;">
-                        ${e.expense_type} &bull; ${e.payment_method || 'efectivo'}
-                        ${e.responsible_name ? `&bull; Resp: ${e.responsible_name}` : ''}
+        <div style="padding:12px;margin-bottom:8px;background:#fff;border:1px solid #fee2e2;border-radius:12px;border-left:4px solid var(--error);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;">
+                    <span style="font-size:20px;flex-shrink:0;">${typeEmojis[e.expense_type] || '📌'}</span>
+                    <div style="min-width:0;flex:1;">
+                        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.description || e.expense_type}</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">
+                            <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;background:#fff0f0;color:var(--error);text-transform:uppercase;">
+                                <i class="fas fa-tag" style="font-size:7px;"></i> ${e.expense_type}
+                            </span>
+                            ${e.payment_method ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;background:#eff6ff;color:#2563eb;text-transform:capitalize;">
+                                <i class="fas fa-wallet" style="font-size:7px;"></i> ${e.payment_method}
+                            </span>` : ''}
+                            ${e.responsible_name ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;background:#f0fdf4;color:#15803d;">
+                                <i class="fas fa-user" style="font-size:7px;"></i> ${e.responsible_name}
+                            </span>` : ''}
+                            ${e.reference_number ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;">
+                                <i class="fas fa-hashtag" style="font-size:7px;"></i> ${e.reference_number}
+                            </span>` : ''}
+                        </div>
                     </div>
-                    ${e.reference_number ? `<div style="font-size:9px;color:var(--text-muted);">Ref: ${e.reference_number}</div>` : ''}
                 </div>
-            </div>
-            <div style="text-align:right;display:flex;align-items:center;gap:10px;">
-                <div>
-                    <div style="font-size:13px;font-weight:900;color:var(--error);">${fmtUSD(e.amount_usd || 0)}</div>
-                    ${e.amount_ves > 0 ? `<div style="font-size:10px;color:var(--text-muted);">Bs ${Number(e.amount_ves).toLocaleString('es-VE',{minimumFractionDigits:0})}</div>` : ''}
+                <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+                    <div style="font-size:14px;font-weight:900;color:var(--error);">${fmtUSD(e.amount_usd || 0)}</div>
+                    ${e.amount_ves > 0 ? `<div style="font-size:10px;font-weight:700;color:var(--text-muted);">Bs ${Number(e.amount_ves).toLocaleString('es-VE',{minimumFractionDigits:0})}</div>` : ''}
+                    <button onclick="deleteExpense('${e.id}', '${storeId}')" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:13px;padding:2px 4px;margin-top:2px;" title="Eliminar gasto">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>
-                <button onclick="deleteExpense('${e.id}')" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:14px;padding:4px;">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
             </div>
         </div>`).join('')}
     `;
@@ -1199,7 +1337,7 @@ async function saveExpense(storeId) {
     };
 
     const btn = document.querySelector('#expense-form button');
-    if (btn) btn.textContent = 'Guardando...';
+    if (btn) { btn.textContent = 'Guardando...'; btn.disabled = true; }
 
     try {
         const res = await fetch(`${supabaseUrl}/rest/v1/store_expenses`, {
@@ -1216,7 +1354,7 @@ async function saveExpense(storeId) {
         if (!res.ok) {
             const err = await res.text();
             if (err.includes('store_expenses') && err.includes('does not exist')) {
-                alert('⚠️ Tabla "store_expenses" no existe en Supabase.\n\nEjecuta este SQL en tu Supabase:\n\nCREATE TABLE store_expenses (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  store_id text,\n  expense_type text,\n  description text,\n  amount_usd numeric DEFAULT 0,\n  amount_ves numeric DEFAULT 0,\n  date date,\n  created_at timestamptz DEFAULT now()\n);');
+                alert('⚠️ Tabla "store_expenses" no existe en Supabase.\n\nEjecuta este SQL en tu Supabase:\n\nCREATE TABLE store_expenses (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  store_id text,\n  expense_type text,\n  description text,\n  payment_method text,\n  reference_number text,\n  responsible_name text,\n  amount_usd numeric DEFAULT 0,\n  amount_ves numeric DEFAULT 0,\n  date date,\n  created_at timestamptz DEFAULT now()\n);');
             } else {
                 alert('Error al guardar: ' + err);
             }
@@ -1224,33 +1362,40 @@ async function saveExpense(storeId) {
         }
 
         // Limpiar formulario
-        document.getElementById('expense-desc').value = '';
-        document.getElementById('expense-usd').value = '';
-        document.getElementById('expense-ves').value = '';
-        if (document.getElementById('expense-ref')) document.getElementById('expense-ref').value = '';
-        if (document.getElementById('expense-resp')) document.getElementById('expense-resp').value = '';
-        
+        ['expense-desc','expense-usd','expense-ves','expense-ref','expense-resp'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
         document.getElementById('expense-form').style.display = 'none';
 
-        // Actualizar datos
-        loadExpenses(storeId);
-        loadDashboard(); // Recargar el dashboard completo para actualizar el margen global
+        // Mostrar toast de éxito
+        showToast('✅ Gasto registrado correctamente');
+
+        // Refrescar lista de gastos + dashboard global
+        await loadExpenses(storeId);
+        loadDashboard(); // Actualiza métricas globales (margen, gastos, etc.)
     } catch(e) {
         alert('Error de red: ' + e.message);
+    } finally {
+        if (btn) { btn.textContent = 'Guardar Gasto'; btn.disabled = false; }
     }
 }
 
-async function deleteExpense(expenseId) {
+async function deleteExpense(expenseId, storeId) {
     if (!confirm('¿Eliminar este gasto?')) return;
     try {
-        await fetch(`${supabaseUrl}/rest/v1/store_expenses?id=eq.${expenseId}`, {
+        const res = await fetch(`${supabaseUrl}/rest/v1/store_expenses?id=eq.${expenseId}`, {
             method: 'DELETE',
             headers: {
                 'apikey': supabaseKey,
                 'Authorization': `Bearer ${supabaseKey}`
             }
         });
-        loadExpenses(currentStoreId);
+        if (!res.ok) { alert('Error al eliminar gasto.'); return; }
+        showToast('🗑️ Gasto eliminado');
+        // Refrescar lista Y dashboard para actualizar margen
+        await loadExpenses(storeId || currentStoreId);
+        loadDashboard();
     } catch(e) {
         alert('Error al eliminar: ' + e.message);
     }
@@ -1289,7 +1434,7 @@ function renderGlobalInventory(products) {
         const stockColor = p.stock <= 0 ? 'var(--error)' : p.stock <= 5 ? 'var(--warning)' : 'var(--primary)';
         
         return `
-        <div class="card" style="padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px;" onclick="openDetail('${p.store_id}')">
+        <div class="card" style="padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="openEditModal('${p.product_id}')">
             <div style="width:40px; height:40px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">
                 ${p.img_url ? `<img src="${p.img_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fas fa-box" style="color:var(--text-muted)"></i>'}
             </div>
@@ -1302,6 +1447,9 @@ function renderGlobalInventory(products) {
             <div style="text-align:right;">
                 <div style="font-size:14px; font-weight:900; color:var(--text);">${fmtUSD(p.price)}</div>
                 <div style="font-size:10px; font-weight:800; color:${stockColor}; margin-top:2px;">${p.stock} uds</div>
+            </div>
+            <div style="padding-left:8px;">
+                <i class="fas fa-pen" style="color:var(--text-muted); font-size:12px;"></i>
             </div>
         </div>
         `;
