@@ -15,9 +15,22 @@
       "output": "dist_FINAL"
     },
     "win": {
-      "target": "dir",
+      "target": ["nsis"],
       "icon": "icon.ico"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://cajafresh.emprende.ve/updates"
+      }
+    ],
     "files": [
       "**/*",
       "!dist*/**/*",
@@ -42,6 +55,7 @@
   "dependencies": {
     "cloudflared": "^0.7.1",
     "cors": "^2.8.6",
+    "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",

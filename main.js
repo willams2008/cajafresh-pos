@@ -16,6 +16,17 @@ const https = require('https');
 const { initDatabase, api: dbApi } = require('./database');
 const CloudSync = require('./cloud-sync');
 
+// --- AUTO UPDATER ---
+let autoUpdater;
+try {
+    autoUpdater = require('electron-updater').autoUpdater;
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+} catch (e) {
+    console.warn('[AUTO-UPDATER] electron-updater no disponible:', e.message);
+    autoUpdater = null;
+}
+
 // --- STARTUP DIAGNOSTIC LOG ---
 const startupLogPath = path.join(app.getPath('userData'), 'startup_debug.log');
 function logStartup(msg) {
@@ -1363,6 +1374,36 @@ app.whenReady().then(async () => {
     initWhatsApp();
     startServer();
     createWindow();
+
+    // === AUTO-UPDATER: IPC Handlers y chequeo programado ===
+    if (autoUpdater && mainWindow) {
+        const sendUpdateStatus = (payload) => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', payload);
+            }
+        };
+
+        autoUpdater.on('checking-for-update', () => sendUpdateStatus({ status: 'checking' }));
+        autoUpdater.on('update-available', (info) => sendUpdateStatus({ status: 'available', version: info.version }));
+        autoUpdater.on('update-not-available', () => sendUpdateStatus({ status: 'up-to-date' }));
+        autoUpdater.on('download-progress', (prog) => sendUpdateStatus({ status: 'downloading', percent: Math.round(prog.percent) }));
+        autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ status: 'downloaded', version: info.version }));
+        autoUpdater.on('error', (err) => sendUpdateStatus({ status: 'error', message: err.message }));
+
+        ipcMain.handle('check-for-updates', async () => {
+            try { return await autoUpdater.checkForUpdates(); } catch(e) { return { error: e.message }; }
+        });
+        ipcMain.handle('download-update', async () => {
+            try { return await autoUpdater.downloadUpdate(); } catch(e) { return { error: e.message }; }
+        });
+        ipcMain.handle('install-update', () => {
+            autoUpdater.quitAndInstall(false, true);
+        });
+
+        // Chequear actualizaciones 30s después del arranque, y luego cada 4 horas
+        setTimeout(() => { try { autoUpdater.checkForUpdates(); } catch(e) {} }, 30000);
+        setInterval(() => { try { autoUpdater.checkForUpdates(); } catch(e) {} }, 4 * 60 * 60 * 1000);
+    }
 });
 
 app.on('window-all-closed', () => {

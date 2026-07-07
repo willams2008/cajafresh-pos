@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectMobileBg: () => ipcRenderer.invoke('select-mobile-bg'),
     // Dashboard Remoto
     syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
+    // Auto-Updater
+    onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, data) => callback(data)),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
     send: (channel, data) => {
         const validChannels = ['dashboard-data', 'sync-products', 'generate-remote-qr', 'generate-download-qr', 'request-discovery-update', 'request-tunnel-info', 'license-activated'];
         if (validChannels.includes(channel)) ipcRenderer.send(channel, data);
@@ -52,7 +57,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'incoming-order', 
             'payment-detected',
             'whatsapp-qr',
-            'whatsapp-status'
+            'whatsapp-status',
+            'update-status'
         ];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (event, ...args) => callback(...args));

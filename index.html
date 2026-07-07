@@ -145,20 +145,44 @@
 
     <!-- Sidebar Navigation -->
     <aside
-        class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between transition-all duration-300 z-20 shadow-sm relative shrink-0 h-full initial-hidden">
+        class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between transition-all duration-300 z-20 shadow-sm relative shrink-0 h-full initial-hidden group">
+        
+        <button onclick="toggleSidebar()" class="absolute -right-3 top-1/2 -translate-y-1/2 bg-white border border-slate-200 shadow-sm rounded-full w-6 h-6 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:shadow-md transition-all z-50">
+            <i class="sidebar-toggle-icon fas fa-chevron-left text-[10px]"></i>
+        </button>
+        
         <div class="flex-1 overflow-y-auto custom-scrollbar">
-            <div
-                class="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-                <div
-                    class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30 shrink-0">
-                    <i class="fas fa-glass-water text-white text-xl"></i>
+            <div id="sidebar-header-container" class="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100 sticky top-0 bg-white z-10 relative group cursor-pointer" onclick="document.getElementById('logo-upload').click()" title="Cambiar logo del negocio">
+                
+                <!-- Default State -->
+                <div id="sidebar-default-logo" class="flex items-center w-full">
+                    <div class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30 shrink-0">
+                        <i class="fas fa-store text-white text-lg"></i>
+                    </div>
+                    <h1 id="main-brand-logo" class="hidden lg:block ml-3 font-black text-lg xl:text-xl tracking-tight text-slate-800 truncate flex-1 min-w-0">Punto<span class="text-brand-600">Pila</span></h1>
                 </div>
-                <h1 id="main-brand-logo" class="hidden lg:block ml-3 font-black text-lg xl:text-xl tracking-tight text-slate-800 truncate flex-1 min-w-0">Punto<span
-                        class="text-brand-600">Pila</span></h1>
+
+                <!-- Custom Logo State -->
+                <img id="sidebar-biz-logo" src="" class="absolute inset-0 w-full h-full object-contain p-2 hidden z-10 bg-white">
+                
+                <!-- Hover Overlay -->
+                <div class="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <div class="bg-slate-900/80 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg backdrop-blur-sm flex items-center gap-2">
+                        <i class="fas fa-camera"></i>
+                        <span class="hidden lg:block sidebar-logo-text">Cambiar Logo</span>
+                    </div>
+                </div>
+
+                <input type="file" id="logo-upload" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
             </div>
             <nav class="mt-6 flex flex-col gap-2 px-3 pb-6">
-                <a href="#" id="nav-pos"
+                <a href="#" id="nav-dashboard"
                     class="nav-item flex items-center px-3 py-3 rounded-xl bg-brand-50 text-brand-600 cursor-pointer transition-all active">
+                    <div class="w-8 flex justify-center"><i class="fas fa-tachometer-alt text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2 truncate">Dashboard</span>
+                </a>
+                <a href="#" id="nav-pos"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 cursor-pointer transition-all">
                     <div class="w-8 flex justify-center"><i class="fas fa-cash-register text-lg"></i></div>
                     <span class="hidden lg:block font-semibold ml-2 truncate">Punto de Venta</span>
                 </a>
@@ -245,7 +269,7 @@
             <button onclick="syncLicenseStatus()" 
                 class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-brand-600 rounded-xl transition-all text-xs font-black uppercase tracking-widest border border-slate-100">
                 <i class="fas fa-sync-alt" id="sync-lic-icon"></i>
-                Sincronizar Licencia
+                <span class="sync-lic-text">Sincronizar Licencia</span>
             </button>
         </div>
         <div class="p-4 border-t border-slate-100 dark:border-slate-800 hidden lg:block shrink-0 bg-white">
@@ -308,9 +332,26 @@
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-[#f8fafc] initial-hidden">
 
+        <!-- === VISTA DASHBOARD === -->
+        <section id="view-dashboard"
+            class="flex-1 flex flex-col h-full overflow-y-auto absolute inset-0 w-full animate-fade-in view-section bg-slate-50 custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm shrink-0 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Dashboard</h2>
+                    <p class="text-sm text-slate-500 mt-1">Resumen general del negocio</p>
+                </div>
+            </header>
+            <div id="view-dashboard-content" class="p-8 flex-1">
+                <!-- Dashboard.render() will populate this container -->
+                <div class="flex items-center justify-center h-64 text-slate-400">
+                    <i class="fas fa-spinner fa-spin text-3xl mr-3"></i> Cargando métricas...
+                </div>
+            </div>
+        </section>
+
         <!-- === VISTA POS === -->
         <section id="view-pos"
-            class="flex-1 flex h-full overflow-hidden absolute inset-0 w-full animate-fade-in view-section">
+            class="flex-1 flex h-full overflow-hidden absolute inset-0 w-full view-section hidden opacity-0 transition-opacity duration-300">
 
             <!-- Products Section -->
             <div class="flex-1 flex flex-col h-full bg-slate-50 relative z-0">
@@ -318,6 +359,9 @@
                 <header
                     class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
                     <div class="flex items-center gap-4">
+                        <button onclick="toggleSidebar()" class="relative p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-all group lg:hidden" title="Alternar Menú Lateral">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
                         <h2 class="text-2xl font-bold tracking-tight hidden md:block">Catálogo</h2>
                         <!-- Cloud Sync Indicator -->
                         <div id="cloud-sync-indicator" class="text-lg text-slate-300 hidden md:flex items-center justify-center cursor-help transition-all" title="Cloud Sync No Configurado">
@@ -557,7 +601,11 @@
                     <h2 class="text-2xl font-bold text-slate-800">Reporte de Caja</h2>
                     <p class="text-sm text-slate-500 mt-1">Resumen de ventas y arqueo</p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-3 flex-wrap">
+                    <button onclick="if(window.Reports) Reports.openCashReconciliation();"
+                        class="text-amber-600 bg-amber-50 hover:bg-amber-100 font-bold px-5 py-3 rounded-xl transition-all flex items-center shadow-sm hover:scale-105 active:scale-95 border border-amber-100">
+                        <i class="fas fa-calculator mr-2"></i> Cuadre de Caja
+                    </button>
                     <button id="download-report-pdf-btn"
                         class="text-brand-600 bg-brand-50 hover:bg-brand-100 font-bold px-5 py-3 rounded-xl transition-all flex items-center shadow-sm hover:scale-105 active:scale-95 border border-brand-100">
                         <i class="fas fa-file-pdf mr-2"></i> Descargar PDF
@@ -2864,5 +2912,18 @@
     <!-- Botón de WhatsApp removido -->
 
     <script src="app.js"></script>
+    <!-- Financial Analytics Module (Rendimiento, Costos, Rentabilidad) -->
+    <script src="src/renderer/analytics-financiero.js"></script>
+    <script src="src/renderer/funciones-pendientes.js"></script>
+    <!-- === MÓDULOS CORE (Strangler Pattern) === -->
+    <script src="src/modules/master-styles.js"></script>
+    <script src="src/modules/pos.js"></script>
+    <script src="src/modules/reports.js"></script>
+    <script src="src/modules/dashboard.js"></script>
+    <script src="src/modules/notifications.js"></script>
+    <script src="src/modules/auto-update.js"></script>
+    <!-- === FEATURES === -->
+    <script src="src/features/multi-orden.js"></script>
+    <script src="src/features/calculadora.js"></script>
 </body>
 </html>

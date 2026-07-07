@@ -981,6 +981,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             syncDashboardData();
             setInterval(syncDashboardData, 60000);
 
+            // === INICIALIZACIÓN DE MÓDULOS STRANGLER ===
+            try {
+                if (window.POS && POS.init) POS.init();
+                if (window.Notifications && Notifications.init) Notifications.init();
+                if (window.Reports && Reports.initDateFilter) Reports.initDateFilter();
+                if (window.UpdateManager && UpdateManager.init) UpdateManager.init();
+                if (window.MultiOrder && MultiOrder.init) MultiOrder.init();
+                if (window.POSCalculator && POSCalculator.init) POSCalculator.init('calculadora-container');
+                // Renderizar Dashboard si es la vista activa por defecto
+                if (window.Dashboard && Dashboard.render) Dashboard.render();
+            } catch(modErr) { console.error('Error inicializando módulos strangler:', modErr); }
+
             // 5. EVENTOS REMOTOS (Boss App)
             if (window.electronAPI && window.electronAPI.onProductUpdatedRemote) {
                 window.electronAPI.onProductUpdatedRemote((updatedProduct) => {
@@ -1414,6 +1426,7 @@ function incTicketNumber() { currentTicketNumber++; localStorage.setItem('freshp
 // Navigation Logic
 function initNavigation() {
     const navItems = {
+        'nav-dashboard': 'view-dashboard',
         'nav-pos': 'view-pos',
         'nav-inventory': 'view-inventory',
         'nav-clients': 'view-clients',
@@ -1462,6 +1475,7 @@ function initNavigation() {
             }
         }
 
+        if (viewId === 'view-dashboard' && window.Dashboard) Dashboard.render();
         if (viewId === 'view-pos') renderProducts();
         if (viewId === 'view-inventory') renderInventory();
         if (viewId === 'view-clients') renderClients();
@@ -1655,13 +1669,15 @@ function initSettingsAndAutoClose() {
             const todayStr = now.toDateString();
             if (lastCloseStr !== todayStr && sales.length > 0) {
                 localStorage.setItem('freshpos_last_close', todayStr);
-                generateZReport(true);
+                if (typeof generateZReport === 'function') generateZReport(true);
             }
         }
     }, 60000);
 
     // Manual triggers
-    document.getElementById('generate-pdf-btn')?.addEventListener('click', () => generateZReport(false));
+    document.getElementById('generate-pdf-btn')?.addEventListener('click', () => {
+        if (typeof generateZReport === 'function') generateZReport(false);
+    });
     document.getElementById('force-close-btn')?.addEventListener('click', () => {
         Swal.fire({
             title: '¿Forzar Cierre de Caja?',
@@ -1671,7 +1687,7 @@ function initSettingsAndAutoClose() {
             confirmButtonColor: '#ef4444',
             confirmButtonText: 'Sí, cerrar caja'
         }).then(res => {
-            if (res.isConfirmed) generateZReport(true);
+            if (res.isConfirmed && typeof generateZReport === 'function') generateZReport(true);
         });
     });
 }
@@ -2230,7 +2246,7 @@ window.deleteClient = (id) => {
 // CART & CHECKOUT LOGIC
 // ==========================================
 function addToCart(product) {
-    if (product.stock <= 0) return;
+    if ((product.stock || 0) <= 0) return;
 
     // Si el producto tiene sabores definidos, mostrar selector primero
     if (product.flavors && product.flavors.length > 0) {
@@ -2286,7 +2302,7 @@ function addToCart(product) {
     // Sin sabores: flujo normal
     const existingIndex = cart.findIndex(item => item.id === product.id);
     if (existingIndex > -1) {
-        if (cart[existingIndex].qty >= product.stock) {
+        if (cart[existingIndex].qty >= (product.stock || 0)) {
             Swal.fire({ title: 'Stock Insuficiente', icon: 'warning', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
             return;
         }
@@ -2822,8 +2838,11 @@ function renderReports() {
                 <button onclick="continueInvoice('${displayTicket}')" class="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors mr-1" title="Continuar Factura">
                     <i class="fas fa-redo-alt"></i>
                 </button>
-                <button onclick="printTicketFromReport('${displayTicket}')" class="text-brand-600 hover:bg-brand-50 p-2 rounded-lg transition-colors" title="Imprimir Ticket">
+                <button onclick="printTicketFromReport('${displayTicket}')" class="text-brand-600 hover:bg-brand-50 p-2 rounded-lg transition-colors mr-1" title="Imprimir Ticket">
                     <i class="fas fa-print"></i>
+                </button>
+                <button onclick="if(window.POSExtensions) POSExtensions.voidSale('${displayTicket}', 'Anulación manual');" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Anular Venta">
+                    <i class="fas fa-ban"></i>
                 </button>
             </td>
         `;
@@ -6910,3 +6929,88 @@ if (window.cloudSync) {
         }
     });
 }
+
+window.toggleSidebar = function() {
+    var aside = document.querySelector('aside');
+    if (aside) {
+        aside.classList.remove('lg:w-64');
+        if (aside.classList.contains('w-64')) {
+            aside.classList.remove('w-64');
+            aside.classList.add('w-20');
+        } else if (aside.classList.contains('w-20')) {
+            aside.classList.remove('w-20');
+            aside.classList.add('w-64');
+        } else {
+            aside.classList.add('w-20');
+        }
+        var icon = aside.querySelector('.sidebar-toggle-icon');
+        if (icon) {
+            if (aside.classList.contains('w-20')) {
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+            } else {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
+            }
+        }
+    }
+};
+
+
+window.toggleSidebar = function() {
+    var aside = document.querySelector('aside');
+    if (aside) {
+        aside.classList.remove('lg:w-64');
+        if (aside.classList.contains('w-64')) {
+            aside.classList.remove('w-64');
+            aside.classList.add('w-20');
+        } else if (aside.classList.contains('w-20')) {
+            aside.classList.remove('w-20');
+            aside.classList.add('w-64');
+        } else {
+            aside.classList.add('w-20');
+        }
+        var icon = aside.querySelector('.sidebar-toggle-icon');
+        if (icon) {
+            if (aside.classList.contains('w-20')) {
+                icon.classList.remove('fa-chevron-left');
+                icon.classList.add('fa-chevron-right');
+            } else {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-left');
+            }
+        }
+    }
+};
+
+
+
+window.handleLogoUpload = function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const logoData = e.target.result;
+            localStorage.setItem('bizLogo', logoData);
+            loadBizLogo();
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+window.loadBizLogo = function() {
+    const logoData = localStorage.getItem('bizLogo');
+    const img = document.getElementById('sidebar-biz-logo');
+    const defaultLogo = document.getElementById('sidebar-default-logo');
+    if (logoData && img && defaultLogo) {
+        img.src = logoData;
+        img.classList.remove('hidden');
+        defaultLogo.classList.add('hidden');
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadBizLogo();
+});
+
+
