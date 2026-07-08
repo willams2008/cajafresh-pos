@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportToPDF: () => ipcRenderer.invoke('export-to-pdf'),
     // Fiscal Printer
     writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
+    // Auto-Updater
+    checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.send('download-update'),
+    installUpdate: () => ipcRenderer.send('install-update'),
+    onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
     // Dashboard Remoto
     syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
     send: (channel, data) => {

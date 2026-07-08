@@ -1,13 +1,13 @@
 @echo off
-title Compilando Caja Fresh POS v2.2 - FIX TÚNEL & APK...
+title Compilando Caja Fresh POS v2.3 - FIX TÚNEL & APK...
 
 echo ==============================================
-echo  Caja Fresh POS - Compilacion v2.2
-echo  Con mejoras de busqueda y categorias
+echo  Caja Fresh POS - Compilacion v2.3
+echo  Con correcciones de Dashboard y QR Cloudflare
 echo ==============================================
 echo.
 
-set OUT_DIR=dist_v2.2
+set OUT_DIR=dist_v2.3
 
 echo Paso 1: Limpiando compilacion anterior en %OUT_DIR%...
 if exist "%OUT_DIR%" rmdir /s /q "%OUT_DIR%"
@@ -54,7 +54,7 @@ copy /Y "boss\manifest.json" "temp_app\boss\"
 (
   echo {
   echo   "name": "cajafresh-pos",
-  echo   "version": "2.2.0",
+  echo   "version": "2.3.0",
   echo   "main": "main.js",
   echo   "dependencies": {
   echo     "express": "^5.2.1",
@@ -93,7 +93,7 @@ rename "%OUT_DIR%\electron.exe" "Caja Fresh POS.exe"
 
 echo.
 echo ==============================================
-echo  EXITO! La aplicacion v2.2 fue compilada en:
+echo  EXITO! La aplicacion v2.3 fue compilada en:
 echo  %OUT_DIR%\Caja Fresh POS.exe
 echo ==============================================
 echo.

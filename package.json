@@ -1,12 +1,13 @@
 {
   "name": "puntopila-pos",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Sistema POS Punto Pila - Gestión Inteligente",
   "main": "main.js",
   "scripts": {
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
     "build": "electron-builder",
-    "package": "electron-packager . \"Punto Pila POS\" --platform=win32 --arch=x64 --out=dist --overwrite"
+    "package": "electron-packager . \"Punto Pila POS\" --platform=win32 --arch=x64 --out=dist --overwrite",
+    "publish": "electron-builder -p always"
   },
   "build": {
     "appId": "com.puntopila.pos",

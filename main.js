@@ -1660,6 +1660,61 @@ ipcMain.on('license-activated', () => {
     setTimeout(initCloudSync, 3000);
 });
 
+// ==========================================
+// AUTO UPDATER (GitHub Releases)
+// ==========================================
+const { autoUpdater } = require('electron-updater');
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('update-available', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-status', { status: 'available', info: info });
+    }
+});
+autoUpdater.on('update-not-available', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-status', { status: 'not-available' });
+    }
+});
+autoUpdater.on('error', (err) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
+    }
+});
+autoUpdater.on('download-progress', (progressObj) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-status', { status: 'downloading', progress: progressObj });
+    }
+});
+autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-status', { status: 'downloaded', info: info });
+    }
+});
+
+ipcMain.on('check-for-updates', () => {
+    try {
+        autoUpdater.checkForUpdates();
+    } catch(err) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
+        }
+    }
+});
+ipcMain.on('download-update', () => {
+    try {
+        autoUpdater.downloadUpdate();
+    } catch(err) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
+        }
+    }
+});
+ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(async () => {
     // Inicializar Base de Datos
     try {
