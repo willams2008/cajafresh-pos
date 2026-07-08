@@ -9,6 +9,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Lazy accessor — database may not be open at module load time
+function getDbApi() {
+    return require('./database').api;
+}
+
 class CloudSync {
     constructor(options = {}) {
         this.supabaseUrl = options.supabaseUrl || '';
@@ -16,6 +21,7 @@ class CloudSync {
         this.storeId = options.storeId || '';
         this.storeName = options.storeName || 'Mi Tienda';
         this.brandName = options.brandName || 'Caja Fresh';
+        this.licenseExpiry = options.licenseExpiry || null;
         this.enabled = false;
         this.lastSyncTime = 0;
         this.syncInterval = null;
@@ -23,6 +29,13 @@ class CloudSync {
         this.queuePath = options.queuePath || '';
         this.onStatusChange = options.onStatusChange || (() => {});
         this.lastStatus = { synced: false, lastSync: null, error: null };
+
+        console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}`);
+
+        // Auto-inicializar si ya vienen datos
+        if (this.supabaseUrl && this.supabaseKey && this.storeId) {
+            this.configure(options);
+        }
     }
 
     configure(config) {
@@ -31,6 +44,7 @@ class CloudSync {
         if (config.storeId) this.storeId = config.storeId;
         if (config.storeName) this.storeName = config.storeName;
         if (config.brandName) this.brandName = config.brandName;
+        if (config.licenseExpiry !== undefined) this.licenseExpiry = config.licenseExpiry;
         if (config.queuePath) this.queuePath = config.queuePath;
 
         this.enabled = !!(this.supabaseUrl && this.supabaseKey && this.storeId);
@@ -46,11 +60,41 @@ class CloudSync {
 
     _startPeriodicSync() {
         if (this.syncInterval) clearInterval(this.syncInterval);
-        // Sincronizar cada 2 minutos (y comandos cada 30 segundos usando otro intervalo o el mismo)
-        this.syncInterval = setInterval(() => {
-            this._flushQueue();
-            this._fetchCommands(); // Revisar comandos remotos
-        }, 10000); // 10 segundos para mayor velocidad de respuesta
+        
+        // Backoff exponencial: cuando hay errores de red, aumentar el intervalo
+        // Base: 10s, Máximo: 5 minutos. Se resetea cuando la conexión vuelve.
+        this._syncFailCount = this._syncFailCount || 0;
+        
+        const scheduleNext = () => {
+            if (this.syncInterval) clearTimeout(this.syncInterval);
+            
+            // Calcular delay con backoff: 10s, 20s, 40s, 80s, ..., hasta 300s
+            const baseDelay = 10000;
+            const maxDelay = 300000; // 5 minutos
+            const delay = Math.min(baseDelay * Math.pow(2, this._syncFailCount), maxDelay);
+            
+            this.syncInterval = setTimeout(async () => {
+                try {
+                    await this._flushQueue();
+                    await this._fetchCommands();
+                    
+                    // Si llegó aquí sin error, resetear el contador
+                    if (this._syncFailCount > 0) {
+                        console.log('[CLOUD-SYNC] ✅ Conexión restablecida, volviendo a sync rápido.');
+                        this._syncFailCount = 0;
+                    }
+                } catch(e) {
+                    // Solo loguear el primer error y cada vez que escale
+                    if (this._syncFailCount === 0 || this._syncFailCount % 3 === 0) {
+                        console.log(`[CLOUD-SYNC] ⏸️ Sin conexión (intento ${this._syncFailCount + 1}), próximo intento en ${Math.round(Math.min(baseDelay * Math.pow(2, this._syncFailCount + 1), maxDelay) / 1000)}s`);
+                    }
+                    this._syncFailCount = Math.min(this._syncFailCount + 1, 5);
+                }
+                scheduleNext();
+            }, delay);
+        };
+        
+        scheduleNext();
     }
 
     // ==========================================
@@ -85,19 +129,24 @@ class CloudSync {
                             resolve({ success: true });
                         }
                     } else {
-                        console.error(`[CLOUD-SYNC] Error ${res.statusCode}: ${body}`);
+                        const errMsg = `[CLOUD-SYNC] ❌ ${method} ${table} → HTTP ${res.statusCode}: ${body.substring(0, 300)}`;
+                        console.error(errMsg);
+                        try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${errMsg}\n`); } catch(_){}
                         reject(new Error(`Supabase ${res.statusCode}: ${body}`));
                     }
                 });
             });
 
             req.on('error', (e) => {
-                console.error('[CLOUD-SYNC] Error de red:', e.message);
+                const errMsg = `[CLOUD-SYNC] ERROR FETCH: ${e.message}`;
+                console.error(errMsg);
+                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${errMsg}\n`); } catch(_){}
                 reject(e);
             });
 
             req.setTimeout(15000, () => {
                 req.destroy();
+                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR FETCH: Timeout (${method} ${table})\n`); } catch(_){}
                 reject(new Error('Timeout'));
             });
 
@@ -120,7 +169,8 @@ class CloudSync {
                 method: 'GET',
                 headers: {
                     'apikey': this.supabaseKey,
-                    'Authorization': `Bearer ${this.supabaseKey}`
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Accept': 'application/json'
                 }
             };
 
@@ -152,13 +202,18 @@ class CloudSync {
     async registerStore() {
         if (!this.enabled) return;
         try {
-            await this._supabaseRequest('stores', 'POST', {
+            const payload = {
                 id: this.storeId,
                 name: this.storeName,
                 brand_name: this.brandName,
                 last_seen: new Date().toISOString(),
                 status: 'online'
-            });
+            };
+            if (this.licenseExpiry) {
+                payload.license_expiry = this.licenseExpiry;
+            }
+
+            await this._supabaseRequest('stores', 'POST', payload);
             console.log(`[CLOUD-SYNC] 🏪 Tienda registrada: ${this.storeName}`);
             this._updateStatus(true);
         } catch (e) {
@@ -176,6 +231,63 @@ class CloudSync {
             }, `?id=eq.${this.storeId}`);
         } catch (e) {
             // Silenciar errores de heartbeat
+        }
+    }
+
+    // ==========================================
+    // IMPORTAR CATÁLOGO DESDE SUPABASE → SQLite
+    // ==========================================
+    async pullCatalogFromCloud() {
+        if (!this.enabled) return;
+        try {
+            console.log('[CLOUD-SYNC] ⬇️ Importando catálogo desde Supabase...');
+            const remoteProducts = await this._supabaseGet('store_products', `?store_id=eq.${this.storeId}`);
+            if (!remoteProducts || remoteProducts.length === 0) {
+                console.log('[CLOUD-SYNC] ⚠️ No hay productos en store_products para esta tienda.');
+                return;
+            }
+
+            const localDbApi = getDbApi();
+            const currentLocalProducts = await localDbApi.getProducts(this.storeId);
+            const localMap = new Map((currentLocalProducts || []).map(p => [String(p.id), p]));
+
+            let imported = 0;
+            for (const rp of remoteProducts) {
+                const pid = String(rp.product_id);
+                const existing = localMap.get(pid);
+                
+                const localProduct = {
+                    id: rp.product_id,
+                    name: rp.name || 'Sin nombre',
+                    category: rp.category || 'Otros',
+                    priceUSD: parseFloat(rp.price) || 0,
+                    priceVES: parseFloat(rp.price_ves) || 0,
+                    priceEUR: parseFloat(rp.price_eur) || 0,
+                    promoPrice: parseFloat(rp.promo_price) || 0,
+                    costPrice: parseFloat(rp.cost) || 0,
+                    stock: existing ? (existing.stock ?? 0) : (parseInt(rp.stock) || 0),
+                    minStock: existing ? (existing.minStock ?? 5) : 5,
+                    img: rp.img_url || (existing ? existing.img : ''),
+                    flavors: existing ? (typeof existing.flavors === 'string' ? JSON.parse(existing.flavors) : existing.flavors) : [],
+                    expiryDate: rp.expiry_date || (existing ? existing.expiryDate : ''),
+                    description: existing ? existing.description : ''
+                };
+                await localDbApi.saveProduct(this.storeId, localProduct);
+                imported++;
+            }
+
+            console.log(`[CLOUD-SYNC] ✅ ${imported} productos importados a la BD local.`);
+
+            // Notificar al renderer para que recargue la lista
+            try {
+                const { BrowserWindow } = require('electron');
+                BrowserWindow.getAllWindows().forEach(win => {
+                    win.webContents.send('catalog-pulled-from-cloud', { count: imported });
+                });
+            } catch(e) {}
+
+        } catch (e) {
+            console.error('[CLOUD-SYNC] Error importando catálogo:', e.message);
         }
     }
 
@@ -226,13 +338,19 @@ class CloudSync {
     // ENVÍO DE VENTA INDIVIDUAL
     // ==========================================
     async pushSale(saleData) {
-        if (!this.enabled) return;
+        if (!this.enabled) {
+            console.warn('[CLOUD-SYNC] ⚠️ pushSale llamado pero sync NO está habilitado.');
+            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] pushSale IGNORADO: sync deshabilitado. enabled=${this.enabled} url=${!!this.supabaseUrl} key=${!!this.supabaseKey} storeId=${this.storeId}\n`); } catch(_){}
+            return;
+        }
 
+        const saleDate = saleData.date || new Date().toISOString();
+        const datePart = saleDate.split('T')[0].replace(/-/g, '');
         const sale = {
-            id: `${this.storeId}_${saleData.ticket || saleData.id || Date.now()}`,
+            id: `${this.storeId}_S${datePart}_${Date.now()}_${saleData.ticket || '0'}`,
             store_id: this.storeId,
             ticket: saleData.ticket || saleData.id || '---',
-            date: (saleData.date || new Date().toISOString()).split('T')[0],
+            date: saleDate,
             timestamp: saleData.timestamp || Date.now(),
             total_usd: saleData.totalUSD || saleData.total_usd || saleData.total || 0,
             total_ves: saleData.totalVES || 0,
@@ -241,13 +359,48 @@ class CloudSync {
             items_count: (saleData.items || []).reduce((a, i) => a + (i.qty || 1), 0),
             items_json: JSON.stringify(saleData.items || []),
             exchange_rate: saleData.exchangeRate || 0,
+            client_name: saleData.client?.name || 'Venta Local',
             status: saleData.status || 'paid'
         };
 
+        console.log(`[CLOUD-SYNC] 🛒 Enviando venta ${sale.id} ($${sale.total_usd}) a Supabase...`);
+        try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] PUSH_SALE: ${sale.id} total=$${sale.total_usd} method=${sale.method} date=${sale.date}\n`); } catch(_){}
+
         try {
             await this._supabaseRequest('store_sales', 'POST', sale);
+            console.log(`[CLOUD-SYNC] ✅ Venta ${sale.id} enviada con éxito.`);
+            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ✅ PUSH_SALE OK: ${sale.id}\n`); } catch(_){}
         } catch (e) {
+            console.error('[CLOUD-SYNC] ❌ Error enviando venta:', e.message);
+            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ❌ PUSH_SALE FAIL: ${sale.id} → ${e.message}\n`); } catch(_){}
             this.pendingQueue.push({ type: 'sale', data: sale, timestamp: Date.now() });
+            this._savePendingQueue();
+        }
+    }
+
+    // ==========================================
+    // ENVÍO DE GASTO INDIVIDUAL
+    // ==========================================
+    async pushExpense(expenseData) {
+        if (!this.enabled) return;
+
+        const expense = {
+            id: `${this.storeId}_${expenseData.id || Date.now()}`,
+            store_id: this.storeId,
+            date: (expenseData.date || new Date().toISOString()).split('T')[0],
+            description: expenseData.description || 'Gasto General',
+            amount_usd: expenseData.amountUSD || 0,
+            payment_method: expenseData.paymentMethod || 'efectivo',
+            reference_number: expenseData.referenceNumber || '',
+            responsible_name: expenseData.responsibleName || ''
+        };
+
+        try {
+            await this._supabaseRequest('store_expenses', 'POST', expense);
+            console.log(`[CLOUD-SYNC] 💸 Gasto sincronizado: ${expense.description} ($${expense.amount_usd})`);
+        } catch (e) {
+            console.error('[CLOUD-SYNC] Error enviando gasto:', e.message);
+            this.pendingQueue.push({ type: 'expense', data: expense, timestamp: Date.now() });
             this._savePendingQueue();
         }
     }
@@ -311,19 +464,22 @@ class CloudSync {
             const chunkSize = 20;
             for (let i = 0; i < products.length; i += chunkSize) {
                 const chunk = products.slice(i, i + chunkSize);
-                const supabaseProducts = chunk.map(p => ({
-                    id: `${this.storeId}_${p.id}`,
-                    store_id: this.storeId,
-                    product_id: p.id,
-                    name: p.name,
-                    price: p.priceUSD || p.price || 0,
-                    price_ves: p.priceVES || 0,
-                    cost: p.costPrice || p.cost || 0,
-                    stock: p.stock || 0,
-                    category: p.category || 'General',
-                    img_url: p.img || '',
-                    updated_at: new Date().toISOString()
-                }));
+                const supabaseProducts = chunk.map(p => {
+                    const item = {
+                        id: `${this.storeId}_${p.id}`,
+                        store_id: this.storeId,
+                        product_id: p.id,
+                        name: p.name,
+                        price: p.priceUSD || p.price || 0,
+                        price_ves: p.priceVES || 0,
+                        cost: p.costPrice || p.cost || 0,
+                        stock: p.stock || 0,
+                        category: p.category || 'General',
+                        updated_at: new Date().toISOString(),
+                        img_url: p.img || ''
+                    };
+                    return item;
+                });
                 
                 // UPSERT: si el id ya existe lo actualiza, si no lo crea
                 const res = await fetch(`${this.supabaseUrl}/rest/v1/store_products`, {
@@ -420,15 +576,26 @@ class CloudSync {
     // LECTURA DE COMANDOS REMOTOS (App del Jefe)
     // ==========================================
     async _fetchCommands() {
-        if (!this.enabled) return;
+        if (!this.enabled) {
+            console.log('[CLOUD-SYNC] ⏸️ Sincronización desactivada. Saltando fetchCommands.');
+            return;
+        }
         
         try {
+            const msg1 = `[CLOUD-SYNC] 🔍 Buscando comandos para store: ${this.storeId}...`;
+            console.log(msg1);
+            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${msg1}\n`); } catch(e){}
+
             const commands = await this._supabaseGet('store_commands', `?store_id=eq.${this.storeId}&status=eq.pending`);
+            
+            const msg2 = `[CLOUD-SYNC] 🔍 Resultado supabaseGet: ${commands ? commands.length : 'null'}`;
+            console.log(msg2, commands);
+            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${msg2}\n`); } catch(e){}
+
             if (commands && commands.length > 0) {
                 console.log(`[CLOUD-SYNC] 📥 Recibidos ${commands.length} comandos remotos pendientes`);
                 
-                const { api: dbApi } = require('./database'); // Import dinámico para evitar dependencias circulares
-                const { ipcMain } = require('electron'); // Importamos mainWindow o ipcMain
+                const dbApi = getDbApi();
                 
                 for (const cmd of commands) {
                     if (cmd.command_type === 'UPDATE_PRICE') {
@@ -436,16 +603,16 @@ class CloudSync {
                         console.log(`[CLOUD-SYNC] Ejecutando UPDATE_PRICE para ${product_id} a ${new_price}`);
                         
                         try {
-                            const productsList = await dbApi.getProducts();
+                            const productsList = await dbApi.getProducts(this.storeId);
                             const prod = productsList.find(p => p.id === product_id);
                             
                             if (prod) {
                                 prod.priceUSD = parseFloat(new_price);
-                                await dbApi.saveProduct(prod);
+                                await dbApi.saveProduct(this.storeId, prod);
                                 
                                 await this._supabaseRequest('store_commands', 'PATCH', { 
-                                    status: 'done', 
-                                    executed_at: new Date().toISOString() 
+                                    status: 'done',
+                                    executed_at: new Date().toISOString()
                                 }, `?id=eq.${cmd.id}`);
                                 
                                 const { BrowserWindow } = require('electron');
@@ -457,15 +624,19 @@ class CloudSync {
                                     });
                                 });
                             } else {
-                                await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', error_log: 'Producto no encontrado' }, `?id=eq.${cmd.id}`);
+                                console.warn(`[CLOUD-SYNC] ⚠️ Producto ${product_id} NO encontrado en BD local`);
+                                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR PRODUCT NOT FOUND: ${product_id} en tienda ${this.storeId}\n`); } catch(e){}
+                                await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: 'Producto no encontrado' }, `?id=eq.${cmd.id}`);
                             }
                         } catch (err) {
                             console.error('[CLOUD-SYNC] Error ejecutando comando:', err.message);
-                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', error_log: err.message }, `?id=eq.${cmd.id}`);
+                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: err ? err.message : 'Error interno' }, `?id=eq.${cmd.id}`);
                         }
                     } else if (cmd.command_type === 'UPDATE_PRODUCT_FULL') {
                         const { 
                             product_id, 
+                            new_name,
+                            new_category,
                             new_price_usd, 
                             new_price_ves, 
                             new_price_eur, 
@@ -478,8 +649,10 @@ class CloudSync {
                         console.log(`[CLOUD-SYNC] ▶ UPDATE_PRODUCT_FULL para: ${product_id}`);
                         
                         try {
-                            const productsList = await dbApi.getProducts();
+                            const localDbApi = getDbApi();
+                            const productsList = await localDbApi.getProducts(this.storeId);
                             const prod = productsList.find(p => p.id === product_id);
+                            console.log(`[CLOUD-SYNC] 🔎 Buscando producto ${product_id} en ${productsList.length} productos locales...`);
                             
                             if (prod) {
                                 if (new_price_usd !== undefined && new_price_usd !== null) prod.priceUSD = parseFloat(new_price_usd);
@@ -493,11 +666,11 @@ class CloudSync {
                                 }
                                 if (new_expiry !== undefined && new_expiry !== null) prod.expiryDate = new_expiry;
                                 
-                                await dbApi.saveProduct(prod);
+                                await localDbApi.saveProduct(this.storeId, prod);
                                 
                                 await this._supabaseRequest('store_commands', 'PATCH', { 
-                                    status: 'done', 
-                                    executed_at: new Date().toISOString() 
+                                    status: 'done',
+                                    executed_at: new Date().toISOString()
                                 }, `?id=eq.${cmd.id}`);
                                 
                                 const { BrowserWindow } = require('electron');
@@ -505,11 +678,51 @@ class CloudSync {
                                     win.webContents.send('product-updated-remote-full', prod);
                                 });
                             } else {
-                                await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', error_log: 'Producto no encontrado' }, `?id=eq.${cmd.id}`);
+                                // 🆕 CREAR producto si no existe en la sede local
+                                console.log(`[CLOUD-SYNC] 🆕 Producto ${product_id} no existe localmente. Creando...`);
+                                const newProd = {
+                                    id: product_id,
+                                    name: cmd.payload.new_name || 'Producto Nuevo (Remoto)',
+                                    category: cmd.payload.new_category || 'General',
+                                    priceUSD: parseFloat(new_price_usd) || 0,
+                                    priceVES: parseFloat(new_price_ves) || 0,
+                                    priceEUR: parseFloat(new_price_eur) || 0,
+                                    promoPrice: parseFloat(new_promo_price) || 0,
+                                    stock: parseInt(new_stock) || 0,
+                                    img: new_img || '',
+                                    flavors: typeof new_variants === 'string' ? new_variants.split(',').map(v => v.trim()) : (new_variants || []),
+                                    expiryDate: new_expiry || '',
+                                    description: ''
+                                };
+                                await localDbApi.saveProduct(this.storeId, newProd);
+                                
+                                await this._supabaseRequest('store_commands', 'PATCH', { 
+                                    status: 'done',
+                                    executed_at: new Date().toISOString()
+                                }, `?id=eq.${cmd.id}`);
+                                
+                                const { BrowserWindow } = require('electron');
+                                BrowserWindow.getAllWindows().forEach(win => {
+                                    win.webContents.send('product-updated-remote-full', newProd);
+                                });
                             }
                         } catch (err) {
                             console.error('[CLOUD-SYNC] Error ejecutando UPDATE_PRODUCT_FULL:', err.message);
-                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', error_log: err.message }, `?id=eq.${cmd.id}`);
+                            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR UPDATE_PRODUCT_FULL: ${err.message} - stack: ${err.stack}\n`); } catch(e){}
+                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: err ? err.message : 'Error interno' }, `?id=eq.${cmd.id}`);
+                        }
+                    } else if (cmd.command_type === 'PUSH_FULL_CATALOG') {
+                        console.log('[CLOUD-SYNC] ▶ PUSH_FULL_CATALOG solicitado por Jefe');
+                        try {
+                            const allProducts = await getDbApi().getProducts(this.storeId);
+                            await this.pushCatalog(allProducts);
+                            await this._supabaseRequest('store_commands', 'PATCH', { 
+                                status: 'done',
+                                executed_at: new Date().toISOString()
+                            }, `?id=eq.${cmd.id}`);
+                        } catch (err) {
+                            console.error('[CLOUD-SYNC] Error ejecutando PUSH_FULL_CATALOG:', err.message);
+                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: err ? err.message : 'Error interno' }, `?id=eq.${cmd.id}`);
                         }
                     } else if (cmd.command_type === 'UPDATE_EXCHANGE_RATE') {
                         const { new_rate } = cmd.payload;
@@ -522,21 +735,31 @@ class CloudSync {
                             });
                             
                             await this._supabaseRequest('store_commands', 'PATCH', { 
-                                status: 'done', 
-                                executed_at: new Date().toISOString() 
+                                status: 'done',
+                                executed_at: new Date().toISOString()
                             }, `?id=eq.${cmd.id}`);
                         } catch (err) {
-                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', error_log: err.message }, `?id=eq.${cmd.id}`);
+                            await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: err ? err.message : 'Error interno' }, `?id=eq.${cmd.id}`);
                         }
                     }
                 }
                 
                 // Sincronizar catálogo de vuelta
-                const allProducts = await dbApi.getProducts();
-                await this.pushCatalog(allProducts);
+                try {
+                    const dbApi2 = getDbApi();
+                    const allProducts = await dbApi2.getProducts(this.storeId);
+                    await this.pushCatalog(allProducts);
+                } catch(catalogErr) {
+                    console.error('[CLOUD-SYNC] Error sincronizando catálogo post-comando:', catalogErr.message);
+                }
             }
         } catch (e) {
-            console.error('[CLOUD-SYNC] Error en polling de comandos:', e.message);
+            console.error('[CLOUD-SYNC] ❌ Error en polling de comandos:', e.message, e.stack);
+            try {
+                const { app } = require('electron');
+                fs.appendFileSync(path.join(app.getPath('userData'), 'startup_debug.log'),
+                    `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR FETCH: ${e.message}\n`);
+            } catch(_){}
         }
     }
 
@@ -605,6 +828,39 @@ class CloudSync {
 
     getStatus() {
         return this.lastStatus;
+    }
+
+    // ==========================================
+    // BACKUP SEMANAL AUTOMÁTICO
+    // ==========================================
+    async pushBackup(dbApi) {
+        if (!this.enabled) return;
+        
+        console.log('[CLOUD-SYNC] 🔄 Iniciando backup automático en la nube...');
+        try {
+            const products = await dbApi.getProducts(this.storeId) || [];
+            const clients = await dbApi.getClients(this.storeId) || [];
+            // Resumen básico de ventas de los últimos 7 días
+            const sales = await dbApi.getSales(this.storeId) || [];
+            const recentSales = sales
+                .filter(s => (Date.now() - new Date(s.date).getTime()) < 7 * 24 * 60 * 60 * 1000)
+                .map(s => ({
+                    id: s.id, totalUSD: s.totalUSD, method: s.method, date: s.date
+                }));
+
+            const backupData = {
+                store_id: this.storeId,
+                backup_date: new Date().toISOString(),
+                products_json: products,
+                clients_json: clients,
+                sales_summary_json: recentSales
+            };
+
+            await this._supabaseRequest('store_backups', 'POST', backupData);
+            console.log(`[CLOUD-SYNC] ✅ Backup automático guardado en la nube para tienda: ${this.storeId}`);
+        } catch (e) {
+            console.error('[CLOUD-SYNC] ❌ Error subiendo backup automático:', e.message);
+        }
     }
 
     destroy() {

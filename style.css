@@ -158,6 +158,55 @@ body {
     .hidden { 
         display: none !important; 
     }
+
+    /* --- OVERRIDES PARA EXPORTAR EL EXPEDIENTE A PDF --- */
+    body.exporting-analytics aside,
+    body.exporting-analytics main,
+    body.exporting-analytics .modal,
+    body.exporting-analytics #print-ticket-container,
+    body.exporting-analytics #print-ticket-container * {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+    
+    body.exporting-analytics #pdf-export-report {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        top: 0 !important; left: 0 !important; right: 0 !important;
+        background: white !important;
+        color: black !important;
+        z-index: 999999 !important;
+    }
+    
+    body.exporting-analytics #pdf-export-report table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+    }
+    body.exporting-analytics #pdf-export-report th, 
+    body.exporting-analytics #pdf-export-report td {
+        border: 1px solid #cbd5e1;
+        padding: 6px 8px;
+        text-align: left;
+    }
+    body.exporting-analytics #pdf-export-report th {
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
+        font-weight: bold;
+    }
+}
+    body.exporting-analytics main { display: flex !important; width: 100% !important; overflow: visible !important; height: auto !important; opacity: 1 !important; visibility: visible !important; }
+    body.exporting-analytics #print-ticket-container, 
+    body.exporting-analytics #print-ticket-container *, 
+    body.exporting-analytics #z-report-template, 
+    body.exporting-analytics #z-report-template * { 
+        display: none !important; opacity: 0 !important; visibility: hidden !important; 
+    }
+    body.exporting-analytics #view-analytics { display: flex !important; position: static !important; overflow: visible !important; height: auto !important; opacity: 1 !important; visibility: visible !important; }
+    body.exporting-analytics #view-analytics .custom-scrollbar { overflow: visible !important; }
 }
 
 .modal-fade-in {
@@ -307,12 +356,41 @@ input[type=number] {
     border-color: rgba(255, 255, 255, 0.1);
 }
 
-aside.w-20 span.lg\:block { display: none !important; }
-aside.w-20 #main-brand-logo { display: none !important; }
+/* Cashier Login Panel Animations */
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fadeOutOverlay {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+@keyframes scaleInPanel {
+    from { opacity: 0; transform: scale(0.92) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
 
-
-aside.w-20 div.lg\:block { display: none !important; }
-
-
-aside.w-20 .sync-lic-text { display: none !important; }
-
+/* Sidebar collapsible sections */
+.nav-section-header {
+    user-select: none;
+}
+.nav-section-header:hover {
+    opacity: 0.7;
+}
+.nav-section-chevron {
+    transition: transform 0.2s ease;
+}
+.nav-section-header.collapsed .nav-section-chevron {
+    transform: rotate(-90deg);
+}
+.nav-section-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+    max-height: 300px;
+    opacity: 1;
+}
+.nav-section-body.collapsed {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+}

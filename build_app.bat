@@ -21,6 +21,8 @@ mkdir "temp_app"
 copy /Y "index.html" "temp_app\"
 copy /Y "app.js"     "temp_app\"
 copy /Y "main.js"    "temp_app\"
+copy /Y "database.js" "temp_app\"
+copy /Y "cloud-sync.js" "temp_app\"
 copy /Y "license.js" "temp_app\"
 copy /Y "theme.js"   "temp_app\"
 copy /Y "preload.js" "temp_app\"
@@ -28,6 +30,7 @@ copy /Y "style.css"  "temp_app\"
 copy /Y "activation.html" "temp_app\"
 copy /Y "download.html"   "temp_app\"
 copy /Y "icon.png"   "temp_app\"
+copy /Y "lanzar_tunel.bat" "temp_app\"
 mkdir "temp_app\mobile"
 copy /Y "mobile\index.html" "temp_app\mobile\"
 copy /Y "mobile\app.js"     "temp_app\mobile\"
@@ -35,6 +38,17 @@ copy /Y "mobile\manifest.json" "temp_app\mobile\"
 copy /Y "mobile\sw.js"      "temp_app\mobile\"
 copy /Y "mobile\icon-192.png" "temp_app\mobile\"
 copy /Y "mobile\icon-512.png" "temp_app\mobile\"
+mkdir "temp_app\boss-multi"
+copy /Y "boss-multi\index.html" "temp_app\boss-multi\"
+copy /Y "boss-multi\app.js"     "temp_app\boss-multi\"
+copy /Y "boss-multi\index.css"  "temp_app\boss-multi\"
+copy /Y "boss-multi\manifest.json" "temp_app\boss-multi\"
+copy /Y "boss-multi\sw.js"      "temp_app\boss-multi\"
+mkdir "temp_app\boss"
+copy /Y "boss\index.html" "temp_app\boss\"
+copy /Y "boss\app.js"     "temp_app\boss\"
+copy /Y "boss\sw.js"      "temp_app\boss\"
+copy /Y "boss\manifest.json" "temp_app\boss\"
 
 (
   echo {
@@ -49,7 +63,8 @@ copy /Y "mobile\icon-512.png" "temp_app\mobile\"
   echo     "cloudflared": "^0.7.1",
   echo     "localtunnel": "^2.0.2",
   echo     "ngrok": "^5.0.0-beta.2",
-  echo     "whatsapp-web.js": "^1.34.6"
+  echo     "whatsapp-web.js": "^1.34.6",
+  echo     "sqlite3": "^6.0.1"
   echo   }
   echo }
 ) > "temp_app\package.json"

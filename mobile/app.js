@@ -6,9 +6,36 @@ let savedServerUrl = localStorage.getItem('pos_server_url') || permanentUrl;
 let socket = null;
 let isOffline = !navigator.onLine;
 
-let products = JSON.parse(localStorage.getItem('pos_mobile_products')) || [];
-let cart = JSON.parse(localStorage.getItem('pos_mobile_cart')) || [];
-let exchangeRate = parseFloat(localStorage.getItem('pos_mobile_rate')) || 36.50;
+let products = [];
+try {
+    const cachedProducts = localStorage.getItem('pos_mobile_products');
+    if (cachedProducts && cachedProducts !== 'undefined' && cachedProducts !== 'null') {
+        products = JSON.parse(cachedProducts) || [];
+    }
+} catch (e) {
+    console.error('Error parsing products cache:', e);
+}
+
+let cart = [];
+try {
+    const cachedCart = localStorage.getItem('pos_mobile_cart');
+    if (cachedCart && cachedCart !== 'undefined' && cachedCart !== 'null') {
+        cart = JSON.parse(cachedCart) || [];
+    }
+} catch (e) {
+    console.error('Error parsing cart cache:', e);
+}
+
+let exchangeRate = 36.50;
+try {
+    const cachedRate = localStorage.getItem('pos_mobile_rate');
+    if (cachedRate && cachedRate !== 'undefined' && cachedRate !== 'null') {
+        exchangeRate = parseFloat(cachedRate) || 36.50;
+    }
+} catch (e) {
+    console.error('Error parsing rate cache:', e);
+}
+
 let currentCategory = 'Todos';
 
 // UI Elements for connection
@@ -28,14 +55,25 @@ function updateStatus(text, colorClass, hideAfter = 0) {
 }
 
 async function initConnection() {
-    // 1. Prioridad: Revisar si hay una URL en el hash (desde ntfy.sh / QR nuevo)
+    // 1. Prioridad: Revisar si hay una URL o un Business ID (bid) en el hash
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const urlOverride = hashParams.get('url');
+    const bidOverride = hashParams.get('bid');
+
     if (urlOverride && urlOverride.startsWith('http')) {
         console.log('🚀 Sobreescritura de URL detectada:', urlOverride);
         savedServerUrl = urlOverride;
         localStorage.setItem('pos_server_url', urlOverride);
     }
+
+    // Persistir el Business ID único para futuras reconexiones
+    if (bidOverride) {
+        console.log('🆔 Nuevo Business ID detectado:', bidOverride);
+        localStorage.setItem('pos_business_id', bidOverride);
+    }
+
+    // Usar el ID dinámico o el fallback histórico
+    const activeBid = localStorage.getItem('pos_business_id') || 'cajafresh_pos_v2_778899_remote';
 
     // 2. Mostrar estado amigable
     updateStatus('CONECTANDO...', 'amber');
@@ -51,8 +89,8 @@ async function initConnection() {
         `http://192.168.0.5:3000`
     ].filter(u => u && u.length > 5);
 
-    // 2. Descubrimiento silencioso en nube vía NTFY
-    fetch(`https://ntfy.sh/cajafresh_pos_v2_778899_remote/json?poll=1&since=12h`, { signal: AbortSignal.timeout(3500) })
+    // 2. Descubrimiento silencioso en nube vía NTFY (usando el canal del cliente)
+    fetch(`https://ntfy.sh/${activeBid}/json?poll=1&since=12h`, { signal: AbortSignal.timeout(3500) })
         .then(res => res.text())
         .then(text => {
             const lines = text.trim().split('\n');
@@ -179,8 +217,9 @@ function setupSocketEvents() {
     });
 
     socket.on('products-updated', (data) => {
-        products = data.products;
-        exchangeRate = data.exchangeRate;
+        if (!data) return;
+        products = data.products || [];
+        exchangeRate = parseFloat(data.exchangeRate) || 36.50;
         
         // Dynamic Branding update
         const displayTitle = data.mobileTitle || data.companyName || 'PUNTO PILA';

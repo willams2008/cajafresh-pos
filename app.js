@@ -638,16 +638,16 @@ let currentCategory = 'Todos';
 
 
 const INITIAL_DATA_PRODUCTS = [
-    { id: 'p_1', name: 'Coca-Cola Clásica Lata', category: 'Gaseosas', price: 1.50, costPrice: 0.80, stock: 45, img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_2', name: 'Agua Mineral Evian', category: 'Aguas', price: 2.00, costPrice: 1.10, stock: 30, img: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4c?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_3', name: 'Jugo de Naranja Natural', category: 'Jugos', price: 2.50, costPrice: 1.50, stock: 15, img: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_4', name: 'Papas Fritas Lays 150g', category: 'Snacks', price: 1.80, costPrice: 0.90, stock: 50, img: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_5', name: 'Galletas Oreo Original', category: 'Snacks', price: 1.20, costPrice: 0.60, stock: 80, img: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_6', name: 'Cerveza Corona Extra', category: 'Licores', price: 2.50, costPrice: 1.20, stock: 60, img: 'https://images.unsplash.com/photo-1614316049964-67258db54637?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_7', name: 'Café Expreso Doble', category: 'Cafetería', price: 2.00, costPrice: 0.50, stock: 99, img: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_8', name: 'Croissant de Mantequilla', category: 'Panadería', price: 1.50, costPrice: 0.40, stock: 25, img: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_9', name: 'Helado de Vainilla y Fresa', category: 'Postres', price: 3.00, costPrice: 1.20, stock: 20, img: 'https://images.unsplash.com/photo-1570197571499-166b36435e9f?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_10', name: 'Sándwich de Jamón y Queso', category: 'Comida Rápida', price: 4.50, costPrice: 2.00, stock: 12, img: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&q=80&w=400' }
+    { id: 'p_1', name: 'Coca-Cola Clásica Lata', category: 'Gaseosas', price: 1.50, costPrice: 0.80, stock: 45 },
+    { id: 'p_2', name: 'Agua Mineral Evian', category: 'Aguas', price: 2.00, costPrice: 1.10, stock: 30 },
+    { id: 'p_3', name: 'Jugo de Naranja Natural', category: 'Jugos', price: 2.50, costPrice: 1.50, stock: 15 },
+    { id: 'p_4', name: 'Papas Fritas Lays 150g', category: 'Snacks', price: 1.80, costPrice: 0.90, stock: 50 },
+    { id: 'p_5', name: 'Galletas Oreo Original', category: 'Snacks', price: 1.20, costPrice: 0.60, stock: 80 },
+    { id: 'p_6', name: 'Cerveza Corona Extra', category: 'Licores', price: 2.50, costPrice: 1.20, stock: 60 },
+    { id: 'p_7', name: 'Café Expreso Doble', category: 'Cafetería', price: 2.00, costPrice: 0.50, stock: 99 },
+    { id: 'p_8', name: 'Croissant de Mantequilla', category: 'Panadería', price: 1.50, costPrice: 0.40, stock: 25 },
+    { id: 'p_9', name: 'Helado de Vainilla y Fresa', category: 'Postres', price: 3.00, costPrice: 1.20, stock: 20 },
+    { id: 'p_10', name: 'Sándwich de Jamón y Queso', category: 'Comida Rápida', price: 4.50, costPrice: 2.00, stock: 12 }
 ];
 const INITIAL_DATA_CLIENTS = [
     { id: 'c_1', document: 'V-12345678', name: 'Cliente Frecuente', phone: '0414-1234567' }
@@ -897,6 +897,14 @@ function syncDashboardData() {
 
 // Initialize System
 document.addEventListener('DOMContentLoaded', async () => {
+    // Global image error handler: replace any broken image with local placeholder
+    document.addEventListener('error', (e) => {
+        if (e.target && e.target.tagName === 'IMG' && !e.target.src.startsWith('data:')) {
+            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSIyMDAiIHk9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIGZpbGw9IiM5NGEzYjgiIGZvbnQtc2l6ZT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
+            e.target.onerror = null;
+        }
+    }, true);
+
     console.log("🚀 Iniciando Sistema Caja Fresh POS...");
     
     const splash = document.getElementById('splash-screen');
@@ -971,6 +979,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // TRIAL INFO: Actualizar días restantes en configuración
             window.updateTrialInfo();
+            
+            // FETCH DAILY RATE
+            if (typeof fetchDailyRate === 'function') fetchDailyRate();
             
             // MASTER TOUR: Si el wizard terminó pero el tour pro no se ha hecho
             if (localStorage.getItem('freshpos_wizard_done') && !localStorage.getItem('puntopila_master_tour_done')) {
@@ -1148,6 +1159,11 @@ async function loadData() {
                     
                     // Boolean featured
                     p.featured = !!p.featured;
+
+                    // Strip external image URLs that would 404
+                    if (p.img && (p.img.includes('unsplash.com') || p.img.includes('placeholder.com'))) {
+                        p.img = '';
+                    }
                     
                     return p;
                 });
@@ -1386,7 +1402,6 @@ function saveProducts() {
     if (window.db && window.db.saveProductsBulk) {
         window.db.saveProductsBulk(products).catch(e => console.error(e));
     }
-    if (typeof syncProductsToMobile === 'function') syncProductsToMobile();
 }
 function saveSales() { 
     localStorage.setItem('freshpos_sales', JSON.stringify(sales)); 
@@ -1415,8 +1430,6 @@ function saveSettings(forceTunnelRestart = false) {
     if (forceTunnelRestart && window.electronAPI && window.electronAPI.restartTunnels) {
         window.electronAPI.restartTunnels();
     }
-    
-    if (typeof syncProductsToMobile === 'function') syncProductsToMobile();
 }
 function incTicketNumber() { currentTicketNumber++; localStorage.setItem('freshpos_ticket', currentTicketNumber); }
 
@@ -1433,8 +1446,14 @@ function initNavigation() {
         'nav-reports': 'view-reports',
         'nav-analytics': 'view-analytics',
         'nav-purchases': 'view-purchases',
+        'nav-proveedores': 'view-proveedores',
+        'nav-payables': 'view-payables',
         'nav-credits': 'view-credits',
         'nav-expenses': 'view-expenses',
+        'nav-client-history': 'view-client-history',
+        'nav-movements': 'view-movements',
+        'nav-excel-export': 'view-excel-export',
+        'nav-cashup': 'view-cashup',
         'nav-server': 'view-server',
         'nav-settings': 'view-settings',
         'nav-mobile-payments': 'view-mobile-payments',
@@ -1474,16 +1493,33 @@ function initNavigation() {
                 }
             }
         }
-
         if (viewId === 'view-dashboard' && window.Dashboard) Dashboard.render();
         if (viewId === 'view-pos') renderProducts();
         if (viewId === 'view-inventory') renderInventory();
         if (viewId === 'view-clients') renderClients();
         if (viewId === 'view-reports') renderReports();
-        if (viewId === 'view-analytics' && window.Statistics) window.Statistics.renderAnalytics();
+        if (viewId === 'view-analytics') renderAnalytics();
         if (viewId === 'view-purchases') initPurchases();
+        if (viewId === 'view-proveedores') {
+            if (typeof renderProveedores === 'function') renderProveedores();
+        }
+        if (viewId === 'view-payables') {
+            if (typeof renderPayables === 'function') renderPayables();
+        }
         if (viewId === 'view-credits') renderCredits();
         if (viewId === 'view-expenses') renderExpenses();
+        if (viewId === 'view-client-history') {
+            if (typeof renderClientHistory === 'function') renderClientHistory();
+        }
+        if (viewId === 'view-movements') {
+            if (typeof renderMovements === 'function') renderMovements();
+        }
+        if (viewId === 'view-excel-export') {
+            if (typeof renderExcelExport === 'function') renderExcelExport();
+        }
+        if (viewId === 'view-cashup') {
+            if (typeof renderCashup === 'function') renderCashup();
+        }
         if (viewId === 'view-server') initMobileServer();
         if (viewId === 'view-mobile-payments') renderMobilePaymentsRegistry();
         if (viewId === 'view-mobile-deliveries') renderMobileDeliveries();
@@ -1675,9 +1711,7 @@ function initSettingsAndAutoClose() {
     }, 60000);
 
     // Manual triggers
-    document.getElementById('generate-pdf-btn')?.addEventListener('click', () => {
-        if (typeof generateZReport === 'function') generateZReport(false);
-    });
+    document.getElementById('generate-pdf-btn')?.addEventListener('click', () => generateZReport(false));
     document.getElementById('force-close-btn')?.addEventListener('click', () => {
         Swal.fire({
             title: '¿Forzar Cierre de Caja?',
@@ -1687,7 +1721,7 @@ function initSettingsAndAutoClose() {
             confirmButtonColor: '#ef4444',
             confirmButtonText: 'Sí, cerrar caja'
         }).then(res => {
-            if (res.isConfirmed && typeof generateZReport === 'function') generateZReport(true);
+            if (res.isConfirmed) generateZReport(true);
         });
     });
 }
@@ -1818,7 +1852,7 @@ function renderProducts() {
 
         card.innerHTML = `
             <div class="h-40 bg-slate-100 dark:bg-slate-700 relative overflow-hidden">
-                <img src="${product.img || 'https://via.placeholder.com/400?text=No+Image'}" alt="${product.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                <img src="${product.img || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSIyMDAiIHk9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIGZpbGw9IiM5NGEzYjgiIGZvbnQtc2l6ZT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg=='}" alt="${product.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
                 ${isOutOfStock ? '<div class="absolute inset-0 bg-red-500/80 text-white font-black text-xl flex items-center justify-center backdrop-blur-sm z-10">AGOTADO</div>' : ''}
                 ${product.promoPrice ? '<div class="absolute top-2 left-2 bg-rose-500 text-white font-black px-2 py-1 rounded-lg text-xs shadow-sm z-0 animate-pulse">PROMO</div>' : ''}
                 <div class="absolute top-2 right-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur text-brand-600 dark:text-brand-400 font-black px-2 py-1 rounded-lg text-sm shadow-sm z-0">
@@ -1870,12 +1904,12 @@ function initInventory() {
         if (flavInput) flavInput.value = '';
 
         modal.classList.add('modal-open');
-        setTimeout(() => { modal.classList.add('modal-fade-in'); content.classList.add('modal-scale-in'); }, 10);
+        setTimeout(() => { modal.classList.add('modal-fade-in'); }, 10);
     });
 
     document.querySelectorAll('.close-product-modal').forEach(btn => btn.addEventListener('click', () => {
         modal.classList.remove('modal-fade-in'); content.classList.remove('modal-scale-in');
-        setTimeout(() => modal.classList.remove('modal-open'), 300);
+        modal.classList.remove('modal-open');
     }));
 
     // Add event listeners for price suggestion and real-time preview
@@ -1951,7 +1985,7 @@ function initInventory() {
             preview.src = e.target.value;
             preview.classList.remove('hidden');
         } else {
-            preview.src = 'https://via.placeholder.com/150?text=No+Image';
+            preview.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTUwIDE1MCI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSI3NSIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiBmaWxsPSIjOTRhM2I4IiBmb250LXNpemU9IjE2IiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
         }
     });
 
@@ -2006,7 +2040,7 @@ function renderInventory() {
         tr.className = "hover:bg-slate-50 transition-colors group border-b border-slate-100";
         tr.innerHTML = `
             <td class="py-3 px-4">
-                <img src="${p.img || 'https://via.placeholder.com/50?text=No+Image'}" alt="${p.name}" class="w-10 h-10 object-cover rounded-md">
+                <img src="${p.img || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDUwIDUwIj48cmVjdCB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSIyNSIgeT0iMjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiBmaWxsPSIjOTRhM2I4IiBmb250LXNpemU9IjgiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIj4tPC90ZXh0Pjwvc3ZnPg=='}" alt="${p.name}" class="w-10 h-10 object-cover rounded-md">
             </td>
             <td class="py-3 px-4">
                 <div class="font-bold text-slate-800">${p.name}</div>
@@ -2064,7 +2098,7 @@ window.editProduct = (id) => {
     // Preview image with safeguard
     const preview = document.getElementById('product-img-preview');
     if (preview) {
-        preview.src = p.img || 'https://via.placeholder.com/150?text=No+Image';
+        preview.src = p.img || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTUwIDE1MCI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSI3NSIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiBmaWxsPSIjOTRhM2I4IiBmb250LXNpemU9IjE2IiBmb250LWZhbWlseT0iQXJpYWwsc2Fucy1zZXJpZiI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4=';
         preview.classList.remove('hidden');
     }
     
@@ -2089,7 +2123,7 @@ window.editProduct = (id) => {
 
     const modal = document.getElementById('product-modal');
     modal.classList.add('modal-open');
-    setTimeout(() => { modal.classList.add('modal-fade-in'); document.getElementById('product-modal-content').classList.add('modal-scale-in'); }, 10);
+    setTimeout(() => { modal.classList.add('modal-fade-in'); }, 10);
 };
 
 
@@ -2141,12 +2175,11 @@ function initClients() {
         document.getElementById('modal-client-title').textContent = 'Nuevo Cliente';
 
         modal.classList.add('modal-open');
-        setTimeout(() => { modal.classList.add('modal-fade-in'); content.classList.add('modal-scale-in'); }, 10);
+        setTimeout(() => { modal.classList.add('modal-fade-in'); }, 10);
     });
 
     document.querySelectorAll('.close-client-modal').forEach(btn => btn.addEventListener('click', () => {
-        modal.classList.remove('modal-fade-in'); content.classList.remove('modal-scale-in');
-        setTimeout(() => modal.classList.remove('modal-open'), 300);
+        modal.classList.remove('modal-open');
     }));
 
     document.getElementById('client-form').addEventListener('submit', (e) => {
@@ -2225,7 +2258,7 @@ window.editClient = (id) => {
 
     const modal = document.getElementById('client-modal');
     modal.classList.add('modal-open');
-    setTimeout(() => { modal.classList.add('modal-fade-in'); document.getElementById('client-modal-content').classList.add('modal-scale-in'); }, 10);
+    setTimeout(() => { modal.classList.add('modal-fade-in'); }, 10);
 };
 
 window.deleteClient = (id) => {
@@ -2246,7 +2279,7 @@ window.deleteClient = (id) => {
 // CART & CHECKOUT LOGIC
 // ==========================================
 function addToCart(product) {
-    if ((product.stock || 0) <= 0) return;
+    if (product.stock <= 0) return;
 
     // Si el producto tiene sabores definidos, mostrar selector primero
     if (product.flavors && product.flavors.length > 0) {
@@ -2302,7 +2335,7 @@ function addToCart(product) {
     // Sin sabores: flujo normal
     const existingIndex = cart.findIndex(item => item.id === product.id);
     if (existingIndex > -1) {
-        if (cart[existingIndex].qty >= (product.stock || 0)) {
+        if (cart[existingIndex].qty >= product.stock) {
             Swal.fire({ title: 'Stock Insuficiente', icon: 'warning', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
             return;
         }
@@ -2727,6 +2760,10 @@ function processPayment() {
         // Actualizar número de orden en pantalla principal si existe
         const orderDisp = document.getElementById('order-number-display');
         if (orderDisp) orderDisp.textContent = `Ticket #${padTicketNumber(currentTicketNumber)}`;
+        
+        // Trigger dashboard update immediately
+        if (window.Dashboard && typeof Dashboard.render === 'function') Dashboard.render();
+        if (typeof syncDashboardData === 'function') syncDashboardData();
 
     } catch (err) {
         console.error('❌ Error crítico en processPayment:', err);
@@ -2737,6 +2774,10 @@ function processPayment() {
 // ==========================================
 // REPORTS
 // ==========================================
+let chartCategory = null;
+let chartPayment = null;
+let anaTrendChart = null;
+let anaEfficiencyChart = null;
 
 function renderReports() {
     const totalUSD = sales.reduce((acc, sale) => acc + (Number(sale.totalUSD) || 0), 0);
@@ -2831,11 +2872,8 @@ function renderReports() {
                 <button onclick="continueInvoice('${displayTicket}')" class="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors mr-1" title="Continuar Factura">
                     <i class="fas fa-redo-alt"></i>
                 </button>
-                <button onclick="printTicketFromReport('${displayTicket}')" class="text-brand-600 hover:bg-brand-50 p-2 rounded-lg transition-colors mr-1" title="Imprimir Ticket">
+                <button onclick="printTicketFromReport('${displayTicket}')" class="text-brand-600 hover:bg-brand-50 p-2 rounded-lg transition-colors" title="Imprimir Ticket">
                     <i class="fas fa-print"></i>
-                </button>
-                <button onclick="if(window.POSExtensions) POSExtensions.voidSale('${displayTicket}', 'Anulación manual');" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Anular Venta">
-                    <i class="fas fa-ban"></i>
                 </button>
             </td>
         `;
@@ -2843,13 +2881,13 @@ function renderReports() {
     });
 
     // Charts are now in Rendimientos - aggregate data for later use
-    // Render Charts in window.Statistics.renderAnalytics() instead
+    // Render Charts in renderAnalytics() instead
     window._lastCatTotals = catTotals;
     window._lastMethodTotals = methodTotals;
     
     // If analytics view is visible, update charts immediately
     if (!document.getElementById('view-analytics').classList.contains('hidden')) {
-        if (window.Charts) window.Charts.renderInternalCharts(catTotals, methodTotals);
+        renderInternalCharts(catTotals, methodTotals);
     }
 
     // Clear btn
@@ -2866,6 +2904,419 @@ function renderReports() {
         });
     };
 }
+
+function renderAnalytics() {
+    // 1. Inversión en Stock (Stock * Costo)
+    const inventoryValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.costPrice) || 0)), 0);
+    const valEl = document.getElementById('ana-inventory-value');
+    if (valEl) valEl.textContent = formatUSD(inventoryValue);
+
+    // 2. Utilidad Acumulada Histórica
+    const totalProfitHistory = dailyHistory.reduce((acc, d) => acc + (Number(d.profitUSD) || 0), 0);
+    
+    // Calcular ganancia del día, retro-aplicando costos si la venta se guardó sin ellos
+    let recalculatedDayProfit = 0;
+    sales.forEach(s => {
+        let saleCost = Number(s.totalCostUSD) || 0;
+        if (saleCost === 0 && Array.isArray(s.items)) {
+            // Retro-calcular costo basado en el inventario actual
+            saleCost = s.items.reduce((accItem, item) => {
+                const prod = products.find(p => p.id === item.id || p.id === item.parentId);
+                return accItem + ((Number(prod?.costPrice) || 0) * (Number(item.qty) || 0));
+            }, 0);
+        }
+        recalculatedDayProfit += ((Number(s.totalUSD) || 0) - saleCost);
+    });
+    const currDayProfit = recalculatedDayProfit;
+
+    const profEl = document.getElementById('ana-total-profit');
+    if (profEl) profEl.textContent = formatUSD(totalProfitHistory + currDayProfit);
+
+    // 3. Margen Promedio Real
+    const totalSalesHistory = dailyHistory.reduce((acc, d) => acc + (Number(d.salesUSD) || 0), 0);
+    const daySales = sales.reduce((acc, s) => acc + (Number(s.totalUSD) || 0), 0);
+    const totalSalesAll = totalSalesHistory + daySales;
+    const avgMargin = totalSalesAll > 0 ? ((totalProfitHistory + currDayProfit) / totalSalesAll) * 100 : 0;
+    const margEl = document.getElementById('ana-average-margin');
+    if (margEl) margEl.textContent = (isNaN(avgMargin) ? 0 : avgMargin).toFixed(1) + '%';
+
+    // 4. Ranking de Productos más Rentables
+    const prodStats = {};
+    sales.forEach(s => {
+        if (!Array.isArray(s.items)) return;
+        s.items.forEach(i => {
+            if (!prodStats[i.id]) prodStats[i.id] = { name: i.name, qty: 0, profit: 0, cost: 0 };
+            const prod = products.find(p => p.id === i.id);
+            const cost = Number(prod?.costPrice) || 0;
+            const itemPrice = Number(i.unitPriceUSD || i.price) || 0;
+            const itemQty = Number(i.qty) || 0;
+            prodStats[i.id].qty += itemQty;
+            prodStats[i.id].profit += (itemPrice - cost) * itemQty;
+            prodStats[i.id].cost = cost;
+        });
+    });
+
+    const ranking = Object.values(prodStats).sort((a,b) => b.profit - a.profit).slice(0, 5);
+    const rankingBody = document.getElementById('ana-top-products-body');
+    if (rankingBody) {
+        rankingBody.innerHTML = ranking.length ? ranking.map(p => {
+            const unitProfit = p.qty > 0 ? p.profit / p.qty : 0;
+            const unitCost = p.cost;
+            const margin = (unitProfit + unitCost) > 0 ? (unitProfit / (unitProfit + unitCost)) * 100 : 0;
+            const safeMargin = isNaN(margin) ? 0 : margin.toFixed(0);
+
+            return `
+                <tr>
+                    <td class="py-4 px-8 font-bold text-slate-700">${p.name}</td>
+                    <td class="py-4 px-8 text-center font-medium text-slate-500">${p.qty}</td>
+                    <td class="py-4 px-8 text-center"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded font-bold">${safeMargin}%</span></td>
+                    <td class="py-4 px-8 text-right font-black text-slate-800">${formatUSD(p.profit || 0)}</td>
+                </tr>
+            `;
+        }).join('') : '<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">No hay ventas registradas aún hoy</td></tr>';
+    }
+
+    // 5. Gráficos de Tendencia y Eficiencia
+    renderAnalyticsCharts(currDayProfit);
+
+    // 5b. Gráficos de Categoría y Métodos de Pago (movidos desde Reporte de Caja)
+    if (window._lastCatTotals && window._lastMethodTotals) {
+        renderInternalCharts(window._lastCatTotals, window._lastMethodTotals);
+    } else {
+        // Recalcular si no hay cache (primera vez que se abre Rendimientos sin pasar por Reportes)
+        let catTotals = {};
+        let methodTotals = { 'cash-usd': 0, 'cash-ves': 0, 'card-ves': 0 };
+        sales.forEach(sale => {
+            methodTotals[sale.method] = (methodTotals[sale.method] || 0) + (Number(sale.totalVES) || 0);
+            if (!Array.isArray(sale.items)) return;
+            sale.items.forEach(item => {
+                catTotals[item.category] = (catTotals[item.category] || 0) + ((Number(item.unitPriceVES) || 0) * (Number(item.qty) || 0));
+            });
+        });
+        renderInternalCharts(catTotals, methodTotals);
+    }
+
+    // 6. NUEVO: Punto de Equilibrio y Proyecciones (Analytics 2.0)
+    // Asegurar que expenses esté definido
+    const expensesList = typeof expenses !== 'undefined' && Array.isArray(expenses) ? expenses : [];
+    const totalExpensesUSD = expensesList.reduce((acc, e) => acc + (Number(e.amountUSD) || 0), 0);
+    const avgMarginRate = (isNaN(avgMargin) || avgMargin <= 0) ? 0.3 : (avgMargin / 100);
+    
+    // Punto de Equilibrio: Cuánto necesito vender para cubrir gastos
+    const breakEvenSales = totalExpensesUSD / (avgMarginRate > 0 ? avgMarginRate : 0.01);
+    const bePercent = breakEvenSales > 0 ? Math.min(100, (daySales / breakEvenSales) * 100) : 100;
+    
+    const beStatusEl = document.getElementById('ana-be-status');
+    const bePercentEl = document.getElementById('ana-be-percent');
+    const beBarEl = document.getElementById('ana-be-bar');
+    
+    if (beStatusEl) {
+        if (totalExpensesUSD === 0) {
+            beStatusEl.textContent = "Registra gastos para calcular el punto de equilibrio";
+            beStatusEl.classList.remove('text-emerald-600');
+        } else if (daySales >= breakEvenSales) {
+            beStatusEl.textContent = "¡Meta Alcanzada! (Ganancia neta)";
+            beStatusEl.classList.add('text-emerald-600');
+        } else {
+            beStatusEl.textContent = `Faltan ${formatUSD(breakEvenSales - daySales)} para ser rentable hoy`;
+            beStatusEl.classList.remove('text-emerald-600');
+        }
+    }
+    
+    const displayPercent = totalExpensesUSD === 0 ? 0 : bePercent;
+    if (bePercentEl) bePercentEl.textContent = (isNaN(displayPercent) ? 0 : displayPercent).toFixed(0) + '%';
+    if (beBarEl) beBarEl.style.width = (isNaN(displayPercent) ? 0 : displayPercent) + '%';
+
+    // TRIGGER: Notificación WhatsApp Punto de Equilibrio (NUEVO)
+    const alertKey = `be_alert_${new Date().toLocaleDateString()}`;
+    if (totalExpensesUSD > 0 && daySales >= breakEvenSales && !localStorage.getItem(alertKey)) {
+        if (typeof sendBusinessAlert === 'function') {
+            sendBusinessAlert(`💰 *META ALCANZADA*: Hoy has superado el punto de equilibrio administrativo.\n*Ventas*: ${formatUSD(daySales)}\n*Status*: Operando en ganancia neta.`);
+            localStorage.setItem(alertKey, 'sent');
+        }
+    }
+
+    // 7. Cierre Proyectado (Mes)
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const currentDay = new Date().getDate();
+    const history7 = dailyHistory.slice(-7);
+    
+    // Incluir las ventas de hoy en el promedio para que la proyección no sea 0 si el historial está vacío
+    const totalRecentSales = history7.reduce((acc, d) => acc + (Number(d.salesUSD) || 0), 0) + daySales;
+    const daysCount = history7.length + (daySales > 0 ? 1 : 0) || 1; // Evitar división por cero
+    const avgDailySales = totalRecentSales / daysCount;
+    
+    const projectedSales = ((isNaN(avgDailySales) ? 0 : avgDailySales) * daysInMonth);
+    const projEl = document.getElementById('ana-projection-value');
+    if (projEl) projEl.textContent = formatUSD(projectedSales);
+
+    // 8. Inteligencia de Negocio: Capital Muerto e Insights
+    const insightsContainer = document.getElementById('ana-insights-container');
+    if (insightsContainer) {
+        let insightsHTML = '';
+        
+        // Detección de Capital Muerto (Productos con stock que no se han vendido en los últimos 7 días)
+        const soldInHistoryIds = new Set();
+        history7.forEach(d => {
+            // Nota: dailyHistory no tiene items detallados, usaremos una lógica de 'baja rotación' basada en ventas actuales
+        });
+        
+        // Simulación lógica de insight: Productos con stock significativo que no se han vendido hoy
+        const slowMovers = products.filter(p => p.stock > 0 && !prodStats[p.id]).sort((a,b) => (b.stock * b.costPrice) - (a.stock * a.costPrice)).slice(0, 2);
+        const totalDeadValue = slowMovers.reduce((acc, p) => acc + (p.stock * p.costPrice), 0);
+        
+        if (slowMovers.length > 0 && totalDeadValue > 0) {
+            insightsHTML += `
+                <div class="flex gap-4 animate-fadeIn">
+                    <div class="w-10 h-10 shrink-0 bg-rose-500/20 rounded-xl flex items-center justify-center text-rose-400">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-rose-300 mb-1">Capital Muerto Detectado</p>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            Tienes <b>${formatUSD(totalDeadValue)}</b> atrapados en stock que no se mueve hoy. 
+                            Específicamente: ${slowMovers.map(p => `<b>${p.name}</b> (x${p.stock})`).join(' y ')}.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Rendimiento de Gastos
+        if (totalExpensesUSD > 0 && currDayProfit > 0) {
+            const expenseRatio = (totalExpensesUSD / currDayProfit) * 100;
+            if (expenseRatio > 50) {
+                insightsHTML += `
+                    <div class="flex gap-4 animate-fadeIn">
+                        <div class="w-10 h-10 shrink-0 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-400">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-amber-300 mb-1">Alerta de Gastos</p>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">
+                                Los gastos de hoy (<b>${formatUSD(totalExpensesUSD)}</b>) consumen el <b>${expenseRatio.toFixed(0)}%</b> de tu utilidad. 
+                                Considera optimizar costos operativos.
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Success Insight
+        if (daySales > avgDailySales * 1.05) {
+            const growthDiff = daySales - avgDailySales;
+            insightsHTML += `
+                <div class="flex gap-4 animate-fadeIn">
+                    <div class="w-10 h-10 shrink-0 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-emerald-300 mb-1">Crecimiento Detectado</p>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            ¡Gran jornada! Estás vendiendo <b>${formatUSD(growthDiff)}</b> más que tu promedio diario habitual.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        insightsContainer.innerHTML = insightsHTML || '<p class="text-xs text-slate-500 italic text-center">Analizando datos... No hay alertas críticas hoy.</p>';
+    }
+
+    // 9. Capacidad de Reposición (Sugerencia)
+    const replenishEl = document.getElementById('ana-replenish-advice');
+    if (replenishEl) {
+        const safeReinvest = currDayProfit * 0.7; // Deja el 30% como ganancia neta segura
+        replenishEl.textContent = `Puedes reinvertir hasta ${formatUSD(safeReinvest)} en mercancía manteniendo el flujo de caja estable.`;
+    }
+
+    // 10. NUEVO: Hiper-Realismo (Fase 3)
+    
+    // A. Días de Cobertura (Inventory Runway)
+    const avgDailyItemsCost = history7.length ? history7.reduce((acc, d) => acc + (d.salesUSD - (d.profitUSD || 0)), 0) / history7.length : (daySales * 0.7);
+    const runwayDays = inventoryValue / (avgDailyItemsCost || 1);
+    const runwayEl = document.getElementById('ana-inventory-runway');
+    if (runwayEl) {
+        runwayEl.textContent = `${runwayDays.toFixed(0)} días de stock`;
+        if (runwayDays < 5) {
+            runwayEl.className = "px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-black rounded-lg border border-rose-100 animate-pulse";
+        } else {
+            runwayEl.className = "px-2 py-0.5 bg-brand-50 text-brand-700 text-[10px] font-black rounded-lg border border-brand-100";
+        }
+    }
+
+    // B. Resiliencia de Tasa (Ajuste por Inflación en USD/VES)
+    const lastSnapshot = dailyHistory[dailyHistory.length - 1];
+    const resEl = document.getElementById('ana-rate-resilience');
+    if (resEl && lastSnapshot) {
+        const rateDiff = settings.exchangeRate - (lastSnapshot.exchangeRate || settings.exchangeRate);
+        resEl.classList.remove('hidden');
+        if (rateDiff > 0.5) { // Si la tasa subió más de 0.50 VES
+            resEl.textContent = "ALERTA TASA ??";
+            resEl.className = "text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md border bg-rose-500 text-white border-rose-600 animate-bounce";
+            
+            // Insight de ajuste
+            if (insightsContainer) {
+                const lossPercent = (rateDiff / settings.exchangeRate) * 100;
+                insightsContainer.innerHTML += `
+                    <div class="flex gap-4 animate-fadeIn">
+                        <div class="w-10 h-10 shrink-0 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-500">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-rose-300 mb-1">Riesgo de Reposición</p>
+                            <p class="text-[10px] text-slate-400 leading-relaxed">La tasa subió un ${lossPercent.toFixed(1)}%. Tu utilidad real es menor a la nominal. Revisa precios de costo.</p>
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            resEl.textContent = "TASA ESTABLE ??";
+            resEl.className = "text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md border bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        }
+    }
+
+    // Insight de Reabastecimiento Crítico
+    if (runwayDays < 3 && insightsContainer) {
+        insightsContainer.innerHTML += `
+            <div class="flex gap-4 animate-fadeIn">
+                <div class="w-10 h-10 shrink-0 bg-brand-500/20 rounded-xl flex items-center justify-center text-brand-400">
+                    <i class="fas fa-truck-loading"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-brand-300 mb-1">Reabastecimiento Crítico</p>
+                    <p class="text-[10px] text-slate-400 leading-relaxed">Tu inventario se agotará en menos de 3 días al ritmo actual de ventas.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Función Helper para Alertas de Negocio via WhatsApp
+function sendBusinessAlert(message) {
+    const rawPhone = localStorage.getItem('boss_phone') || settings.bossPhone || '';
+    const phone = normalizeVEPhone(rawPhone);
+    if (!phone) return;
+
+    if (window.electronAPI && window.electronAPI.sendWhatsAppBackground) {
+        window.electronAPI.sendWhatsAppBackground(phone, message)
+            .then(res => console.log('[BI-ALERT] Notificación enviada'))
+            .catch(err => console.error('[BI-ALERT] Error enviando notification', err));
+    }
+}
+
+function renderAnalyticsCharts(dayProfitToday) {
+    const canvasTrend = document.getElementById('ana-chart-trend');
+    const canvasEff = document.getElementById('ana-chart-efficiency');
+    if (!canvasTrend || !canvasEff) return;
+
+    const ctxTrend = canvasTrend.getContext('2d');
+    const ctxEff = canvasEff.getContext('2d');
+
+    if (anaTrendChart) anaTrendChart.destroy();
+    if (anaEfficiencyChart) anaEfficiencyChart.destroy();
+
+    // Data para tendencia (últimos 6 registros de historia + hoy)
+    const historyLast = dailyHistory.slice(-6);
+    const labels = historyLast.map(d => new Date(d.date).toLocaleDateString('es-VE', {day:'2-digit', month:'short'}));
+    labels.push('Hoy');
+
+    const salesData = historyLast.map(d => d.salesUSD);
+    salesData.push(sales.reduce((acc, s) => acc + s.totalUSD, 0));
+
+    const profitData = historyLast.map(d => d.profitUSD);
+    profitData.push(dayProfitToday);
+
+    anaTrendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Ventas USD', data: salesData, borderColor: '#6366f1', backgroundColor: '#6366f120', fill: true, tension: 0.4 },
+                { label: 'Utilidad USD', data: profitData, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, tension: 0.4 }
+            ]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { position: 'top', labels: { font: { weight: 'bold' } } } },
+            scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+        }
+    });
+
+    // Eficiencia (Ganancia vs Gastos)
+    const totalExpensesUSD = expenses.reduce((acc, e) => acc + (e.amountUSD || 0), 0);
+    const netProfit = Math.max(0, dayProfitToday - totalExpensesUSD);
+    
+    // UI Update (Absolutes)
+    const elProfit = document.getElementById('ana-eff-profit-val');
+    const elExpense = document.getElementById('ana-eff-expense-val');
+    if(elProfit) elProfit.textContent = `$${netProfit.toFixed(2)}`;
+    if(elExpense) elExpense.textContent = `$${totalExpensesUSD.toFixed(2)}`;
+
+    anaEfficiencyChart = new Chart(ctxEff, {
+        type: 'doughnut',
+        data: {
+            labels: ['Ganancia Neta', 'Gastos'],
+            datasets: [{
+                data: [netProfit, totalExpensesUSD],
+                backgroundColor: ['#10b981', '#f43f5e'],
+                borderWidth: 0
+            }]
+        },
+        options: { cutout: '70%', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+    });
+}
+
+function renderInternalCharts(catTotals, methodTotals) {
+    const ctxCat = document.getElementById('view-chart-category').getContext('2d');
+    const ctxPay = document.getElementById('view-chart-payment').getContext('2d');
+
+    if (chartCategory) chartCategory.destroy();
+    if (chartPayment) chartPayment.destroy();
+
+    const categories = Object.keys(catTotals);
+    if (categories.length === 0) return;
+
+    chartCategory = new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+            labels: categories,
+            datasets: [{
+                data: Object.values(catTotals),
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '65%',
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { weight: 'bold' } } } }
+        }
+    });
+
+    chartPayment = new Chart(ctxPay, {
+        type: 'bar',
+        data: {
+            labels: ['Efec $', 'Efec BS', 'Punto BS'],
+            datasets: [{
+                label: 'Ventas (VES)',
+                data: [methodTotals['cash-usd'], methodTotals['cash-ves'], methodTotals['card-ves']],
+                backgroundColor: ['#10b981', '#2563eb', '#6366f1'],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { display: false } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
 
 
 // ==========================================
@@ -3168,7 +3619,7 @@ function initPurchases() {
                     priceVES: item.newPriceVES,
                     costPrice: (item.boxPriceGross * (1 - (item.discountPerc / 100)) * (1 + (item.ivaPerc / 100))) / (item.unitsPerBox || 1),
                     stock: 0, // Se inicializa en 0 y se suma abajo
-                    img: 'https://images.unsplash.com/photo-1583258223611-399cc194c632?auto=format&fit=crop&q=80&w=400'
+                    img: ''
                 };
                 products.push(p);
                 item.productId = newId;
@@ -3879,14 +4330,14 @@ function initMobileServer() {
         const TOPIC = 'puntopila_caja_pos_tunnel_url_secret_eb6044';
 
         // Inicializar QR Permanente inmediatamente
-        const permanentQR = document.getElementById('permanent-qr-display');
-        if (permanentQR && typeof QRCode !== 'undefined') {
+        const canvasMobile = document.getElementById('qr-mobile');
+        if (canvasMobile && typeof QRCode !== 'undefined') {
             // SMART START: Si tenemos un dominio estático configurado, empezar con ese link directo
             // de lo contrario, usar ntfy.sh como puente.
             const initialLink = (settings.ngrokDomain) ? `https://${settings.ngrokDomain}/mobile` : `https://ntfy.sh/${TOPIC}`;
             
-            QRCode.toDataURL(initialLink, { margin: 2, scale: 10, color: { dark: '#f59e0b' } }, (err, url) => {
-                if (!err) permanentQR.src = url;
+            QRCode.toCanvas(canvasMobile, initialLink, { margin: 2, scale: 4, color: { dark: '#000000', light: '#ffffff' } }, (err) => {
+                if (err) console.error(err);
             });
         }
 
@@ -3896,18 +4347,16 @@ function initMobileServer() {
         // Recibir información del servidor desde electron
         window.electronAPI.onServerInfo((info) => {
             const localMobileUrl = `http://${info.ip}:${info.port}/mobile`;
-
             document.getElementById('server-ip-display').textContent = localMobileUrl;
-            document.getElementById('server-qr-display').src = info.qr;
+
+            const sqr = document.getElementById('server-qr-display');
+            if (sqr) sqr.src = info.qr;
             document.getElementById('server-status-dot').classList.replace('bg-slate-300', 'bg-emerald-500');
 
             // Solo generar QR de descarga con IP local si NO hay túnel aún
             if (!activeTunnelUrl) {
                 window.electronAPI.generateDownloadQR(localMobileUrl);
             }
-
-            // Sincronizar productos iniciales
-            syncProductsToMobile();
         });
 
         // Mostrar estado "Conectando..." hasta que el túnel real se establezca.
@@ -3932,9 +4381,9 @@ function initMobileServer() {
             const remoteUrl = document.getElementById('remote-url-display');
             const passContainer = document.getElementById('tunnel-password-container');
             const passDisplay = document.getElementById('tunnel-password-display');
-            const permanentQR = document.getElementById('permanent-qr-display');
-            const remoteQR = document.getElementById('remote-qr-display');
-            const downloadQR = document.getElementById('download-qr-display');
+            const canvasMobile = document.getElementById('qr-mobile');
+            const canvasJefe = document.getElementById('qr-jefe');
+            const canvasDownload = document.getElementById('qr-download');
 
             if (remoteUrl) {
                 const urlClean = info.url.replace(/\/$/, ""); 
@@ -3948,30 +4397,25 @@ function initMobileServer() {
                 // ACTUALIZACIÓN DE TODOS LOS QRS SMART
                 if (typeof QRCode !== 'undefined') {
                     // 1. QR Definitivo (Punto Móvil / Launcher)
-                    if (permanentQR) {
+                    if (canvasMobile) {
                         const targetUrl = settings.launcherUrl 
                             ? (settings.launcherUrl.startsWith('http') ? settings.launcherUrl : `https://${settings.launcherUrl}`) 
                             : urlClean + "/mobile";
 
-                        QRCode.toDataURL(targetUrl, { margin: 2, scale: 10, color: { dark: '#000000' } }, (err, url) => {
+                        QRCode.toCanvas(canvasMobile, targetUrl, { margin: 2, scale: 4, color: { dark: '#000000', light: '#ffffff' } }, (err) => {
                             if (!err) {
-                                permanentQR.src = url;
-                                const idDisplay = permanentQR.closest('div').nextElementSibling.querySelector('p.font-mono');
+                                const idDisplay = canvasMobile.closest('div').nextElementSibling.querySelector('p.font-mono');
                                 if (idDisplay) idDisplay.textContent = settings.launcherUrl ? "LANZADOR PERMANENTE ACTIVO" : "TUNEL PROFESIONAL ACTIVO (DIRECTO)";
                             }
                         });
                     }
                     // 2. QR Remoto (anywhere)
-                    if (remoteQR) {
-                        QRCode.toDataURL(urlClean + "/mobile", { margin: 2, scale: 10, color: { dark: '#4f46e5' } }, (err, url) => {
-                            if (!err) remoteQR.src = url;
-                        });
+                    if (canvasJefe) {
+                        QRCode.toCanvas(canvasJefe, urlClean + "/mobile", { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, (err) => {});
                     }
                     // 3. QR de Descarga
-                    if (downloadQR) {
-                        QRCode.toDataURL(urlClean + "/download", { margin: 2, scale: 10, color: { dark: '#4f46e5' } }, (err, url) => {
-                            if (!err) downloadQR.src = url;
-                        });
+                    if (canvasDownload) {
+                        QRCode.toCanvas(canvasDownload, urlClean + '/download', { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, (err) => {});
                     }
                 }
 
@@ -4682,7 +5126,10 @@ window.rejectOrder = (index) => {
     renderIncomingOrders();
 };
 
+let _syncMobileTimer = null;
 function syncProductsToMobile() {
+    if (_syncMobileTimer) return;
+    _syncMobileTimer = setTimeout(() => { _syncMobileTimer = null; }, 3000);
     console.log("Iniciando syncProductsToMobile...");
     if (!products || products.length === 0) {
         console.warn("Intento de sincronización con lista de productos vacía. Abortando.");
@@ -4917,9 +5364,6 @@ function initSettingsView() {
 
 
             saveSettings(); // uses helper
-            
-            // Sync change to Mobile
-            syncProductsToMobile();
 
 
             // Apply changes
@@ -6517,87 +6961,55 @@ if (window.cloudSync) {
     });
 }
 
-window.toggleSidebar = function() {
-    var aside = document.querySelector('aside');
-    if (aside) {
-        aside.classList.remove('lg:w-64');
-        if (aside.classList.contains('w-64')) {
-            aside.classList.remove('w-64');
-            aside.classList.add('w-20');
-        } else if (aside.classList.contains('w-20')) {
-            aside.classList.remove('w-20');
-            aside.classList.add('w-64');
-        } else {
-            aside.classList.add('w-20');
+
+// UI Helper Functions (Restored)
+window.switchAnalyticsTab = function(tabName) {
+    const tabs = ['resumen', 'graficos', 'productos', 'empleados'];
+    tabs.forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        const content = document.getElementById('tab-content-' + t);
+        if(btn) { btn.classList.remove('border-brand-600', 'text-brand-600'); btn.classList.add('border-transparent', 'text-slate-400'); }
+        if(content) { content.classList.add('hidden'); }
+    });
+    const selectedBtn = document.getElementById('tab-btn-' + tabName);
+    const selectedContent = document.getElementById('tab-content-' + tabName);
+    if(selectedBtn) { selectedBtn.classList.add('border-brand-600', 'text-brand-600'); selectedBtn.classList.remove('border-transparent', 'text-slate-400'); }
+    if(selectedContent) { selectedContent.classList.remove('hidden'); }
+};
+
+window.toggleProductType = function(type) {
+    const types = ['simple', 'complex', 'recipe'];
+    types.forEach(t => {
+        const btn = document.getElementById('btn-prod-' + t);
+        if(btn) {
+            if(t === type) { btn.classList.add('bg-white', 'shadow-sm', 'text-brand-600'); btn.classList.remove('text-slate-500'); }
+            else { btn.classList.remove('bg-white', 'shadow-sm', 'text-brand-600'); btn.classList.add('text-slate-500'); }
         }
-        var icon = aside.querySelector('.sidebar-toggle-icon');
-        if (icon) {
-            if (aside.classList.contains('w-20')) {
-                icon.classList.remove('fa-chevron-left');
-                icon.classList.add('fa-chevron-right');
-            } else {
-                icon.classList.remove('fa-chevron-right');
-                icon.classList.add('fa-chevron-left');
-            }
-        }
+    });
+    const valInput = document.getElementById('product-type-value');
+    if(valInput) valInput.value = type;
+    
+    const advancedFields = document.querySelectorAll('.advanced-field');
+    const recipeFields = document.querySelectorAll('.recipe-field');
+    
+    if (type === 'simple') {
+        advancedFields.forEach(el => el.style.display = 'none');
+        recipeFields.forEach(el => el.style.display = 'none');
+    } else if (type === 'complex') {
+        advancedFields.forEach(el => el.style.display = 'block');
+        recipeFields.forEach(el => el.style.display = 'none');
+    } else if (type === 'recipe') {
+        advancedFields.forEach(el => el.style.display = 'block');
+        recipeFields.forEach(el => el.style.display = 'block');
     }
 };
 
-
-window.toggleSidebar = function() {
-    var aside = document.querySelector('aside');
-    if (aside) {
-        aside.classList.remove('lg:w-64');
-        if (aside.classList.contains('w-64')) {
-            aside.classList.remove('w-64');
-            aside.classList.add('w-20');
-        } else if (aside.classList.contains('w-20')) {
-            aside.classList.remove('w-20');
-            aside.classList.add('w-64');
-        } else {
-            aside.classList.add('w-20');
-        }
-        var icon = aside.querySelector('.sidebar-toggle-icon');
-        if (icon) {
-            if (aside.classList.contains('w-20')) {
-                icon.classList.remove('fa-chevron-left');
-                icon.classList.add('fa-chevron-right');
-            } else {
-                icon.classList.remove('fa-chevron-right');
-                icon.classList.add('fa-chevron-left');
-            }
-        }
+window.openIngredientsModal = function() {
+    const modal = document.getElementById('ingredients-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (typeof renderIngredients === 'function') renderIngredients();
     }
 };
-
-
-
-window.handleLogoUpload = function(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const logoData = e.target.result;
-            localStorage.setItem('bizLogo', logoData);
-            loadBizLogo();
-        };
-        reader.readAsDataURL(file);
-    }
-};
-
-window.loadBizLogo = function() {
-    const logoData = localStorage.getItem('bizLogo');
-    const img = document.getElementById('sidebar-biz-logo');
-    const defaultLogo = document.getElementById('sidebar-default-logo');
-    if (logoData && img && defaultLogo) {
-        img.src = logoData;
-        img.classList.remove('hidden');
-        defaultLogo.classList.add('hidden');
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadBizLogo();
-});
-
 

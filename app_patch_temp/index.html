@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreshPOS - Sistema de Ventas</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap"
+        rel="stylesheet">
+    <!-- Chart.js & html2pdf -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex selection:bg-brand-500 selection:text-white">
+
+    <!-- Sidebar Navigation -->
+    <aside
+        class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between transition-all duration-300 z-20 shadow-sm relative shrink-0 h-full">
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+            <div
+                class="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100 sticky top-0 bg-white z-10">
+                <div
+                    class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
+                    <i class="fas fa-glass-water text-white text-xl"></i>
+                </div>
+                <h1 class="hidden lg:block ml-3 font-black text-xl tracking-tight text-slate-800">Fresh<span
+                        class="text-brand-600">POS</span></h1>
+            </div>
+            <nav class="mt-6 flex flex-col gap-2 px-3 pb-6">
+                <a href="#" id="nav-pos"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl bg-brand-50 text-brand-600 cursor-pointer transition-all active">
+                    <div class="w-8 flex justify-center"><i class="fas fa-cash-register text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Punto de Venta</span>
+                </a>
+                <a href="#" id="nav-cierre" onclick="openCierreModal()"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-hand-holding-dollar text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Cierre de Caja</span>
+                </a>
+                <a href="#" id="nav-clients"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-users text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Clientes</span>
+                </a>
+                <a href="#" id="nav-inventory"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-box-open text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Inventario</span>
+                </a>
+                <a href="#" id="nav-reports"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-chart-pie text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Reportes Caja</span>
+                </a>
+                <a href="#" id="nav-server"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-server text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">App Móvil</span>
+                    <span id="server-status-dot" class="ml-auto w-2 h-2 rounded-full bg-slate-300"></span>
+                </a>
+                <div class="h-px bg-slate-100 my-4 lg:mx-6"></div>
+                <a href="#" id="nav-purchases"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-truck-ramp-box text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2 text-emerald-700">Carga Surtidor</span>
+                </a>
+                <div class="h-px bg-slate-100 my-4 lg:mx-6"></div>
+                <!-- NUEVAS OPCIONES DE NEGOCIO -->
+                <a href="#" id="nav-credits"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-hand-holding-dollar text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Cuentas por Cobrar (Fiaos)</span>
+                </a>
+                <a href="#" id="nav-expenses"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-file-invoice-dollar text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Gestión de Gastos</span>
+                </a>
+                <div class="h-px bg-slate-100 my-4 lg:mx-6"></div>
+                <a href="#" id="nav-settings"
+                    class="nav-item flex items-center px-3 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
+                    <div class="w-8 flex justify-center"><i class="fas fa-cog text-lg"></i></div>
+                    <span class="hidden lg:block font-semibold ml-2">Configuración</span>
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-slate-100 dark:border-slate-800 hidden lg:block shrink-0 bg-white">
+            <!-- Config Toggles -->
+            <div class="space-y-2 mb-4">
+                <button id="theme-toggle-btn"
+                    class="w-full flex items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i id="theme-icon" class="fas fa-moon text-lg"></i>
+                    <span class="ml-2 font-bold text-sm">Modo Oscuro</span>
+                </button>
+                <button id="autoprint-toggle-btn"
+                    class="w-full flex items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i id="autoprint-icon" class="fas fa-print text-lg text-slate-400"></i>
+                    <span class="ml-2 font-bold text-sm" id="autoprint-text">Auto-Impresión OFF</span>
+                </button>
+            </div>
+
+            <!-- Exchange Rate Widget -->
+            <div
+                class="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tasa USD-VES</p>
+                <div class="flex items-center">
+                    <i class="fas fa-exchange-alt text-brand-500 mr-2 text-sm"></i>
+                    <input type="number" id="exchange-rate-input"
+                        class="w-full bg-transparent border-none text-slate-700 dark:text-slate-200 font-bold p-0 focus:ring-0 outline-none"
+                        value="36.50" step="0.01">
+                    <span class="text-xs font-bold text-slate-400 ml-1">Bs</span>
+                </div>
+            </div>
+
+            <div class="flex items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-xl transition-all"
+                id="profile-lock-btn" onclick="lockSession()">
+                <div
+                    class="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500 relative">
+                    <i class="fas fa-user"></i>
+                    <div class="absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center"
+                        id="role-status-badge">
+                        <i class="fas fa-check text-[8px] text-white"></i>
+                    </div>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-bold text-slate-700 dark:text-slate-200" id="role-text">Modo Cajero
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400" id="auto-close-indicator">Auto Cierre
+                        18:15</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-[#f8fafc]">
+
+        <!-- === VISTA POS === -->
+        <section id="view-pos"
+            class="flex-1 flex h-full overflow-hidden absolute inset-0 w-full animate-fade-in view-section">
+
+            <!-- Products Section -->
+            <div class="flex-1 flex flex-col h-full bg-slate-50 relative z-0">
+                <!-- Top Header -->
+                <header
+                    class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-2xl font-bold tracking-tight hidden md:block">Catálogo</h2>
+                        <!-- Botón Campana con activación forzosa -->
+                        <button id="mobile-orders-bell" onclick="openMobileOrdersPanel()"
+                            class="relative p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all group">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span id="bell-badge"
+                                class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white hidden animate-bounce">0</span>
+                        </button>
+                    </div>
+                    <div class="flex-1 md:ml-6 max-w-2xl flex gap-3">
+                        <div class="relative w-1/3 group">
+                            <span
+                                class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-brand-500 transition-colors pointer-events-none">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input type="text" id="pos-client-search" placeholder="Buscar cliente..." autocomplete="off"
+                                class="w-full bg-slate-100 border-2 border-transparent rounded-full py-2.5 pl-11 pr-4 text-sm font-medium focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all">
+                            <div id="pos-client-results"
+                                class="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 hidden max-h-60 overflow-y-auto custom-scrollbar">
+                                <!-- Results here -->
+                            </div>
+                            <input type="hidden" id="pos-client-id" value="">
+                            <input type="hidden" id="pos-client-document" value="">
+                            <input type="hidden" id="pos-client-name" value="">
+                            <input type="hidden" id="pos-client-phone" value="">
+                        </div>
+                        <div class="relative group flex-1">
+                            <span
+                                class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-brand-500 transition-colors">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" id="search-product" placeholder="Buscar por nombre..."
+                                class="w-full bg-slate-100 border-2 border-transparent rounded-full py-2.5 pl-11 pr-4 text-sm font-medium focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all">
+                        </div>
+                        <!-- Botón Ventas Recientes (Relocado aquí) -->
+                        <button id="view-recent-sales-btn"
+                            class="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-all font-bold shadow-lg shadow-emerald-500/20 active:scale-95">
+                            <i class="fas fa-list-ul"></i>
+                            <span class="hidden xl:inline">Ventas Recientes</span>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Categories -->
+                <div
+                    class="bg-white border-b border-slate-200 px-6 py-3 flex gap-2 overflow-x-auto hide-scrollbar shadow-sm z-0">
+                    <button class="category-btn active px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        data-category="Todos">Todos</button>
+                    <button class="category-btn px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        data-category="Gaseosas">Gaseosas</button>
+                    <button class="category-btn px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        data-category="Aguas">Aguas</button>
+                    <button class="category-btn px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        data-category="Jugos">Jugos</button>
+                    <button class="category-btn px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                        data-category="Energizantes">Energizantes</button>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="flex-1 overflow-y-auto p-6 scroll-smooth custom-scrollbar">
+                    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 pb-20" id="products-grid">
+                        <!-- JS renders here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cart Sidebar -->
+            <aside
+                class="w-[340px] lg:w-[400px] bg-white shadow-2xl flex flex-col z-20 border-l border-slate-200 flex-shrink-0">
+                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                            <i class="fas fa-shopping-cart text-brand-500 mr-2"></i> Orden Actual
+                        </h3>
+                        <p class="text-xs text-slate-500 font-medium mt-1" id="order-number-display">Ticket #0001</p>
+                    </div>
+                    <button id="clear-cart-btn"
+                        class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                        title="Vaciar Carrito">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30" id="cart-items">
+                    <!-- JS renders cart here -->
+                </div>
+
+                <div class="bg-white border-t border-slate-200 p-6 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-10">
+                    <div class="space-y-3 mb-5">
+                        <div
+                            class="flex justify-between items-center text-xl font-black text-slate-800 dark:text-slate-100 border-t border-dashed border-slate-200 dark:border-slate-700 pt-3 mt-1">
+                            <span class="text-sm">TOTAL USD</span><span id="cart-total"
+                                class="text-brand-600 dark:text-brand-400 text-2xl">$0.00</span>
+                        </div>
+                        <div
+                            class="flex justify-between items-center text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 rounded-lg p-2 mt-1">
+                            <span>TOTAL VES</span><span id="cart-total-ves">Bs 0.00</span>
+                        </div>
+                    </div>
+                    <button id="show-checkout-btn"
+                        class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/30 transition-all transform hover:-translate-y-1 flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-lg"
+                        disabled>
+                        Pagar Ahora <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </aside>
+        </section>
+
+        <!-- === VISTA CLIENTES === -->
+        <section id="view-clients"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full">
+            <header
+                class="bg-white px-8 py-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between shrink-0 border-b border-slate-200 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Clientes</h2>
+                    <p class="text-sm text-slate-500 mt-1">Directorio para facturación</p>
+                </div>
+                <div class="flex-1 sm:mx-8 max-w-md relative group">
+                    <i
+                        class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"></i>
+                    <input type="text" id="client-search-input" placeholder="Buscar por nombre, cédula o teléfono..."
+                        class="w-full bg-slate-100 border-2 border-transparent focus:border-indigo-500 focus:bg-white rounded-xl py-2.5 pl-11 pr-4 text-sm outline-none transition-all placeholder-slate-400">
+                </div>
+                <button id="add-client-btn"
+                    class="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md transition-all flex items-center">
+                    <i class="fas fa-user-plus mr-2"></i> Nuevo Cliente
+                </button>
+            </header>
+
+
+            <div class="p-8 flex-1 overflow-hidden flex flex-col">
+                <div
+                    class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                    <div class="overflow-x-auto flex-1 custom-scrollbar">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200">
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Documento/RIF</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Nombre</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Teléfono</th>
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">
+                                        Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm divide-y divide-slate-100" id="clients-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA INVENTARIO === -->
+        <section id="view-inventory"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full">
+            <header
+                class="bg-white px-8 py-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between shrink-0 border-b border-slate-200 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Inventario</h2>
+                    <p class="text-sm text-slate-500 mt-1">Gestiona los productos disponibles para la venta</p>
+                </div>
+
+                <!-- NEW: Buscador de Inventario -->
+                <div class="flex-1 sm:mx-8 max-w-md relative group">
+                    <span
+                        class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-brand-500 transition-colors">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" id="search-inventory" placeholder="Filtrar inventario..."
+                        class="w-full bg-slate-100 border-2 border-transparent rounded-full py-2.5 pl-11 pr-4 text-sm font-medium focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all">
+                </div>
+
+                <button id="add-product-btn"
+                    class="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-md transition-all flex items-center shrink-0">
+                    <i class="fas fa-plus mr-2"></i> Nuevo Producto
+                </button>
+            </header>
+
+            <div class="p-8 flex-1 overflow-hidden flex flex-col">
+                <div
+                    class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                    <div class="overflow-x-auto flex-1 custom-scrollbar">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200">
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider w-16">
+                                        Foto</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Producto</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Categoría</th>
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">
+                                        Precio</th>
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">
+                                        Stock</th>
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">
+                                        Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm divide-y divide-slate-100" id="inventory-table-body">
+                                <!-- JS inserts here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA REPORTES === -->
+        <section id="view-reports"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full">
+            <header
+                class="bg-white px-8 py-6 shadow-sm shrink-0 border-b border-slate-200 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Reporte de Caja</h2>
+                    <p class="text-sm text-slate-500 mt-1">Resumen de ventas y arqueo</p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="download-report-pdf-btn"
+                        class="text-brand-600 bg-brand-50 hover:bg-brand-100 font-bold px-5 py-3 rounded-xl transition-all flex items-center shadow-sm hover:scale-105 active:scale-95 border border-brand-100">
+                        <i class="fas fa-file-pdf mr-2"></i> Descargar PDF
+                    </button>
+                    <button id="clear-reports-btn"
+                        class="text-red-600 bg-red-50 hover:bg-red-100 font-bold px-5 py-3 rounded-xl transition-all flex items-center shadow-sm hover:scale-105 active:scale-95 border border-red-100">
+                        <i class="fas fa-trash-alt mr-2"></i> Cerrar Caja y Borrar Datos
+                    </button>
+                </div>
+            </header>
+
+            <div class="p-8 flex-1 overflow-y-auto custom-scrollbar">
+                <!-- KPI Section -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div
+                        class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas Brutas
+                            </p>
+                            <h3 class="text-xl font-black text-slate-800" id="report-total-sales">Bs 0</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-emerald-50 rounded-2xl shadow-sm border border-emerald-100 p-5 relative overflow-hidden group outline outline-2 outline-emerald-200">
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Ganancia
+                                Real</p>
+                            <h3 class="text-xl font-black text-emerald-700" id="report-net-profit">Bs 0</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tickets</p>
+                            <h3 class="text-xl font-black text-slate-800" id="report-total-tickets">0</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Artículos</p>
+                            <h3 class="text-xl font-black text-slate-800" id="report-total-items">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Charts Section Integrated -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h4 class="text-sm font-bold text-slate-600 uppercase tracking-widest mb-4 flex items-center">
+                            <i class="fas fa-chart-pie mr-2 text-brand-500"></i> Ventas por Categoría
+                        </h4>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="view-chart-category"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h4 class="text-sm font-bold text-slate-600 uppercase tracking-widest mb-4 flex items-center">
+                            <i class="fas fa-chart-bar mr-2 text-emerald-500"></i> Métodos de Pago (Bs)
+                        </h4>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="view-chart-payment"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200">
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Ticket #</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Hora</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Cliente</th>
+                                    <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">
+                                        Método</th>
+                                    <th
+                                        class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">
+                                        Total (USD)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm divide-y divide-slate-100" id="reports-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA COMPRAS (SURTIDOR) === -->
+        <section id="view-purchases"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-100 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header
+                class="bg-white px-8 py-6 shadow-sm border-b border-emerald-100 flex justify-between items-center shrink-0">
+                <div
+                    class="bg-white dark:bg-slate-800 rounded-3xl p-10 shadow-2xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 relative overflow-hidden group">
+                    <!-- AI Mode Header -->
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h2 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Carga
+                                Inteligente por OCR</h2>
+                            <p class="text-slate-500 dark:text-slate-400 font-medium">Sube tu factura física y la app
+                                detectará stock y precios.</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="openGeminiSettings()"
+                                class="w-12 h-12 flex items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-all group/settings"
+                                title="Configurar IA Gemini">
+                                <i class="fas fa-robot text-xl group-hover/settings:animate-bounce"></i>
+                            </button>
+                            <div id="ai-mode-status"
+                                class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100">
+                                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                Modo Local: Activo
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Proveedor Selector -->
+                    <div class="mb-8">
+                        <label
+                            class="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Selecciona
+                            el Proveedor (Optimiza la IA)</iLLabel>
+                            <div class="grid grid-cols-3 gap-4">
+                                <label class="relative cursor-pointer group">
+                                    <input type="radio" name="ocr-supplier" value="glup" checked class="peer hidden">
+                                    <div
+                                        class="p-4 rounded-3xl border-2 border-slate-50 bg-slate-50 peer-checked:border-brand-500 peer-checked:bg-white peer-checked:shadow-xl peer-checked:shadow-brand-500/10 transition-all text-center">
+                                        <div class="text-xl mb-1 group-hover:scale-110 transition-transform">💎</div>
+                                        <span
+                                            class="block text-[10px] font-black uppercase text-slate-600">Glup/Sabores</span>
+                                    </div>
+                                </label>
+                                <label class="relative cursor-pointer group">
+                                    <input type="radio" name="ocr-supplier" value="polar" class="peer hidden">
+                                    <div
+                                        class="p-4 rounded-3xl border-2 border-slate-50 bg-slate-50 peer-checked:border-brand-500 peer-checked:bg-white peer-checked:shadow-xl peer-checked:shadow-brand-500/10 transition-all text-center">
+                                        <div class="text-xl mb-1 group-hover:scale-110 transition-transform">🐻</div>
+                                        <span class="block text-[10px] font-black uppercase text-slate-600">Polar</span>
+                                    </div>
+                                </label>
+                                <label class="relative cursor-pointer group">
+                                    <input type="radio" name="ocr-supplier" value="coca" class="peer hidden">
+                                    <div
+                                        class="p-4 rounded-3xl border-2 border-slate-50 bg-slate-50 peer-checked:border-brand-500 peer-checked:bg-white peer-checked:shadow-xl peer-checked:shadow-brand-500/10 transition-all text-center">
+                                        <div class="text-xl mb-1 group-hover:scale-110 transition-transform">🥤</div>
+                                        <span
+                                            class="block text-[10px] font-black uppercase text-slate-600">Coca-Cola</span>
+                                    </div>
+                                </label>
+                            </div>
+                    </div>
+
+                    <div id="ocr-dropzone"
+                        class="border-4 border-dashed border-slate-100 dark:border-slate-700 rounded-[40px] p-16 text-center hover:border-brand-400 hover:bg-brand-50/30 transition-all cursor-pointer group/drop relative overflow-hidden">
+                        <input type="file" id="ocr-file-input" class="hidden" accept="image/*">
+                        <div class="relative z-10">
+                            <div
+                                class="w-24 h-24 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover/drop:scale-110 group-hover/drop:rotate-6 transition-all duration-500">
+                                <i class="fas fa-cloud-upload-alt text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-black text-slate-800 dark:text-white mb-2">Suelte la factura aquí
+                            </h3>
+                            <p class="text-slate-500 dark:text-slate-400 font-medium">o haga clic para buscar en su
+                                equipo</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-4 md:p-8 w-full">
+                <div id="ocr-results" class="hidden space-y-6 animate-in fade-in slide-in-from-bottom-4 w-full">
+                    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                        <div
+                            class="bg-slate-900 text-white px-8 py-4 flex justify-between items-center flex-wrap gap-4">
+                            <div>
+                                <span class="text-xs font-black uppercase tracking-widest text-emerald-400">Panel de
+                                    Carga Inteligente v37</span>
+                                <h3 class="text-lg font-black">PRE-FACTURA DETECTADA</h3>
+                            </div>
+                            <div class="flex items-center gap-4 flex-wrap">
+                                <div
+                                    class="flex items-center gap-2 bg-slate-800 rounded-xl px-4 py-2 border border-slate-700">
+                                    <span class="text-xs font-bold text-slate-400 whitespace-nowrap">Tasa BCV
+                                        (Costo):</span>
+                                    <span class="text-xs font-black text-emerald-400">Bs</span>
+                                    <span id="ocr-bcv-rate-display" class="text-sm font-black text-white">---</span>
+                                </div>
+                                <div
+                                    class="flex items-center gap-2 bg-amber-900/40 rounded-xl px-4 py-2 border border-amber-700">
+                                    <label class="text-xs font-bold text-amber-300 whitespace-nowrap">Tasa Mercado
+                                        (PVP):</label>
+                                    <span class="text-xs font-black text-amber-400">Bs</span>
+                                    <input type="number" id="ocr-market-rate" step="10" placeholder="ej. 2100"
+                                        class="w-24 bg-transparent text-amber-200 font-black text-sm outline-none border-b border-amber-600 text-center"
+                                        oninput="recalcAllOCRPrices()">
+                                </div>
+                                <span class="text-xs opacity-60">Ajusta márgenes y confirma</span>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[1200px]">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-4 px-6 text-[11px] font-black uppercase text-slate-400">Texto
+                                            Original</th>
+                                        <th class="py-4 px-6 text-[11px] font-black uppercase text-slate-600">Mapear a
+                                            Producto (Inventario)</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                            Cant</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                            Costo Bruto</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                            % Desc</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-400 text-center">
+                                            IVA</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center text-emerald-600">
+                                            Costo Neto</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                            Gana %</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center text-brand-600">
+                                            PVP (Bs/Bulto)</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                            Unid.</th>
+                                        <th
+                                            class="py-4 px-6 text-[11px] font-black uppercase text-slate-600 text-center">
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ocr-table-body" class="divide-y divide-slate-100"></tbody>
+                                <tfoot class="bg-slate-900 text-white">
+                                    <tr>
+                                        <td colspan="2"
+                                            class="py-6 px-8 text-right font-black text-slate-400 uppercase tracking-widest text-sm">
+                                            Totales Factura detectados:</td>
+                                        <td id="ocr-total-bultos" class="py-6 px-4 text-center font-black text-2xl">0
+                                        </td>
+                                        <td id="ocr-total-usd"
+                                            class="py-6 px-4 text-center font-black text-emerald-400 text-2xl"
+                                            colspan="3">$0.00</td>
+                                        <td colspan="4"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mt-8 pb-10">
+                        <button id="cancel-ocr-btn"
+                            class="px-8 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl transition-all">Cancelar
+                            Carga</button>
+                        <button id="confirm-ocr-btn"
+                            class="px-12 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-500/30 transition-all transform hover:-translate-y-1">Actualizar
+                            Stock e Inventario</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA SERVIDOR / APP MÓVIL === -->
+        <section id="view-server"
+            class="flex-1 flex flex-col h-full overflow-hidden absolute inset-0 w-full animate-fade-in view-section hidden">
+            <header
+                class="bg-white px-8 py-6 shadow-sm flex items-center justify-between shrink-0 border-b border-slate-200">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Conexión Móvil</h2>
+                    <p class="text-sm text-slate-500 mt-1">Conecta teléfonos por WiFi o Internet (Remoto)</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 font-black text-[10px] uppercase tracking-widest">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        Caja Lista para Conectar
+                    </div>
+                </div>
+            </header>
+            <div class="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+
+                    <!-- Conexión Local (WiFi) -->
+                    <div
+                        class="bg-white p-8 rounded-[32px] shadow-xl shadow-emerald-100/50 border-2 border-emerald-500 relative flex flex-col items-center text-center scale-105">
+                        <div
+                            class="absolute -top-4 bg-emerald-600 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                            Vínculo Permanente (Fijo)
+                        </div>
+                        <div
+                            class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center text-2xl mb-6 shadow-inner">
+                            <i class="fas fa-house-signal"></i>
+                        </div>
+                        <h3 class="text-lg font-black text-slate-800 mb-1">Red Local / WiFi</h3>
+                        <p class="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-4">¡Esta conexión
+                            nunca cambia!</p>
+
+                        <div class="p-4 bg-white border-4 border-emerald-50 rounded-[40px] shadow-inner mb-6">
+                            <img id="server-qr-display" src="" class="w-40 h-40 object-contain">
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-2xl text-left border border-slate-100 w-full mb-3">
+                            <p class="text-[10px] font-black text-slate-400 uppercase mb-1">URL Permanente de Caja</p>
+                            <p id="server-ip-display"
+                                class="text-xs font-mono font-bold text-slate-700 break-all leading-tight">Detectando...
+                            </p>
+                        </div>
+                        <p class="text-[9px] text-slate-500 font-medium mb-4 italic">Escanea este QR desde el móvil para
+                            fijar la conexión.</p>
+                        <button onclick="shareLink('local')"
+                            class="w-full py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-md">
+                            <i class="fab fa-whatsapp text-lg"></i> Compartir IP Fija
+                        </button>
+                    </div>
+
+                    <!-- DESCARGAR APP (NUEVO) -->
+                    <div
+                        class="bg-indigo-600 p-8 rounded-[38px] shadow-2xl shadow-indigo-300/50 flex flex-col items-center text-center text-white scale-105 border-4 border-white">
+                        <div
+                            class="w-16 h-16 bg-white/20 text-white rounded-3xl flex items-center justify-center text-2xl mb-6 backdrop-blur-md">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <h3 class="text-xl font-black mb-1">Descargar App Móvil</h3>
+                        <p class="text-[10px] text-indigo-200 font-bold uppercase tracking-widest mb-6">Crea un acceso
+                            directo en tu celular</p>
+
+                        <div class="p-5 bg-white rounded-[44px] shadow-2xl mb-6">
+                            <img id="download-qr-display" src="" class="w-44 h-44 object-contain">
+                        </div>
+
+                        <div class="space-y-3 w-full">
+                            <p class="text-[10px] font-bold text-indigo-100 uppercase">Escanea con tu cámara o toca
+                                abajo:</p>
+                            <button onclick="shareLink('download')"
+                                class="w-full py-4 bg-white text-indigo-600 rounded-2xl text-[11px] font-black uppercase flex items-center justify-center gap-3 hover:bg-indigo-50 transition-all shadow-lg">
+                                <i class="fab fa-whatsapp text-lg"></i> COMPARTIR QR DE DESCARGA
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Acceso Remoto (Internet) -->
+                    <div
+                        class="bg-white p-8 rounded-[32px] shadow-xl shadow-indigo-100/50 border border-indigo-50 flex flex-col items-center text-center opacity-90 hover:opacity-100 transition-opacity">
+                        <div
+                            class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-2xl mb-6 shadow-inner relative">
+                            <i class="fas fa-globe"></i>
+                            <span
+                                class="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white"></span>
+                        </div>
+                        <h3 class="text-lg font-black text-slate-800 mb-1">Acceso Remoto (Anywhere)</h3>
+                        <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mb-6">Uso con datos
+                            móviles (Calle)</p>
+
+                        <div class="p-4 bg-white border-2 border-indigo-100 rounded-[40px] shadow-inner mb-6">
+                            <img id="remote-qr-display" src="" class="w-40 h-40 object-contain">
+                        </div>
+
+                        <div class="bg-indigo-50 p-4 rounded-2xl text-left border border-indigo-100 w-full mb-3">
+                            <p class="text-[10px] font-black text-indigo-400 uppercase mb-1">Enlace Público Seguro</p>
+                            <a id="remote-url-display" href="#" target="_blank"
+                                class="text-xs font-mono font-bold text-indigo-600 hover:underline break-all uppercase leading-tight">Iniciando
+                                túnel...</a>
+                        </div>
+
+                        <div id="tunnel-password-container"
+                            class="hidden bg-amber-50 p-4 rounded-2xl border border-amber-200 w-full mb-4">
+                            <p class="text-[9px] font-black text-amber-600 uppercase mb-1 flex items-center gap-1">
+                                <i class="fas fa-key"></i> Clave de Acceso (Si la pide)
+                            </p>
+                            <p id="tunnel-password-display"
+                                class="text-sm font-mono font-black text-amber-700 select-all tracking-widest">---</p>
+                            <p class="text-[8px] text-amber-500 font-bold mt-1">Escribe este número si el túnel te pide
+                                una clave.</p>
+                        </div>
+
+                        <button onclick="shareLink('remote')"
+                            class="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-3 hover:bg-indigo-100 transition-all">
+                            <i class="fab fa-whatsapp text-lg"></i> ENVIAR LINK REMOTO
+                        </button>
+                    </div>
+
+                </div>
+
+                <div
+                    class="max-w-4xl mx-auto mt-8 bg-amber-50 border border-amber-100 p-6 rounded-[32px] flex items-center gap-6">
+                    <div
+                        class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl shrink-0">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-amber-900 text-sm">Consejo Fresh:</h4>
+                        <p class="text-xs text-amber-700 font-medium leading-relaxed">Usa la <b>Conexión Local</b> para
+                            los pedidos dentro del negocio (es más rápida). Usa el <b>Acceso Remoto</b> solo cuando los
+                            repartidores estén afuera con sus datos móviles.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA CUENTAS POR COBRAR (FIAOS) === -->
+        <section id="view-credits" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm border-b border-slate-200 shrink-0 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Cuentas por Cobrar (Fiaos)</h2>
+                    <p class="text-sm text-slate-500 mt-1">Sigue el rastro de quién debe y cuánto.</p>
+                </div>
+                <div class="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-black flex items-center gap-2">
+                    <i class="fas fa-hand-holding-dollar"></i>
+                    <span id="credits-summary-total">Total: $0.00</span>
+                </div>
+            </header>
+            <div class="p-8">
+                <div class="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Monto</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="credits-table-body" class="divide-y divide-slate-100">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA GESTIÓN DE GASTOS === -->
+        <section id="view-expenses" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm border-b border-slate-200 shrink-0 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Gestión de Gastos</h2>
+                    <p class="text-sm text-slate-500 mt-1">Registra costos operativos del negocio.</p>
+                </div>
+                <button onclick="openExpenseModal()"
+                    class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Añadir Gasto
+                </button>
+            </header>
+            <div class="p-8">
+                <div class="bg-white rounded-[32px] shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Descripción</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Monto USD</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenses-table-body" class="divide-y divide-slate-100">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA CONFIGURACIÓN === -->
+        <section id="view-settings"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm border-b border-slate-200 shrink-0">
+                <h2 class="text-2xl font-bold text-slate-800">Configuración</h2>
+                <p class="text-sm text-slate-500 mt-1">Personaliza tu sistema y facturas</p>
+            </header>
+
+            <div class="p-8 max-w-4xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- App Details -->
+                    <div class="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div
+                                class="w-12 h-12 bg-brand-50 text-brand-600 rounded-2xl flex items-center justify-center text-xl">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <h3 class="font-black text-slate-800">Empresa y App</h3>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label
+                                    class="block text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Nombre
+                                    de la App (Sidebar)</label>
+                                <input type="text" id="settings-app-name"
+                                    class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none focus:border-brand-500 transition-all">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Nombre
+                                    de Empresa (Factura)</label>
+                                <input type="text" id="settings-company-name"
+                                    class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none focus:border-brand-500 transition-all">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Pie
+                                    de Factura / Contacto</label>
+                                <input type="text" id="settings-company-footer"
+                                    class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-3 px-4 font-bold text-slate-700 outline-none focus:border-brand-500 transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Receipt Customization -->
+                    <div class="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div
+                                class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl">
+                                <i class="fas fa-receipt"></i>
+                            </div>
+                            <h3 class="font-black text-slate-800">Diseño de Ticket</h3>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label
+                                    class="block text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Tamaño
+                                    de Letra (px)</label>
+                                <div class="flex items-center gap-4">
+                                    <input type="range" id="settings-font-size-range" min="8" max="14" step="1"
+                                        class="flex-1 accent-brand-600">
+                                    <span id="settings-font-size-val"
+                                        class="font-black text-brand-600 bg-brand-50 px-3 py-1 rounded-xl">10px</span>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-50">
+                                <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Previsualización</p>
+                                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                    <div id="settings-ticket-preview" class="font-mono text-center overflow-hidden"
+                                        style="font-size: 10px;">
+                                        <p class="font-black" id="preview-company-name">ZONA FRESH</p>
+                                        <p>TICKET: #0001</p>
+                                        <p>----------------</p>
+                                        <p>ITEM EJEMPLO x1</p>
+                                        <p>TOTAL: Bs 1,500</p>
+                                        <p>----------------</p>
+                                        <p id="preview-company-footer" style="font-size: 0.8em;">Zona Fresh 2025 |
+                                            0414-1006858</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-end">
+                    <button id="save-settings-btn"
+                        class="bg-brand-600 hover:bg-brand-700 text-white font-black py-4 px-10 rounded-[24px] shadow-lg shadow-brand-500/30 transition-all transform hover:-translate-y-1 flex items-center">
+                        <i class="fas fa-save mr-2"></i> Guardar Configuración
+                    </button>
+                </div>
+            </div>
+
+            <!-- Floating Orders Overlay -->
+            <div id="incoming-orders-panel"
+                class="fixed right-0 top-0 bottom-0 w-[400px] bg-white shadow-2xl z-50 transform translate-x-full transition-all duration-500 ease-in-out border-l border-slate-200 flex flex-col opacity-0">
+                <header class="px-6 py-8 bg-slate-900 text-white shrink-0">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-black tracking-tight">PEDIDOS MÓVILES</h3>
+                        <button id="close-orders-panel"
+                            class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </header>
+                <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 custom-scrollbar"
+                    id="incoming-orders-list">
+                    <!-- Orders arrive here -->
+                    <div class="text-center py-20 opacity-30 h-full flex flex-col items-center justify-center">
+                        <div class="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-ghost text-4xl"></i>
+                        </div>
+                        <p class="font-bold text-slate-400">No hay pedidos nuevos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Notification Toast -->
+            <div id="order-notification"
+                class="fixed bottom-10 right-10 z-[60] transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+                <div class="bg-red-600 text-white px-6 py-4 rounded-3xl shadow-2xl shadow-red-500/40 flex items-center gap-4 border-2 border-white/20 order-badge-pulse pointer-events-auto cursor-pointer"
+                    id="order-toast-trigger">
+                    <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest opacity-80">Nuevo Pedido Recibido</p>
+                        <p class="text-base font-bold">¡Hay un nuevo cliente esperando!</p>
+                    </div>
+                </div>
+            </div>
+
+
+    </main>
+
+    <!-- === MODALS === -->
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-md transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh] overflow-hidden"
+            id="checkout-modal-content">
+
+            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h3 class="font-bold text-2xl text-slate-800">Pago</h3>
+                <button
+                    class="close-checkout-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="px-8 py-6 bg-slate-50/50 flex-1 overflow-y-auto custom-scrollbar">
+
+                <div
+                    class="flex justify-between items-center mb-6 bg-brand-50 dark:bg-brand-900/30 border border-brand-100 dark:border-brand-800 p-3 rounded-xl">
+                    <div class="text-left">
+                        <p class="text-brand-600 dark:text-brand-400 font-bold text-xs uppercase tracking-wide">Total a
+                            Cobrar</p>
+                        <div class="text-3xl font-black text-slate-800 dark:text-white tracking-tight"
+                            id="checkout-total-display">$0.00</div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wide">
+                            Equivalente</p>
+                        <div class="text-xl font-black text-slate-600 dark:text-slate-300 tracking-tight"
+                            id="checkout-total-ves-display">Bs 0.00</div>
+                    </div>
+                </div>
+
+                <div class="flex rounded-xl bg-slate-200/50 dark:bg-slate-700/50 p-1.5 mb-8">
+                    <button
+                        class="payment-tab flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all"
+                        data-method="cash-usd">
+                        <i class="fas fa-dollar-sign mr-1 text-green-500"></i> Efec USD
+                    </button>
+                    <button
+                        class="payment-tab active flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-white transition-all"
+                        data-method="cash-ves">
+                        <i class="fas fa-money-bill-wave mr-1 text-blue-500"></i> Efec VES
+                    </button>
+                    <button
+                        class="payment-tab flex-1 py-2 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all"
+                        data-method="card-ves">
+                        <i class="fas fa-credit-card mr-1 text-brand-500"></i> Punto BS
+                    </button>
+                </div>
+
+                <!-- Cash Section -->
+                <div id="cash-section" class="space-y-4 animate-fade-in block">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2"
+                            id="label-amount-received">Monto Recibido</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl"
+                                id="currency-input-symbol">Bs</span>
+                            <input type="number" id="amount-received"
+                                class="w-full pl-9 pr-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none text-2xl font-bold dark:text-white transition-all shadow-sm"
+                                placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-50 border-2 border-emerald-100 rounded-xl p-4 flex justify-between items-center transition-all duration-300"
+                        id="change-container">
+                        <div class="flex flex-col">
+                            <span class="text-emerald-800 font-bold uppercase tracking-wide text-xs">Cambio
+                                Vuelto</span>
+                            <span class="text-xs font-semibold text-emerald-600 mt-1"
+                                id="checkout-change-secundary"></span>
+                        </div>
+                        <span class="text-2xl font-black text-emerald-600" id="checkout-change">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Card Section -->
+                <div id="card-section" class="hidden text-center py-6 animate-fade-in">
+                    <div
+                        class="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-3 border-4 border-brand-100 text-brand-500">
+                        <i class="fas fa-wifi text-3xl"></i>
+                    </div>
+                    <p class="text-slate-700 font-bold text-lg mb-1">Punto de Venta (BS)</p>
+                    <p class="text-slate-500 text-sm">Realiza el cargo en el TPV por <strong
+                            id="tpv-amount-bs"></strong></p>
+                </div>
+
+                <!-- Observations Section -->
+                <div class="mt-6 border-t border-slate-100 pt-4">
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Observaciones /
+                        Notas</label>
+                    <textarea id="checkout-observations" rows="2"
+                        class="w-full px-4 py-2 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none text-sm font-medium dark:text-white transition-all resize-none"
+                        placeholder="Opcional: añadir información adicional..."></textarea>
+                </div>
+            </div>
+
+            <div class="px-8 py-6 border-t border-slate-100 bg-white grid grid-cols-1 gap-3 shrink-0">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="close-checkout-modal py-4 rounded-xl border-2 border-slate-200 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
+                    <button id="confirm-payment-btn" class="py-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-lg shadow-brand-500/40 transition-all">Cobrar <i class="fas fa-check ml-1"></i></button>
+                </div>
+                <!-- BOTÓN FIAO -->
+                <button id="fiao-payment-btn"
+                    class="w-full py-4 rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-hand-holding-dollar"></i> Dar a Crédito (Fiao)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Modal (Add/Edit) -->
+    <div id="product-modal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform scale-95 transition-transform duration-300 max-h-[90vh] flex flex-col"
+            id="product-modal-content">
+            <div
+                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
+                <h3 class="font-bold text-xl text-slate-800" id="modal-product-title">Añadir Producto</h3>
+                <button
+                    class="close-product-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                <form id="product-form" class="space-y-4">
+                    <input type="hidden" id="product-id">
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre del Producto *</label>
+                        <input type="text" id="product-name" required
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Código de Barras
+                            (Opcional)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><i
+                                    class="fas fa-barcode"></i></span>
+                            <input type="text" id="product-barcode" placeholder="Escaneé o escriba el código..."
+                                class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-mono tracking-widest text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Categoría *</label>
+                            <select id="product-category" required
+                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium appearance-none">
+                                <option value="Gaseosas">Gaseosas</option>
+                                <option value="Aguas">Aguas</option>
+                                <option value="Jugos">Jugos</option>
+                                <option value="Energizantes">Energizantes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Stock Actual *</label>
+                            <input type="number" id="product-stock" required min="0"
+                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1"
+                                title="Precio de compra al proveedor">Costo Bruto (USD) *</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">$</span>
+                                <input type="number" id="product-cost-price" required min="0.01" step="0.01"
+                                    class="w-full pl-9 pr-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-black text-emerald-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="fas fa-coins text-indigo-500"></i>
+                            <span class="text-xs font-black uppercase text-indigo-700 tracking-wider">Configuración de
+                                Precios Independientes</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Precio en
+                                    Bolívares (VES)</label>
+                                <div class="relative group">
+                                    <span
+                                        class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 font-black text-xs">Bs</span>
+                                    <input type="number" id="product-price-ves" step="0.01" required
+                                        class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-black text-slate-800">
+                                    <button type="button" onclick="suggestPrice('VES')"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-brand-500 transition-colors"
+                                        title="Calcular desde USD según tasa"><i class="fas fa-bolt"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Precio en
+                                    Dólares (USD)</label>
+                                <div class="relative group">
+                                    <span
+                                        class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
+                                    <input type="number" id="product-price-usd" step="0.01" required
+                                        class="w-full pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-black text-slate-800">
+                                    <button type="button" onclick="suggestPrice('USD')"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors"
+                                        title="Calcular desde VES según tasa"><i class="fas fa-bolt"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-indigo-100/50">
+                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Precio Promoción
+                                (Bs) - Opcional</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 font-bold text-xs">Bs</span>
+                                <input type="number" id="product-promo-price-ves" step="0.01" placeholder="Ej. 950"
+                                    class="w-full pl-9 pr-3 py-2 bg-white/50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-rose-600 placeholder:text-rose-200 text-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1"
+                            title="Escribe los sabores separados por coma (ej. Cola, Piña, Naranja)">Sabores / Variantes
+                            (opcional)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400 font-bold"><i
+                                    class="fas fa-tags"></i></span>
+                            <input type="text" id="product-flavors" placeholder="Cola, Naranja, Limón..."
+                                class="w-full pl-11 pr-4 py-2.5 bg-purple-50 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all font-medium placeholder:text-purple-300">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Teléfono
+                                del Jefe (WhatsApp)</label>
+                            <input type="text" id="product-boss-phone-input" placeholder="Ej: 58412..."
+                                class="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-0 outline-none transition-all font-bold">
+                            <p class="text-[10px] text-slate-400 mt-2 italic">Sin el símbolo + (Ej: 584123633283)</p>
+                        </div>
+                        <!-- NUEO: CallMeBot API Key -->
+                        <div class="mt-4">
+                            <label
+                                class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                                <span>CallMeBot API Key (Opcional)</span>
+                                <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank"
+                                    class="text-brand-600 hover:underline">¿Cómo obtenerla?</a>
+                            </label>
+                            <input type="text" id="callmebot-key-input" placeholder="Ej: 123456"
+                                class="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 focus:ring-0 outline-none transition-all font-bold">
+                            <p class="text-[10px] text-emerald-600 mt-2 font-bold uppercase tracking-tighter">✨
+                                ¡Habilita envíos 100% automáticos y silenciosos!</p>
+                        </div>
+                    </div>
+                    <label class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i class="fas fa-star text-amber-400"></i> Producto Destacado
+                    </label>
+                    <p class="text-[10px] text-slate-500 mt-1">Se mostrará con prioridad y diseño especial en la
+                        app móvil.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">URL de Imagen</label>
+                <input type="url" id="product-img" placeholder="https://..."
+                    class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all text-sm">
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                    <label class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i class="fas fa-star text-amber-400"></i> Producto Destacado
+                    </label>
+                    <p class="text-[10px] text-slate-500 mt-1">Se mostrará con prioridad y diseño especial en la
+                        app móvil.</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="product-featured" class="sr-only peer">
+                    <div
+                        class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-400">
+                    </div>
+                </label>
+            </div>
+            </form>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
+            <button
+                class="close-product-modal py-2.5 px-5 rounded-xl border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-slate-50 hover:text-slate-800 transition-colors">Cancelar</button>
+            <button form="product-form" type="submit"
+                class="py-2.5 px-6 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/30 transition-all">Guardar
+                Producto</button>
+        </div>
+    </div>
+    </div>
+    <!-- Client Modal -->
+    <div id="client-modal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh] overflow-hidden"
+            id="client-modal-content">
+
+            <div
+                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
+                <h3 class="font-bold text-xl text-slate-800" id="modal-client-title">Añadir Cliente</h3>
+                <button
+                    class="close-client-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-6">
+                <form id="client-form" class="space-y-4">
+                    <input type="hidden" id="client-id">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Cédula / RIF *</label>
+                        <input type="text" id="client-document" placeholder="V-12345678" required
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo *</label>
+                        <input type="text" id="client-name" required
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teléfono o Email</label>
+                        <input type="text" id="client-phone"
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
+                <button form="client-form" type="submit"
+                    class="w-full py-2.5 px-6 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/30">Guardar</button>
+            </div>
+
+        </div>
+    </div>
+    </div>
+    <!-- === THERMAL PRINT TICKET TEMPLATE 80mm === -->
+    <div id="print-ticket-container" class="print-ticket bg-white text-black font-mono">
+        <div class="text-center" style="padding:0;margin:0;">
+            <h1 id="branding-ticket-name" class="font-black uppercase" style="margin:0;padding:0;line-height:1;">Caja Fresh</h1>
+            <p class="font-bold" id="print-ticket-num-header" style="margin:0;padding:0;font-size:0.9em;"></p>
+        </div>
+        <div
+            style="font-size:0.85em;font-weight:700;margin:0;padding:0;border-top:1px dashed black;border-bottom:1px dashed black;">
+            <span id="print-ticket-client-name"></span> | <span id="print-ticket-client-doc"></span><br>
+            <span id="print-ticket-date" style="font-size:0.8em;"></span>
+        </div>
+        <table class="w-full font-black border-collapse" style="table-layout:fixed;font-size:0.9em;">
+            <thead>
+                <tr style="border-bottom:1px solid black;">
+                    <th style="width:50%;text-align:left;padding:0;">PRODUCTO</th>
+                    <th style="width:10%;text-align:center;padding:0;">CT</th>
+                    <th style="width:20%;text-align:right;padding:0;">UNIT</th>
+                    <th style="width:20%;text-align:right;padding:0;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody id="print-ticket-items"></tbody>
+        </table>
+        <table class="w-full font-black" style="table-layout:fixed;font-size:1em;border-top:1px solid black;">
+            <tr>
+                <td style="width:40%;text-align:left;padding:0;">TOTAL Bs:</td>
+                <td style="width:60%;text-align:right;padding:0;font-size:11px;">Bs <span
+                        id="print-ticket-total-ves"></span></td>
+            </tr>
+            <tr>
+                <td style="width:40%;text-align:left;padding:0;">REF USD:</td>
+                <td style="width:60%;text-align:right;padding:0;">$ <span id="print-ticket-total-usd"></span></td>
+            </tr>
+        </table>
+        <div id="print-ticket-observations-container" class="hidden"
+            style="font-size:0.75em;font-weight:700;border-top:1px dashed black;margin:0;padding:0;">
+            <span>NOTAS: <span id="print-ticket-observations" style="font-weight:400;"></span></span>
+        </div>
+        <div class="text-center"
+            style="font-size:0.75em;font-weight:700;border-top:1px dashed black;padding:0;margin:0;line-height:1.1;">
+            <span id="branding-ticket-footer">¡Gracias por preferirnos!</span>
+        </div>
+    </div>
+
+    <!-- Secret Admin Modal -->
+    <div id="secret-admin-modal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden relative max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i
+                        class="fas fa-user-secret text-brand-600"></i> Admin Oculto</h3>
+                <button
+                    onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')"
+                    class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-bold text-slate-700 text-sm">Escáner de código de barras</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-scanner" class="sr-only peer"
+                            onchange="applySecretSettings()">
+                        <div
+                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                        </div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-bold text-slate-700 text-sm">Opción Móvil</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-mobile" class="sr-only peer" onchange="applySecretSettings()">
+                        <div
+                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                        </div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-bold text-slate-700 text-sm">Surtidor con IA</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-ai" class="sr-only peer" onchange="applySecretSettings()">
+                        <div
+                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
+                        </div>
+                    </label>
+                </div>
+                <!-- Business Branding Config -->
+                <div class="pt-4 border-t border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Marca Personalizada (White Label)</p>
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <label class="text-[8px] font-black text-slate-400 uppercase absolute left-3 top-1.5 z-10">Nombre del Negocio</label>
+                            <input type="text" id="business-name-input" placeholder="Nombre de tu negocio"
+                                class="w-full bg-slate-100 border-2 border-transparent rounded-xl pt-5 pb-2 px-3 text-xs font-bold focus:bg-white focus:border-brand-500 transition-all outline-none"
+                                onchange="applySecretSettings()">
+                        </div>
+                        <div class="relative">
+                            <label class="text-[8px] font-black text-slate-400 uppercase absolute left-3 top-1.5 z-10">Teléfono Footer</label>
+                            <input type="text" id="business-phone-footer-input" placeholder="Ej: 0414-1234567"
+                                class="w-full bg-slate-100 border-2 border-transparent rounded-xl pt-5 pb-2 px-3 text-xs font-bold focus:bg-white focus:border-brand-500 transition-all outline-none"
+                                onchange="applySecretSettings()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boss WhatsApp Config -->
+                <div class="pt-4 border-t border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">WhatsApp Jefe (Receptor)</p>
+                    <div class="relative group">
+                        <input type="text" id="boss-phone-input" placeholder="Ej: 584141234567"
+                            class="w-full bg-slate-100 border-2 border-transparent rounded-xl py-3 px-4 text-sm font-bold focus:bg-white focus:border-brand-500 transition-all outline-none"
+                            onchange="applySecretSettings()">
+                        <i
+                            class="fab fa-whatsapp absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 text-lg"></i>
+                    </div>
+                </div>
+                <!-- WhatsApp Professional Integration (Silent Background) -->
+                <div class="pt-4 border-t border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+                        <span>WhatsApp Profesional (Auto)</span>
+                        <span id="wa-status-badge" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 text-[8px] font-bold uppercase transition-all">Buscando...</span>
+                    </p>
+                    <div id="wa-qr-container" class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center min-h-[160px] transition-all">
+                        <div id="wa-qr-placeholder" class="text-center">
+                            <i class="fas fa-qrcode text-3xl text-slate-300 mb-2"></i>
+                            <p class="text-[8px] text-slate-400 font-bold uppercase px-4 leading-tight">Iniciando motor de automatización...</p>
+                        </div>
+                        <img id="wa-qr-img" class="w-32 h-32 hidden shadow-lg rounded-lg border-2 border-white" src="" alt="Escanea para vincular">
+                        <div id="wa-connected-view" class="hidden text-center">
+                            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm">
+                                <i class="fab fa-whatsapp text-2xl"></i>
+                            </div>
+                            <p class="text-[9px] text-emerald-600 font-black uppercase tracking-tighter">¡Vinculado con éxito!</p>
+                            <p class="text-[8px] text-slate-400 mt-1 italic">Los reportes ahora son 100% automáticos.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button
+                    onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')"
+                    class="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Guardar
+                    y Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Modal -->
+    <div id="pin-modal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xs flex flex-col overflow-hidden relative">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i
+                        class="fas fa-lock text-brand-600"></i> Acceso Restringido</h3>
+                <button
+                    onclick="document.getElementById('pin-modal').classList.add('hidden'); document.getElementById('pin-modal').classList.remove('flex')"
+                    class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-500 mb-4 text-center font-medium">Ingresa el PIN de Administrador</p>
+                <input type="password" id="admin-pin-input" placeholder="****"
+                    class="w-full text-center tracking-[0.5em] font-bold text-2xl px-4 py-3 bg-slate-100 border-2 border-transparent rounded-xl focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all"
+                    maxlength="4" onkeypress="if(event.key === 'Enter') verifyAdminPin()">
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-stretch">
+                <button onclick="verifyAdminPin()"
+                    class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Desbloquear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden PDF Report Template (For WhatsApp Professional) -->
+    <div style="display: none;">
+        <div id="whatsapp-pdf-template" style="width: 700px; padding: 30px; font-family: 'Inter', sans-serif; color: #1e293b; background: white; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #1d4ed8; padding-bottom: 20px; margin-bottom: 30px;">
+                <div>
+                    <h1 id="branding-pdf-header-name" style="margin: 0; color: #1d4ed8; font-size: 32px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase;">Caja Fresh</h1>
+                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px; font-weight: 600;">Reporte Automatizado de Ventas</p>
+                </div>
+                <div style="text-align: right;">
+                    <div id="pdf-report-date" style="font-weight: 800; color: #1e293b; font-size: 16px;"></div>
+                    <div id="pdf-report-range" style="color: #64748b; font-size: 12px; margin-top: 5px; font-weight: 700;"></div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px;">
+                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <p style="margin: 0 0 8px 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Ingreso Total USD</p>
+                    <p id="pdf-total-usd" style="margin: 0; font-size: 24px; font-weight: 900; color: #0f172a;"></p>
+                </div>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <p style="margin: 0 0 8px 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Ingreso Total VES</p>
+                    <p id="pdf-total-ves" style="margin: 0; font-size: 24px; font-weight: 900; color: #0f172a;"></p>
+                </div>
+            </div>
+
+            <h3 style="font-size: 14px; font-weight: 800; color: #1e293b; text-transform: uppercase; margin-bottom: 15px; border-left: 4px solid #1d4ed8; padding-left: 10px;">Detalle de las Ultimas Ventas</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background: #1e293b; color: white;">
+                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; border-radius: 8px 0 0 0; width: 15%;">TICKET</th>
+                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; width: 45%;">CLIENTE</th>
+                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; width: 20%;">TOTAL USD</th>
+                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; border-radius: 0 8px 0 0; width: 20%;">TOTAL VES</th>
+                    </tr>
+                </thead>
+                <tbody id="pdf-sales-table-body">
+                    <!-- Filas dinámicas -->
+                </tbody>
+            </table>
+
+            <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+                <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 500;">Este documento fue generado automáticamente por el sistema de administración.</p>
+                <p id="branding-pdf-footer-line" style="margin: 5px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase;"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL PEDIDOS MÓVILES === -->
+    <div id="mobile-orders-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh] overflow-hidden"
+            id="mobile-orders-modal-content">
+            <!-- Header -->
+            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-2xl text-slate-800 tracking-tight">Pedidos Entrantes</h3>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Desde la APP Móvil</p>
+                    </div>
+                </div>
+                <button id="close-mobile-orders-modal"
+                    class="w-10 h-10 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-500 flex items-center justify-center transition-all active:scale-90">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- List of Orders -->
+            <div class="flex-1 overflow-y-auto p-8 bg-slate-50/30 custom-scrollbar space-y-4" id="mobile-orders-list">
+                <!-- JS renders cards here -->
+                <div class="text-center py-20">
+                    <div
+                        class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                        <i class="fas fa-inbox text-3xl"></i>
+                    </div>
+                    <p class="text-slate-400 font-bold">No hay pedidos pendientes por el momento.</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-8 py-6 border-t border-slate-100 bg-white text-center shrink-0">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Caja Fresh POS Server Edition
+                    v1.1</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- QRCode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Cierre de Caja Modal -->
+    <div id="cierre-modal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md flex flex-col overflow-hidden transform scale-95 transition-transform duration-300" id="cierre-modal-content">
+            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                <h3 class="font-black text-2xl text-slate-800 flex items-center gap-3">
+                    <i class="fas fa-file-invoice-dollar text-amber-600"></i> Cierre del Día
+                </h3>
+                <button onclick="document.getElementById('cierre-modal').classList.add('hidden'); document.getElementById('cierre-modal').classList.remove('flex')"
+                    class="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50">
+                <div class="text-center mb-6">
+                    <p class="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Resumen de Ventas Hoy</p>
+                    <p class="text-sm font-bold text-slate-500" id="cierre-date-display"></p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <!-- USD -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-dollar-sign"></i></div>
+                            <span class="font-bold text-slate-700">Efectivo USD</span>
+                        </div>
+                        <span id="cierre-total-usd" class="text-xl font-black text-emerald-600">$0.00</span>
+                    </div>
+                    <!-- VES -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-money-bill-wave"></i></div>
+                            <span class="font-bold text-slate-700">Efectivo BS</span>
+                        </div>
+                        <span id="cierre-total-ves" class="text-xl font-black text-blue-600">Bs 0</span>
+                    </div>
+                    <!-- PUNTO -->
+                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-credit-card"></i></div>
+                            <span class="font-bold text-slate-700">Punto de Venta</span>
+                        </div>
+                        <span id="cierre-total-card" class="text-xl font-black text-indigo-600">Bs 0</span>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-4">
+                    <div class="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-sm"><i class="fas fa-whatsapp"></i></div>
+                    <p class="text-[10px] text-amber-800 font-bold leading-tight">Al confirmar, se enviará automáticamente este resumen al WhatsApp del Jefe.</p>
+                </div>
+            </div>
+
+            <div class="px-8 py-6 border-t border-slate-100 bg-white grid grid-cols-1 gap-3 shrink-0">
+                <button onclick="printCierreZ()" class="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-print"></i> IMPRIMIR CORTE Z
+                </button>
+                <button onclick="confirmFinalCierre()" class="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-black rounded-2xl shadow-lg shadow-brand-500/40 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-paper-plane"></i> FINALIZAR Y ENVIAR AL JEFE
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

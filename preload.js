@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // WhatsApp Professional APIs
     sendWhatsAppBackground: (phone, message) => ipcRenderer.invoke('whatsapp-send-report', { phone, message }),
     sendWhatsAppPDF: (phone, base64Data, filename) => ipcRenderer.invoke('whatsapp-send-pdf', { phone, base64Data, filename }),
+    sendWASaleAlert: (phone, sale, dailyTotal) => ipcRenderer.invoke('whatsapp-sale-alert', { phone, sale, dailyTotal }),
     onWhatsAppQR: (callback) => ipcRenderer.on('whatsapp-qr', (event, qr) => callback(qr)),
     onWhatsAppStatus: (callback) => ipcRenderer.on('whatsapp-status', (event, status) => callback(status)),
     getWhatsAppStatus: () => ipcRenderer.invoke('whatsapp-get-status'),
@@ -31,20 +32,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (event, product) => callback(product)),
     onRemotePriceUpdated: (callback) => ipcRenderer.on('remote-price-updated', (event, data) => callback(data)),
     // License System
-    activateLicense: (key) => ipcRenderer.invoke('license-activate', key),
+    activateLicense: (key, storeName) => ipcRenderer.invoke('license-activate', key, storeName),
     licenseActivated: () => ipcRenderer.send('license-activated'),
     getMachineId: () => ipcRenderer.invoke('license-get-id'),
     getLicenseStatus: () => ipcRenderer.invoke('license-get-status'),
     openActivation: () => ipcRenderer.send('open-activation'),
     licenseForceCheck: () => ipcRenderer.invoke('license-force-check'),
+    getPublicIP: () => ipcRenderer.invoke('get-public-ip'),
     selectMobileBg: () => ipcRenderer.invoke('select-mobile-bg'),
+    exportToPDF: () => ipcRenderer.invoke('export-to-pdf'),
+    // Fiscal Printer
+    writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
     // Dashboard Remoto
     syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
-    // Auto-Updater
-    onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, data) => callback(data)),
-    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-    downloadUpdate: () => ipcRenderer.invoke('download-update'),
-    installUpdate: () => ipcRenderer.invoke('install-update'),
     send: (channel, data) => {
         const validChannels = ['dashboard-data', 'sync-products', 'generate-remote-qr', 'generate-download-qr', 'request-discovery-update', 'request-tunnel-info', 'license-activated'];
         if (validChannels.includes(channel)) ipcRenderer.send(channel, data);
@@ -58,7 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'payment-detected',
             'whatsapp-qr',
             'whatsapp-status',
-            'update-status'
+            'catalog-pulled-from-cloud'
         ];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (event, ...args) => callback(...args));
@@ -78,11 +78,13 @@ contextBridge.exposeInMainWorld('db', {
     getSales: (limit) => ipcRenderer.invoke('db-get-sales', limit),
     getSalesByDate: (startDate, endDate) => ipcRenderer.invoke('db-get-sales-by-date', startDate, endDate),
     saveSale: (sale) => ipcRenderer.invoke('db-save-sale', sale),
+    voidSale: (id) => ipcRenderer.invoke('db-void-sale', id),
     
     getCredits: () => ipcRenderer.invoke('db-get-credits'),
     addCreditPayment: (id, amount, method) => ipcRenderer.invoke('db-add-credit-payment', id, amount, method),
     
-    migrateData: (data) => ipcRenderer.invoke('db-migrate', data)
+    migrateData: (data) => ipcRenderer.invoke('db-migrate', data),
+    cloudSyncLog: (msg) => ipcRenderer.invoke('cloud-sync-log', msg)
 });
 
 // --- CLOUD SYNC (Multi-Sucursal) ---
@@ -90,7 +92,12 @@ contextBridge.exposeInMainWorld('cloudSync', {
     configure: (cfg) => ipcRenderer.invoke('cloud-sync-configure', cfg),
     getStatus: () => ipcRenderer.invoke('cloud-sync-status'),
     pushSale: (sale) => ipcRenderer.invoke('cloud-sync-push-sale', sale),
+    pushExpense: (expense) => ipcRenderer.invoke('cloud-sync-push-expense', expense),
     pushAlerts: (products) => ipcRenderer.invoke('cloud-sync-push-alerts', products),
     pushLiveState: (cart, totals, view) => ipcRenderer.invoke('cloud-sync-push-live', cart, totals, view),
-    onStatusChange: (callback) => ipcRenderer.on('cloud-sync-status', (_, data) => callback(data))
+    pushCatalog: (products) => ipcRenderer.invoke('cloud-sync-push-catalog', products),
+    onStatusChange: (callback) => ipcRenderer.on('cloud-sync-status', (_, data) => callback(data)),
+    onProductUpdatedRemote: (callback) => ipcRenderer.on('product-updated-remote', (_, data) => callback(data)),
+    onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (_, data) => callback(data)),
+    onExchangeRateUpdatedRemote: (callback) => ipcRenderer.on('exchange-rate-updated-remote', (_, data) => callback(data))
 });

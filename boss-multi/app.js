@@ -22,7 +22,18 @@ let euroRate = parseFloat(localStorage.getItem('boss_euro_rate')) || 1.08;
 let enteredPin = '';
 const pinDots = document.querySelectorAll('.pin-dot');
 
-function init() {
+async function init() {
+    try {
+        const res = await fetch('/api/boss/config');
+        const cfg = await res.json();
+        if (cfg.supabaseUrl && cfg.supabaseKey) {
+            supabaseUrl = cfg.supabaseUrl;
+            supabaseKey = cfg.supabaseKey;
+            localStorage.setItem('sb_url', supabaseUrl);
+            localStorage.setItem('sb_key', supabaseKey);
+        }
+    } catch(e) {}
+
     if (!supabaseUrl || !supabaseKey) {
         document.getElementById('loading').style.display = 'none';
         toggleConfig();
@@ -40,7 +51,7 @@ function checkAuth() {
         document.getElementById('setup-container').style.display = 'none';
         document.getElementById('pin-container').style.display = 'flex';
         document.getElementById('login-greeting').innerText = `Hola, ${bossName}`;
-        
+
         if (sessionStorage.getItem('boss_auth')) {
             showApp();
         } else {
@@ -49,7 +60,7 @@ function checkAuth() {
     }
 }
 
-window.saveBossSetup = function() {
+window.saveBossSetup = function () {
     const n = document.getElementById('setup-boss-name').value.trim();
     const b = document.getElementById('setup-business-name').value.trim();
     if (!n || !b) {
@@ -97,12 +108,18 @@ function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('currency-bar').style.display = 'flex';
-    
+
     if (bossName && businessName) {
         document.getElementById('banner-title').innerText = `Bienvenido, ${bossName}`;
         document.getElementById('banner-subtitle').innerText = `a ${businessName} — Tu resumen del día.`;
+        // Update slogans in both headers
+        const slogan = `Conectado a ${businessName}`;
+        const s1 = document.getElementById('hdr-slogan');
+        const s2 = document.getElementById('main-hdr-slogan');
+        if (s1) s1.textContent = slogan;
+        if (s2) s2.textContent = slogan;
     }
-    
+
     loadDashboard();
 }
 
@@ -165,7 +182,7 @@ async function loadDashboard() {
 
         renderStores();
         renderGlobal();
-        
+
         // Cargar datos de otras pestañas si están activas
         if (currentAppTab === 'inventory') loadGlobalInventory();
         if (currentAppTab === 'financial') loadGlobalFinancial();
@@ -190,7 +207,7 @@ setInterval(() => {
 function renderStores(storesToRender = allStores) {
     const el = document.getElementById('stores-list');
     const countBadge = document.getElementById('stores-count');
-    
+
     if (countBadge) countBadge.textContent = storesToRender.length;
 
     if (storesToRender.length === 0) {
@@ -201,7 +218,7 @@ function renderStores(storesToRender = allStores) {
     el.innerHTML = storesToRender.map(store => {
         const snap = allSnapshots.find(s => s.store_id === store.id);
         const isOnline = (Date.now() - new Date(store.last_seen).getTime()) < 120000;
-        
+
         // CALCULAR MÉTRICAS EN TIEMPO REAL DESDE store_sales
         const storeSales = (window.allSalesToday || []).filter(s => s.store_id === store.id);
         const storeExpenses = (window.allExpensesToday || []).filter(e => e.store_id === store.id);
@@ -243,8 +260,8 @@ function renderStores(storesToRender = allStores) {
 
 function filterStores(query) {
     const q = query.toLowerCase().trim();
-    const filtered = allStores.filter(s => 
-        s.name.toLowerCase().includes(q) || 
+    const filtered = allStores.filter(s =>
+        s.name.toLowerCase().includes(q) ||
         (q === 'online' && (Date.now() - new Date(s.last_seen).getTime()) < 120000) ||
         (q === 'offline' && (Date.now() - new Date(s.last_seen).getTime()) >= 120000)
     );
@@ -264,7 +281,7 @@ function renderGlobal() {
     // CALCULAR TOTALES GLOBALES DESDE store_sales PARA TIEMPO REAL
     const totalUSD = (window.allSalesToday || []).reduce((acc, s) => acc + (Number(s.total_usd) || 0), 0);
     const totalTickets = (window.allSalesToday || []).length;
-    
+
     const totalSalesProfit = (window.allSalesToday || []).reduce((acc, s) => acc + (Number(s.total_usd) || 0) - (Number(s.total_cost_usd) || 0), 0);
     const totalExpenses = (window.allExpensesToday || []).reduce((acc, e) => acc + (Number(e.amount_usd) || 0), 0);
     const totalProfit = totalSalesProfit - totalExpenses;
@@ -298,7 +315,7 @@ function renderGlobal() {
     document.getElementById('g-tickets').innerText = totalTickets.toLocaleString();
     if (document.getElementById('g-cash')) document.getElementById('g-cash').innerText = fmtUSD(cash);
     if (document.getElementById('g-zelle')) document.getElementById('g-zelle').innerText = fmtUSD(zelle);
-    if (document.getElementById('g-pm')) document.getElementById('g-pm').innerText = 'Bs ' + pm.toLocaleString('es-VE', {minimumFractionDigits:0});
+    if (document.getElementById('g-pm')) document.getElementById('g-pm').innerText = 'Bs ' + pm.toLocaleString('es-VE', { minimumFractionDigits: 0 });
 
     // Actualizar tarjetas del bento grid
     if (document.getElementById('g-monthly')) document.getElementById('g-monthly').innerText = fmtUSD(totalUSD);
@@ -323,32 +340,32 @@ function renderGlobal() {
 
         // 1. Agrupar Ventas por Hora (6am a 10pm)
         const hoursMap = {};
-        for(let i=6; i<=22; i++) hoursMap[i] = 0;
-        
+        for (let i = 6; i <= 22; i++) hoursMap[i] = 0;
+
         sales.forEach(s => {
-            if(!s.date) return;
+            if (!s.date) return;
             try {
                 const dateObj = new Date(s.date);
                 const h = dateObj.getHours();
-                if(h >= 6 && h <= 22) {
+                if (h >= 6 && h <= 22) {
                     hoursMap[h] += Number(s.total_usd) || 0;
                 }
-            } catch(e) {}
+            } catch (e) { }
         });
 
         let maxHourVal = 0;
         let peakHour = 12;
         Object.keys(hoursMap).forEach(h => {
-            if(hoursMap[h] > maxHourVal) { maxHourVal = hoursMap[h]; peakHour = h; }
+            if (hoursMap[h] > maxHourVal) { maxHourVal = hoursMap[h]; peakHour = h; }
         });
-        
-        const peakHourLabel = `${peakHour}:00 - ${parseInt(peakHour)+1}:00`;
+
+        const peakHourLabel = `${peakHour}:00 - ${parseInt(peakHour) + 1}:00`;
 
         const hourBars = Object.keys(hoursMap).map(h => {
             const val = hoursMap[h];
             const pct = maxHourVal > 0 ? (val / maxHourVal) * 100 : 0;
             const isPeak = (h == peakHour);
-            const hourLabel = h > 12 ? (h-12)+'p' : (h==12?'12p':'');
+            const hourLabel = h > 12 ? (h - 12) + 'p' : (h == 12 ? '12p' : '');
             return `
             <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; group">
                 <div style="height:${pct}%; width:100%; max-width:24px; background:${isPeak ? 'var(--primary)' : 'var(--primary-light)'}; border-radius:4px 4px 0 0; min-height:4px; position:relative;" title="${val.toFixed(2)}$"></div>
@@ -362,7 +379,7 @@ function renderGlobal() {
             { name: 'Efectivo', val: cash, color: '#10b981' },
             { name: 'Zelle', val: zelle, color: '#8b5cf6' },
             { name: 'Pago Móvil', val: pm / exchangeRate, color: '#0ea5e9' }
-        ].sort((a,b) => b.val - a.val);
+        ].sort((a, b) => b.val - a.val);
 
         const methodBars = methodsData.map(m => {
             const pct = methodTotal > 0 ? ((m.val / methodTotal) * 100).toFixed(0) : 0;
@@ -386,9 +403,9 @@ function renderGlobal() {
         sales.forEach(s => {
             let items = s.items;
             if (typeof items === 'string') {
-                try { items = JSON.parse(items); } catch(e){ items = []; }
+                try { items = JSON.parse(items); } catch (e) { items = []; }
             }
-            if(Array.isArray(items)) {
+            if (Array.isArray(items)) {
                 items.forEach(i => {
                     const name = i.name || 'Desconocido';
                     prodCount[name] = (prodCount[name] || 0) + (Number(i.qty) || 1);
@@ -396,14 +413,14 @@ function renderGlobal() {
             }
         });
 
-        const sortedProds = Object.entries(prodCount).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        const sortedProds = Object.entries(prodCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const prodsHtml = sortedProds.length === 0 ? '<div class="empty">Sin datos de ventas aún.</div>' : sortedProds.map(([name, qty], idx) => {
             const colors = ['#f59e0b', '#94a3b8', '#cd7f32', '#64748b', '#94a3b8'];
             const color = colors[idx] || '#cbd5e1';
             return `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--outline);">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="width:24px; height:24px; border-radius:50%; background:${color}20; color:${color}; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;">${idx+1}</div>
+                    <div style="width:24px; height:24px; border-radius:50%; background:${color}20; color:${color}; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;">${idx + 1}</div>
                     <div style="font-size:12px; font-weight:700; color:var(--text); text-transform:uppercase; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${name}</div>
                 </div>
                 <div style="font-size:12px; font-weight:900; color:var(--primary);">${qty} <span style="font-size:9px; color:var(--text-muted); font-weight:600;">unds</span></div>
@@ -470,18 +487,18 @@ function saveConfig() {
 // ==========================================
 // NAVEGACIÓN PRINCIPAL (BOTTOM NAV)
 // ==========================================
-window.switchMainTab = function(tabId, el) {
+window.switchMainTab = function (tabId, el) {
     currentAppTab = tabId;
-    
+
     // UI: Cambiar pestaña activa en el nav
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     if (el) el.classList.add('active');
-    
+
     // UI: Cambiar vista visible
     document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
     const targetView = document.getElementById(`view-${tabId}`);
     if (targetView) targetView.classList.remove('hidden');
-    
+
     // Cambiar Título del Header
     const titles = {
         'panel': 'Panel de Control',
@@ -490,7 +507,7 @@ window.switchMainTab = function(tabId, el) {
         'pos': 'Cajas en Vivo'
     };
     document.getElementById('header-title').textContent = titles[tabId] || 'Punto Pila';
-    
+
     // Cargar datos específicos
     if (tabId === 'inventory') loadGlobalInventory();
     if (tabId === 'financial') loadGlobalFinancial();
@@ -517,7 +534,7 @@ async function setTab(tab) {
     document.getElementById('tab-inventory').classList.toggle('active', tab === 'inventory');
     const perfTab = document.getElementById('tab-performance');
     if (perfTab) perfTab.classList.toggle('active', tab === 'performance');
-    
+
     const content = document.getElementById('detail-content');
     content.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
 
@@ -540,7 +557,7 @@ async function setTab(tab) {
         } else {
             htmlStr = sales.map(s => {
                 let itemsList = s.items_json;
-                if (typeof itemsList === 'string') { try { itemsList = JSON.parse(itemsList); } catch(e){} }
+                if (typeof itemsList === 'string') { try { itemsList = JSON.parse(itemsList); } catch (e) { } }
                 const itemsStr = Array.isArray(itemsList) ? itemsList.map(i => `${i.qty || i.quantity || 1}x ${i.name}`).join(', ') : 'Varios items';
                 const ves = s.total_ves || (s.total_usd * (s.exchange_rate || exchangeRate));
                 const eur = s.total_usd / euroRate;
@@ -565,7 +582,7 @@ async function setTab(tab) {
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:12px;border-top:1px dashed var(--outline);">
                         <div style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px;">
                             <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;font-weight:800;margin-bottom:3px;">Bolívares</div>
-                            <div style="font-size:12px;font-weight:900;color:var(--secondary);">Bs ${Number(ves).toLocaleString('es-VE',{minimumFractionDigits:0})}</div>
+                            <div style="font-size:12px;font-weight:900;color:var(--secondary);">Bs ${Number(ves).toLocaleString('es-VE', { minimumFractionDigits: 0 })}</div>
                         </div>
                         <div style="text-align:center;background:#f8fafc;border-radius:8px;padding:8px;">
                             <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;font-weight:800;margin-bottom:3px;">Euros</div>
@@ -609,7 +626,7 @@ async function setTab(tab) {
             hoursMap[hour] = (hoursMap[hour] || 0) + val;
 
             let items = s.items_json;
-            if (typeof items === 'string') { try { items = JSON.parse(items); } catch(e){} }
+            if (typeof items === 'string') { try { items = JSON.parse(items); } catch (e) { } }
             if (Array.isArray(items)) {
                 items.forEach(i => {
                     const name = i.name || 'Producto';
@@ -619,10 +636,10 @@ async function setTab(tab) {
             }
         });
 
-        const sortedProds = Object.entries(topProds).sort((a,b) => b[1]-a[1]).slice(0,5);
+        const sortedProds = Object.entries(topProds).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const maxProd = sortedProds[0]?.[1] || 1;
         const avgTicket = sales.length > 0 ? (totalUSD / sales.length) : 0;
-        const peakHourEntry = Object.entries(hoursMap).sort((a,b) => b[1]-a[1])[0];
+        const peakHourEntry = Object.entries(hoursMap).sort((a, b) => b[1] - a[1])[0];
         const peakHourLabel = peakHourEntry ? `${peakHourEntry[0]}:00` : '--:--';
 
         const totalExpUSD = Array.isArray(expenses) ? expenses.reduce((acc, e) => acc + (Number(e.amount_usd) || 0), 0) : 0;
@@ -635,7 +652,7 @@ async function setTab(tab) {
         const realProfit = calcProfit - totalExpUSD;
 
         // Gráfica de barras por hora (6am - 10pm)
-        const hours = Array.from({length: 17}, (_, i) => i + 6); // 6 a 22
+        const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6 a 22
         const maxHourVal = Math.max(...hours.map(h => hoursMap[h] || 0), 0.01);
         const hourBars = hours.map(h => {
             const val = hoursMap[h] || 0;
@@ -643,11 +660,11 @@ async function setTab(tab) {
             const isPeak = peakHourEntry && parseInt(peakHourEntry[0]) === h;
             return `
             <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
-                <div style="font-size:9px;font-weight:800;color:${val>0?'var(--primary)':'var(--text-muted)'};">
-                    ${val > 0 ? '$'+val.toFixed(0) : ''}
+                <div style="font-size:9px;font-weight:800;color:${val > 0 ? 'var(--primary)' : 'var(--text-muted)'};">
+                    ${val > 0 ? '$' + val.toFixed(0) : ''}
                 </div>
                 <div style="width:100%;height:70px;display:flex;align-items:flex-end;justify-content:center;">
-                    <div style="width:80%;background:${isPeak?'var(--primary)':'#d1fae5'};height:${Math.max(pct,2)}%;border-radius:4px 4px 0 0;transition:height 0.4s;min-height:3px;"></div>
+                    <div style="width:80%;background:${isPeak ? 'var(--primary)' : '#d1fae5'};height:${Math.max(pct, 2)}%;border-radius:4px 4px 0 0;transition:height 0.4s;min-height:3px;"></div>
                 </div>
                 <div style="font-size:8px;font-weight:700;color:var(--text-muted);">${h}h</div>
             </div>`;
@@ -665,7 +682,7 @@ async function setTab(tab) {
             'zelle': 'Zelle', 'pm': 'Pago Móvil', 'pago_movil': 'Pago Móvil',
             'pago-movil': 'Pago Móvil', 'card': 'Tarjeta', 'tarjeta': 'Tarjeta'
         };
-        const sortedMethods = Object.entries(methodsMap).sort((a,b) => b[1]-a[1]);
+        const sortedMethods = Object.entries(methodsMap).sort((a, b) => b[1] - a[1]);
         const maxMethod = sortedMethods[0]?.[1] || 1;
 
         const methodBars = sortedMethods.length === 0
@@ -692,7 +709,7 @@ async function setTab(tab) {
                 </div>`;
             }).join('');
 
-         content.innerHTML = datePickerHtml + `
+        content.innerHTML = datePickerHtml + `
             <!-- KPIs row -->
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
                 <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:14px;text-align:center;">
@@ -732,15 +749,15 @@ async function setTab(tab) {
                     <i class="fas fa-crown" style="color:#f59e0b;margin-right:8px;"></i>Top Productos Hoy
                 </div>
                 ${sortedProds.length === 0
-                    ? '<div class="empty">Sin datos de ventas aún.</div>'
-                    : sortedProds.map(([name, qty], idx) => {
-                        const pct = Math.round((qty / maxProd) * 100);
-                        const rankColors = ['#f59e0b','#94a3b8','#cd7f32','#6b7280','#6b7280'];
-                        return `
+                ? '<div class="empty">Sin datos de ventas aún.</div>'
+                : sortedProds.map(([name, qty], idx) => {
+                    const pct = Math.round((qty / maxProd) * 100);
+                    const rankColors = ['#f59e0b', '#94a3b8', '#cd7f32', '#6b7280', '#6b7280'];
+                    return `
                         <div style="margin-bottom:14px;">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
                                 <div style="display:flex;align-items:center;gap:10px;">
-                                    <span style="font-size:13px;font-weight:900;color:${rankColors[idx]};width:18px;">#${idx+1}</span>
+                                    <span style="font-size:13px;font-weight:900;color:${rankColors[idx]};width:18px;">#${idx + 1}</span>
                                     <span style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${name}</span>
                                 </div>
                                 <span style="font-size:12px;font-weight:900;background:var(--primary-light);color:var(--primary);padding:3px 10px;border-radius:12px;white-space:nowrap;">${qty} und</span>
@@ -749,7 +766,7 @@ async function setTab(tab) {
                                 <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:3px;"></div>
                             </div>
                         </div>`;
-                    }).join('')}
+                }).join('')}
             </div>
 
             <!-- Gastos -->
@@ -826,7 +843,7 @@ async function setTab(tab) {
         if (!Array.isArray(currentProducts) || currentProducts.length === 0) {
             content.innerHTML = '<div class="empty">No hay productos sincronizados o faltan tablas.</div>';
         } else {
-        content.innerHTML = `
+            content.innerHTML = `
         <div style="margin-bottom:16px">
             <div style="position:relative">
                 <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px"></i>
@@ -860,9 +877,9 @@ function renderInventoryCards(products) {
         <div style="display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid var(--outline);">
             <!-- Icono o imagen pequeña -->
             <div style="width:44px; height:44px; border-radius:10px; background:#f1f5f9; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:18px;">
-                ${p.img_url 
-                    ? `<img src="${p.img_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<i class=&quot;fas fa-box&quot; style=&quot;color:#94a3b8&quot;></i>'">` 
-                    : '<i class="fas fa-box" style="color:#94a3b8"></i>'}
+                ${p.img_url
+                ? `<img src="${p.img_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<i class=&quot;fas fa-box&quot; style=&quot;color:#94a3b8&quot;></i>'">`
+                : '<i class="fas fa-box" style="color:#94a3b8"></i>'}
             </div>
             <!-- Info -->
             <div style="flex:1; min-width:0;">
@@ -870,7 +887,7 @@ function renderInventoryCards(products) {
                 <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-top:2px;">${p.category || 'General'}</div>
                 <div style="display:flex; gap:8px; margin-top:6px; align-items:center;">
                     <span style="font-size:13px; font-weight:900; color:var(--primary);">${fmtUSD(p.price || 0)}</span>
-                    ${p.price_ves > 0 ? `<span style="font-size:11px; color:var(--text-muted); font-weight:700;">Bs ${Number(p.price_ves).toLocaleString('es-VE',{minimumFractionDigits:0})}</span>` : ''}
+                    ${p.price_ves > 0 ? `<span style="font-size:11px; color:var(--text-muted); font-weight:700;">Bs ${Number(p.price_ves).toLocaleString('es-VE', { minimumFractionDigits: 0 })}</span>` : ''}
                 </div>
             </div>
             <!-- Stock + Acciones -->
@@ -892,21 +909,26 @@ function filterInventory(query) {
     const grid = document.getElementById('inv-grid');
     if (!grid || !currentProducts) return;
     const q = query.toLowerCase().trim();
-    const filtered = q 
+    const filtered = q
         ? currentProducts.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
         : currentProducts;
-    grid.innerHTML = filtered.length > 0 
-        ? renderInventoryCards(filtered) 
+    grid.innerHTML = filtered.length > 0
+        ? renderInventoryCards(filtered)
         : `<div class="empty" style="grid-column:1/-1">Sin resultados para "${query}"</div>`;
 }
 
 function openEditModal(productId) {
-    const product = currentProducts.find(p => p.product_id === productId);
+    let product = (window.currentProducts || []).find(p => p.product_id === productId);
+    if (!product && window.allGlobalProducts) {
+        product = window.allGlobalProducts.find(p => p.product_id === productId);
+    }
     if (!product) return;
+
+    currentStoreId = product.store_id;
 
     document.getElementById('edit-product-id').value = productId;
     document.getElementById('edit-product-title').innerText = `Editar: ${product.name}`;
-    
+
     // Badges informativos
     document.getElementById('edit-current-stock').textContent = product.stock ?? '—';
     document.getElementById('edit-current-id').textContent = productId;
@@ -915,7 +937,7 @@ function openEditModal(productId) {
     const usd = product.price || 0;
     const ves = product.price_ves || (usd * exchangeRate) || 0;
     const eur = usd > 0 ? (usd / euroRate).toFixed(2) : 0;
-    
+
     document.getElementById('edit-product-usd').value = usd;
     document.getElementById('edit-product-ves').value = ves;
     document.getElementById('edit-product-eur').value = eur;
@@ -938,7 +960,7 @@ function updateConversionHint() {
     const ves = parseFloat(document.getElementById('edit-product-ves').value) || 0;
     const eur = parseFloat(document.getElementById('edit-product-eur').value) || 0;
     const hint = document.getElementById('edit-conversion-hint');
-    const vesFmt = ves > 0 ? `Bs ${ves.toLocaleString('es-VE', {minimumFractionDigits:2})}` : 'Bs —';
+    const vesFmt = ves > 0 ? `Bs ${ves.toLocaleString('es-VE', { minimumFractionDigits: 2 })}` : 'Bs —';
     const eurFmt = eur > 0 ? `${eur.toFixed(2)} €` : '— €';
     const usdFmt = usd > 0 ? `$${usd.toFixed(2)}` : '';
     hint.textContent = `${vesFmt}${usdFmt ? ' | ' + usdFmt : ''} | ${eurFmt}`;
@@ -980,10 +1002,12 @@ async function saveProductEdits() {
     const expiry = document.getElementById('edit-product-expiry').value.trim();
 
     if (!productId || !currentStoreId) {
+        console.error('[BOSS-SYNC] ❌ Falta productId o currentStoreId', { productId, currentStoreId });
         alert('Error: no hay producto o sucursal seleccionada.');
         return;
     }
 
+    console.log(`[BOSS-SYNC] 🚀 Iniciando guardado para: ${productId} en sucursal: ${currentStoreId}`);
     const btn = document.getElementById('btn-save-product');
     btn.innerText = 'Guardando...';
     btn.disabled = true;
@@ -991,8 +1015,8 @@ async function saveProductEdits() {
     const cmd = {
         store_id: currentStoreId,
         command_type: 'UPDATE_PRODUCT_FULL',
-        payload: { 
-            product_id: productId, 
+        payload: {
+            product_id: productId,
             new_price_usd: priceUSD,
             new_price_ves: priceVES,
             new_price_eur: priceEUR,
@@ -1007,25 +1031,30 @@ async function saveProductEdits() {
 
     try {
         // 1. Enviar comando remoto al POS
+        console.log('[BOSS-SYNC] 📤 Enviando comando a store_commands...', cmd);
         const cmdRes = await fetch(`${supabaseUrl}/rest/v1/store_commands`, {
             method: 'POST',
             headers: {
                 'apikey': supabaseKey,
                 'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
             },
             body: JSON.stringify(cmd)
         });
-        
+
         if (!cmdRes.ok) {
             const errText = await cmdRes.text();
+            console.error('[BOSS-SYNC] ❌ Error POST store_commands:', errText);
             alert('Error al enviar comando al POS: ' + errText);
             return;
         }
+        console.log('[BOSS-SYNC] ✅ Comando registrado en nube.');
 
         // 2. Actualizar store_products DIRECTAMENTE en Supabase
-        //    Para que la App del Jefe vea los cambios sin esperar al POS
         const rowId = `${currentStoreId}_${productId}`;
+        console.log(`[BOSS-SYNC] ☁️ Actualizando store_products para rowId: ${rowId}`);
+
         const patchBody = {
             price: priceUSD,
             price_ves: priceVES,
@@ -1038,18 +1067,39 @@ async function saveProductEdits() {
         };
         if (imgUrl) patchBody.img_url = imgUrl;
 
-        await fetch(`${supabaseUrl}/rest/v1/store_products?id=eq.${encodeURIComponent(rowId)}`, {
+        const patchRes = await fetch(`${supabaseUrl}/rest/v1/store_products?id=eq.${encodeURIComponent(rowId)}`, {
             method: 'PATCH',
             headers: {
                 'apikey': supabaseKey,
                 'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
             },
             body: JSON.stringify(patchBody)
         });
 
+        if (!patchRes.ok) {
+            const patchErr = await patchRes.text();
+            console.error('[BOSS-SYNC] ❌ Error PATCH store_products:', patchErr);
+            if (patchErr.includes('column') && patchErr.includes('does not exist')) {
+                alert('⚠️ Error de Base de Datos: Faltan columnas en la tabla "store_products".\n\nPor favor, ejecuta el SQL de actualización en tu panel de Supabase.');
+            } else {
+                alert('Error al sincronizar con la nube: ' + patchErr);
+            }
+            return;
+        }
+
+        const patchedData = await patchRes.json();
+        console.log('[BOSS-SYNC] ✅ Fila actualizada en Supabase:', patchedData);
+
+        if (patchedData.length === 0) {
+            console.warn(`[BOSS-SYNC] ⚠️ CUIDADO: El PATCH fue exitoso (200 OK) pero NO se actualizó ninguna fila. ¿Existe el ID ${rowId}?`);
+            alert('Atención: El producto se guardó pero no se encontró la fila correspondiente en la nube. Verifica que la sucursal esté sincronizada.');
+        }
+
+
         // 3. Actualizar array local para que el modal refleje datos correctos
-        const localProd = currentProducts.find(p => p.product_id === productId);
+        const localProd = (currentProducts || []).find(p => p.product_id === productId);
         if (localProd) {
             localProd.price = priceUSD;
             localProd.price_ves = priceVES;
@@ -1061,9 +1111,28 @@ async function saveProductEdits() {
             if (imgUrl) localProd.img_url = imgUrl;
         }
 
+        // También actualizar en allGlobalProducts si existe
+        if (window.allGlobalProducts) {
+            const globalProd = window.allGlobalProducts.find(p => p.product_id === productId && p.store_id === currentStoreId);
+            if (globalProd) {
+                globalProd.price = priceUSD;
+                globalProd.price_ves = priceVES;
+                globalProd.price_eur = priceEUR;
+                globalProd.promo_price = promoPrice;
+                globalProd.stock = stock;
+                globalProd.variants = variants;
+                globalProd.expiry_date = expiry;
+                if (imgUrl) globalProd.img_url = imgUrl;
+            }
+        }
+
         closeEditModal();
         // Refrescar inventario con datos actualizados
-        await setTab('inventory');
+        if (currentAppTab === 'inventory') {
+            renderGlobalInventory(window.allGlobalProducts);
+        } else {
+            await setTab('inventory');
+        }
 
     } catch (e) {
         alert('Error de red: ' + e.message);
@@ -1074,10 +1143,10 @@ async function saveProductEdits() {
 }
 
 // Helpers
-function fmtUSD(val) { 
+function fmtUSD(val) {
     const n = Number(val);
     if (isNaN(n)) return '$0.00';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n); 
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 }
 
 function fmtMethod(m) {
@@ -1151,7 +1220,7 @@ async function loadExpenses(storeId) {
             <div style="text-align:right;display:flex;align-items:center;gap:10px;">
                 <div>
                     <div style="font-size:13px;font-weight:900;color:var(--error);">${fmtUSD(e.amount_usd || 0)}</div>
-                    ${e.amount_ves > 0 ? `<div style="font-size:10px;color:var(--text-muted);">Bs ${Number(e.amount_ves).toLocaleString('es-VE',{minimumFractionDigits:0})}</div>` : ''}
+                    ${e.amount_ves > 0 ? `<div style="font-size:10px;color:var(--text-muted);">Bs ${Number(e.amount_ves).toLocaleString('es-VE', { minimumFractionDigits: 0 })}</div>` : ''}
                 </div>
                 <button onclick="deleteExpense('${e.id}')" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:14px;padding:4px;">
                     <i class="fas fa-trash-alt"></i>
@@ -1229,13 +1298,13 @@ async function saveExpense(storeId) {
         document.getElementById('expense-ves').value = '';
         if (document.getElementById('expense-ref')) document.getElementById('expense-ref').value = '';
         if (document.getElementById('expense-resp')) document.getElementById('expense-resp').value = '';
-        
+
         document.getElementById('expense-form').style.display = 'none';
 
         // Actualizar datos
         loadExpenses(storeId);
         loadDashboard(); // Recargar el dashboard completo para actualizar el margen global
-    } catch(e) {
+    } catch (e) {
         alert('Error de red: ' + e.message);
     }
 }
@@ -1251,7 +1320,7 @@ async function deleteExpense(expenseId) {
             }
         });
         loadExpenses(currentStoreId);
-    } catch(e) {
+    } catch (e) {
         alert('Error al eliminar: ' + e.message);
     }
 }
@@ -1266,7 +1335,7 @@ async function loadGlobalInventory() {
     // Si ya tenemos productos cargados en loadDashboard (opcional, pero store_products es grande)
     // Vamos a buscar todos los productos de todas las tiendas
     list.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
-    
+
     try {
         const products = await sbGet('store_products', '?order=name.asc');
         window.allGlobalProducts = Array.isArray(products) ? products : [];
@@ -1287,9 +1356,9 @@ function renderGlobalInventory(products) {
         const store = allStores.find(s => s.id === p.store_id);
         const storeName = store ? store.name : 'Sede Desconocida';
         const stockColor = p.stock <= 0 ? 'var(--error)' : p.stock <= 5 ? 'var(--warning)' : 'var(--primary)';
-        
+
         return `
-        <div class="card" style="padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px;" onclick="openDetail('${p.store_id}')">
+        <div class="card" style="padding:12px; margin-bottom:10px; display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="openEditModal('${p.product_id}')">
             <div style="width:40px; height:40px; border-radius:8px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">
                 ${p.img_url ? `<img src="${p.img_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fas fa-box" style="color:var(--text-muted)"></i>'}
             </div>
@@ -1303,16 +1372,19 @@ function renderGlobalInventory(products) {
                 <div style="font-size:14px; font-weight:900; color:var(--text);">${fmtUSD(p.price)}</div>
                 <div style="font-size:10px; font-weight:800; color:${stockColor}; margin-top:2px;">${p.stock} uds</div>
             </div>
+            <div style="padding-left: 8px;">
+                <i class="fas fa-pen" style="color:var(--text-muted); font-size:12px;"></i>
+            </div>
         </div>
         `;
     }).join('');
 }
 
-window.filterGlobalInventory = function(query) {
+window.filterGlobalInventory = function (query) {
     if (!window.allGlobalProducts) return;
     const q = query.toLowerCase().trim();
-    const filtered = window.allGlobalProducts.filter(p => 
-        p.name.toLowerCase().includes(q) || 
+    const filtered = window.allGlobalProducts.filter(p =>
+        p.name.toLowerCase().includes(q) ||
         (allStores.find(s => s.id === p.store_id)?.name || '').toLowerCase().includes(q)
     );
     renderGlobalInventory(filtered);
@@ -1328,10 +1400,10 @@ async function loadGlobalFinancial() {
     // Usamos los datos ya cargados en loadDashboard
     const sales = window.allSalesToday || [];
     const snapshots = allSnapshots || [];
-    
+
     const totalUSD = snapshots.reduce((a, s) => a + (Number(s.total_usd) || 0), 0);
     const totalProfit = snapshots.reduce((a, s) => a + (Number(s.profit_usd) || 0), 0);
-    
+
     // Agrupar por tienda para el desglose
     const storeBreakdown = allStores.map(store => {
         const snap = snapshots.find(s => s.store_id === store.id) || {};
@@ -1341,7 +1413,7 @@ async function loadGlobalFinancial() {
             profit: Number(snap.profit_usd) || 0,
             tickets: Number(snap.tickets) || 0
         };
-    }).sort((a,b) => b.total - a.total);
+    }).sort((a, b) => b.total - a.total);
 
     content.innerHTML = `
         <div class="card" style="background:var(--secondary); color:white; padding:20px; border:none;">
@@ -1412,15 +1484,15 @@ function renderLiveState(states) {
         </div>
         <div id="live-states-grid">
             ${states.map(s => {
-                const store = allStores.find(st => st.id === s.store_id);
-                const storeName = store ? store.name : 'Sede Desconocida';
-                const cart = Array.isArray(s.cart_data) ? s.cart_data : [];
-                const lastSeen = new Date(s.last_activity);
-                const diffSecs = Math.floor((new Date() - lastSeen) / 1000);
-                const statusColor = diffSecs < 60 ? '#10b981' : '#94a3b8';
-                const statusText = diffSecs < 60 ? 'ACTIVO AHORA' : `VISTO HACE ${Math.floor(diffSecs/60)}m`;
+        const store = allStores.find(st => st.id === s.store_id);
+        const storeName = store ? store.name : 'Sede Desconocida';
+        const cart = Array.isArray(s.cart_data) ? s.cart_data : [];
+        const lastSeen = new Date(s.last_activity);
+        const diffSecs = Math.floor((new Date() - lastSeen) / 1000);
+        const statusColor = diffSecs < 60 ? '#10b981' : '#94a3b8';
+        const statusText = diffSecs < 60 ? 'ACTIVO AHORA' : `VISTO HACE ${Math.floor(diffSecs / 60)}m`;
 
-                return `
+        return `
                 <div class="card" style="padding:0; overflow:hidden; border-top:4px solid ${statusColor};">
                     <div style="padding:16px; background:var(--bg); display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--outline);">
                         <div>
@@ -1449,7 +1521,7 @@ function renderLiveState(states) {
                     </div>
                 </div>
                 `;
-            }).join('')}
+    }).join('')}
         </div>
     `;
 }
@@ -1462,16 +1534,16 @@ setInterval(() => {
 // ==========================================
 // REMOTE RATE UPDATE (Gritarle a las cajas)
 // ==========================================
-window.openRateModal = function() {
+window.openRateModal = function () {
     document.getElementById('new-exchange-rate').value = exchangeRate;
     document.getElementById('rate-modal').classList.add('active');
 };
 
-window.closeRateModal = function() {
+window.closeRateModal = function () {
     document.getElementById('rate-modal').classList.remove('active');
 };
 
-window.saveRemoteRate = async function() {
+window.saveRemoteRate = async function () {
     const newRate = parseFloat(document.getElementById('new-exchange-rate').value);
     if (!newRate || isNaN(newRate)) {
         alert("Ingresa una tasa válida.");
@@ -1516,6 +1588,107 @@ window.saveRemoteRate = async function() {
     } finally {
         btn.innerText = 'Actualizar Todo';
         btn.disabled = false;
+    }
+};
+
+window.logoutBoss = function () {
+    if (confirm('¿Estás seguro de cerrar sesión? Se borrarán las credenciales locales de este navegador.')) {
+        localStorage.clear();
+        location.reload();
+    }
+};
+
+window.forceAllSync = async function () {
+    if (!confirm('Esto ordenará a todas las cajas conectadas que envíen su catálogo completo a la nube. ¿Continuar?')) return;
+
+    try {
+        const promises = allStores.map(store => {
+            const cmd = {
+                store_id: store.id,
+                command_type: 'PUSH_FULL_CATALOG',
+                payload: {},
+                status: 'pending'
+            };
+            return fetch(`${supabaseUrl}/rest/v1/store_commands`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(cmd)
+            });
+        });
+
+        await Promise.all(promises);
+        alert('✅ Comandos de sincronización enviados a todas las sucursales.');
+        toggleConfig();
+    } catch (e) {
+        alert('Error al enviar comandos: ' + e.message);
+    }
+};
+
+// ==========================================
+// SINCRONIZAR NUBE (botón visible en Currency Bar)
+// ==========================================
+window.doCloudSync = async function() {
+    const btn = document.getElementById('btn-cloud-sync');
+    const icon = btn ? btn.querySelector('i') : null;
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.style.background = 'rgba(255,255,255,0.05)';
+    }
+    if (icon) {
+        icon.className = 'fas fa-spinner fa-spin';
+    }
+
+    try {
+        if (!supabaseUrl || !supabaseKey || allStores.length === 0) {
+            alert('No hay sucursales conectadas para sincronizar.');
+            return;
+        }
+
+        const promises = allStores.map(store => {
+            const cmd = {
+                store_id: store.id,
+                command_type: 'PUSH_FULL_CATALOG',
+                payload: {},
+                status: 'pending'
+            };
+            return fetch(`${supabaseUrl}/rest/v1/store_commands`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(cmd)
+            });
+        });
+
+        await Promise.all(promises);
+
+        if (icon) {
+            icon.className = 'fas fa-check';
+            setTimeout(() => { icon.className = 'fas fa-cloud-upload-alt'; }, 2500);
+        }
+    } catch (e) {
+        alert('❌ Error al sincronizar: ' + e.message);
+        if (icon) icon.className = 'fas fa-cloud-upload-alt';
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.background = 'rgba(255,255,255,0.15)';
+        }
+    }
+};
+
+window.logoutBoss = function () {
+    if (confirm('¿Estás seguro de cerrar sesión? Se borrarán las credenciales locales de este navegador.')) {
+        localStorage.clear();
+        location.reload();
     }
 };
 

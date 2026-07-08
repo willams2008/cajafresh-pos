@@ -188,6 +188,12 @@ function renderDashboard() {
         hdr.innerHTML = w.length > 1 ? `${w[0]} <span>${w.slice(1).join(' ')}</span>` : `<span>${d.companyName}</span>`;
     }
 
+    // Slogan / Subtitle
+    const sloganEl = document.getElementById('hdr-slogan');
+    if (sloganEl) {
+        sloganEl.textContent = d.companyFooter || (d.mobileTitle ? `Conectado a ${d.mobileTitle}` : "Conectado a El Arca");
+    }
+
     document.getElementById('k-ves').textContent = fmtVES(d.today?.totalVES);
     document.getElementById('k-usd').textContent = fmtUSD(d.today?.totalUSD);
     document.getElementById('k-tickets').textContent = d.today?.tickets || 0;

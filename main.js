@@ -16,23 +16,50 @@ const https = require('https');
 const { initDatabase, api: dbApi } = require('./database');
 const CloudSync = require('./cloud-sync');
 
-// --- AUTO UPDATER ---
-let autoUpdater;
-try {
-    autoUpdater = require('electron-updater').autoUpdater;
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
-} catch (e) {
-    console.warn('[AUTO-UPDATER] electron-updater no disponible:', e.message);
-    autoUpdater = null;
-}
-
 // --- STARTUP DIAGNOSTIC LOG ---
 const startupLogPath = path.join(app.getPath('userData'), 'startup_debug.log');
+const origLog = console.log;
+const origErr = console.error;
+console.log = function(...args) {
+    origLog.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+    try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [LOG] ${msg}\n`); } catch(e) {}
+};
+console.error = function(...args) {
+    origErr.apply(console, args);
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+    try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [ERROR] ${msg}\n`); } catch(e) {}
+};
+
+// Event Loop & Renderer Lag Monitor
+let _lastLagCheck = Date.now();
+function checkEventLoopLag() {
+    const now = Date.now();
+    const lag = now - _lastLagCheck - 1000;
+    if (lag > 300) {
+        logStartup(`⚠️ MAIN EVENT LOOP LAG: ${lag}ms`);
+    }
+    _lastLagCheck = now;
+}
+setInterval(checkEventLoopLag, 1000);
+
+// Renderer health check: ping every 10s, log if slow
+setInterval(async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const start = Date.now();
+    try {
+        await mainWindow.webContents.executeJavaScript('window.__rendererPong = Date.now()');
+        const rtt = Date.now() - start;
+        if (rtt > 1000) {
+            logStartup(`⚠️ RENDERER SLOW: RTT ${rtt}ms`);
+        }
+    } catch(e) {
+        logStartup(`❌ RENDERER UNRESPONSIVE: ${e.message}`);
+    }
+}, 10000);
+
 function logStartup(msg) {
-    const entry = `[${new Date().toISOString()}] ${msg}\n`;
     console.log(msg);
-    try { fs.appendFileSync(startupLogPath, entry); } catch(e) {}
 }
 
 logStartup('🚀 Iniciando aplicación...');
@@ -64,13 +91,57 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const readline = require('readline');
 const licenseSystem = require('./license');
 
+// ══════════════════════════════════════════════════════════════
+// CREDENCIALES DEL PROVEEDOR — Se cargan desde .env si existe,
+// o usa valores por defecto. Nunca hardcodeados en el código.
+// ══════════════════════════════════════════════════════════════
+let VENDOR_SUPABASE_URL = 'https://effgvevvnfzcuvtulyvs.supabase.co';
+let VENDOR_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmZmd2ZXZ2bmZ6Y3V2dHVseXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTg0MzgsImV4cCI6MjA5MjUzNDQzOH0.0WzyJcGCuGYfJAIE9g1Gxcm5G4thooHxDV0a4D5jMVk';
+let config = null;
+try {
+    config = require('./src/config');
+    VENDOR_SUPABASE_URL = config.supabase.url;
+    VENDOR_SUPABASE_KEY = config.supabase.key;
+} catch (e) {
+    console.warn('[MAIN] ⚠️ No se pudo cargar config, usando valores por defecto:', e.message);
+}
+
 let mainWindow;
 let io;
 let currentTunnelUrl = null;
 let lastDiscoveryUrl = null; // CACHE para evitar spam de señal
 let isStartingTunnel = false; // Flag para evitar ejecuciones concurrentes
 let lastSyncedProducts = null; // CACHE: Guardar última versión de productos para carga instantánea
-const serverPort = 3000;
+const serverPort = (config && config.port) || 3000;
+
+// --- CREATE DESKTOP SHORTCUT ---
+function createDesktopShortcut() {
+    try {
+        const shortcutPath = path.join(app.getPath('desktop'), 'Caja Fresh POS.lnk');
+        if (fs.existsSync(shortcutPath)) return;
+
+        const exePath = process.execPath;
+        const iconPath = path.join(path.dirname(exePath), 'icon.ico');
+        const workingDir = path.dirname(exePath);
+
+        const psScript = `
+            $WshShell = New-Object -comObject WScript.Shell
+            $Shortcut = $WshShell.CreateShortcut("${shortcutPath.replace(/'/g, "''")}")
+            $Shortcut.TargetPath = "${exePath.replace(/'/g, "''")}"
+            $Shortcut.WorkingDirectory = "${workingDir.replace(/'/g, "''")}"
+            $Shortcut.IconLocation = "${iconPath.replace(/'/g, "''")}"
+            $Shortcut.Description = "Caja Fresh POS - Sistema de Punto de Venta"
+            $Shortcut.Save()
+        `;
+        const result = require('child_process').execSync(
+            `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`,
+            { timeout: 10000, stdio: 'pipe' }
+        );
+        console.log(`✅ Acceso directo creado en: ${shortcutPath}`);
+    } catch (e) {
+        console.error('❌ Error creando acceso directo:', e.message);
+    }
+}
 
 // --- CLOUD SYNC (Multi-Sucursal) ---
 let cloudSync = null;
@@ -80,55 +151,179 @@ let logPath = null;
 let whatsappClient = null;
 let isWhatsappReady = false;
 let lastWhatsappStatus = { status: 'starting', message: 'Iniciando motor...' };
+// Contador de reinicios para evitar loop infinito
+let _waRestartCount = 0;
+let _waLastRestartTime = 0;
+const WA_MAX_AUTO_RESTARTS = 3;
+const WA_RESTART_COOLDOWN_MS = 10000;
+
+function safeRestartWhatsApp(reason) {
+    const now = Date.now();
+    if (now - _waLastRestartTime < WA_RESTART_COOLDOWN_MS) {
+        logWA(`⚠️ Reinicio bloqueado por cooldown (${reason})`);
+        return;
+    }
+    if (_waRestartCount >= WA_MAX_AUTO_RESTARTS) {
+        logWA(`🛑 Máximo de reinicios automáticos (${WA_MAX_AUTO_RESTARTS}) alcanzado. WhatsApp se detiene hasta que el usuario lo reinicie manualmente.`);
+        updateWAStatus({ status: 'error', error: `WhatsApp detuvo su reinicio automático tras ${WA_MAX_AUTO_RESTARTS} intentos fallidos. Presiona el botón de reiniciar en Configuración.` });
+        return;
+    }
+    _waRestartCount++;
+    _waLastRestartTime = now;
+    logWA(`🔄 Reinicio automático #${_waRestartCount}/${WA_MAX_AUTO_RESTARTS} (${reason})`);
+    initWhatsApp();
+}
 
 // --- DATABASE IPC HANDLERS ---
-ipcMain.handle('db-get-products', async () => dbApi.getProducts());
+function getStoreIdHelper(passedStoreId) {
+    if (typeof passedStoreId === 'string' && passedStoreId.trim() !== '') {
+        return passedStoreId;
+    }
+    try {
+        const settings = getPersistentSettings();
+        return settings.storeId || '';
+    } catch(e) {
+        return '';
+    }
+}
 
-async function syncCatalogToCloud() {
+ipcMain.handle('db-get-products', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getProducts(sid);
+});
+
+async function syncCatalogToCloud(storeId) {
     if (cloudSync && cloudSync.enabled) {
         try {
-            const allProducts = await dbApi.getProducts();
+            const allProducts = await dbApi.getProducts(storeId);
             await cloudSync.pushCatalog(allProducts);
         } catch(e) { console.error('Error syncing catalog', e); }
     }
 }
 
-ipcMain.handle('db-save-product', async (e, p) => {
-    const res = await dbApi.saveProduct(p);
-    syncCatalogToCloud();
+ipcMain.handle('db-save-product', async (e, storeId, p) => {
+    let sid = storeId;
+    let product = p;
+    if (typeof storeId !== 'string') {
+        product = storeId;
+        sid = getStoreIdHelper();
+    }
+    const res = await dbApi.saveProduct(sid, product);
+    syncCatalogToCloud(sid);
     return res;
 });
-ipcMain.handle('db-save-products-bulk', async (e, p) => {
-    const res = await dbApi.saveProductsBulk(p);
-    syncCatalogToCloud();
+ipcMain.handle('db-save-products-bulk', async (e, storeId, p) => {
+    let sid = storeId;
+    let productsList = p;
+    if (typeof storeId !== 'string') {
+        productsList = storeId;
+        sid = getStoreIdHelper();
+    }
+    const res = await dbApi.saveProductsBulk(sid, productsList);
+    syncCatalogToCloud(sid);
     return res;
 });
-ipcMain.handle('db-delete-product', async (e, id) => {
-    const res = await dbApi.deleteProduct(id);
-    syncCatalogToCloud();
+ipcMain.handle('db-delete-product', async (e, storeId, id) => {
+    let sid = storeId;
+    let productId = id;
+    if (typeof storeId !== 'string') {
+        productId = storeId;
+        sid = getStoreIdHelper();
+    }
+    const res = await dbApi.deleteProduct(sid, productId);
+    syncCatalogToCloud(sid);
     return res;
 });
 
-ipcMain.handle('db-get-clients', async () => dbApi.getClients());
-ipcMain.handle('db-save-client', async (e, c) => dbApi.saveClient(c));
+ipcMain.handle('db-get-clients', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getClients(sid);
+});
+ipcMain.handle('db-save-client', async (e, storeId, c) => {
+    let sid = storeId;
+    let client = c;
+    if (typeof storeId !== 'string') {
+        client = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.saveClient(sid, client);
+});
 
-ipcMain.handle('db-get-sales', async (e, limit) => dbApi.getSales(limit));
-ipcMain.handle('db-get-sales-by-date', async (e, start, end) => dbApi.getSalesByDate(start, end));
-ipcMain.handle('db-save-sale', async (e, s) => {
-    const result = await dbApi.saveSale(s);
-    if (io) io.emit('new-sale', s);
+ipcMain.handle('db-get-sales', async (e, storeId, limit) => {
+    let sid = storeId;
+    let lim = limit;
+    if (typeof storeId !== 'string') {
+        lim = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.getSales(sid, lim);
+});
+ipcMain.handle('db-get-sales-by-date', async (e, storeId, start, end) => {
+    let sid = storeId;
+    let startDate = start;
+    let endDate = end;
+    if (typeof storeId !== 'string') {
+        startDate = storeId;
+        endDate = start;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.getSalesByDate(sid, startDate, endDate);
+});
+ipcMain.handle('db-save-sale', async (e, storeId, s) => {
+    let sid = storeId;
+    let sale = s;
+    if (typeof storeId !== 'string') {
+        sale = storeId;
+        sid = getStoreIdHelper();
+    }
+    const result = await dbApi.saveSale(sid, sale);
+    if (io) io.emit('new-sale', sale);
     return result;
 });
+ipcMain.handle('db-void-sale', async (e, storeId, saleId) => {
+    let sid = storeId;
+    let sId = saleId;
+    if (typeof storeId !== 'string') {
+        sId = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.voidSale(sid, sId);
+});
 
-ipcMain.handle('db-get-credits', async () => dbApi.getCredits());
-ipcMain.handle('db-add-credit-payment', async (e, id, amount, method) => dbApi.addCreditPayment(id, amount, method));
 
-ipcMain.handle('db-migrate', async (e, data) => dbApi.migrateData(data));
+ipcMain.handle('db-get-credits', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getCredits(sid);
+});
+ipcMain.handle('db-add-credit-payment', async (e, storeId, id, amount, method) => {
+    let sid = storeId;
+    let creditId = id;
+    let amt = amount;
+    let meth = method;
+    if (typeof storeId !== 'string') {
+        creditId = storeId;
+        amt = id;
+        meth = amount;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.addCreditPayment(sid, creditId, amt, meth);
+});
+
+ipcMain.handle('db-migrate', async (e, storeId, data) => {
+    let sid = storeId;
+    let migrateData = data;
+    if (typeof storeId !== 'string') {
+        migrateData = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.migrateData(sid, migrateData);
+});
 
 // ==========================================
 // LICENCIA IPC HANDLERS
 // ==========================================
 ipcMain.handle('license-get-id', () => licenseSystem.getPublicMachineId());
+ipcMain.handle('get-public-ip', () => getPublicIP());
 
 // ==========================================
 // WHATSAPP DEBUG LOGGING
@@ -255,6 +450,7 @@ async function initWhatsApp() {
     whatsappClient.on('ready', () => {
         logWA('✅ WhatsApp Conectado y Listo!');
         isWhatsappReady = true;
+        _waRestartCount = 0; // Conexión exitosa: resetear contador
         updateWAStatus({ status: 'ready' });
     });
 
@@ -393,6 +589,36 @@ ipcMain.handle('whatsapp-init', async () => {
     return { success: true };
 });
 
+
+// ==========================================
+// WHATSAPP — Gestión de Alertas
+// ==========================================
+
+// Reporte automático de venta al jefe
+ipcMain.handle('whatsapp-sale-alert', async (event, { phone, sale, dailyTotal }) => {
+    if (!isWhatsappReady || !whatsappClient || !phone) return { success: false };
+    try {
+        const chatId = phone.replace(/[^0-9]/g, '') + '@c.us';
+        const hora = new Date(sale.date).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+        const items = sale.items.map(i => `  • ${i.name} x${i.qty}`).join('\n');
+        const msg = [
+            `🧾 *VENTA #${sale.ticket || sale.id}* — ${hora}`,
+            `💵 *$${parseFloat(sale.totalUSD).toFixed(2)} USD*`,
+            `💰 *Bs ${parseFloat(sale.totalVES).toLocaleString('es-VE')}*`,
+            `💳 Método: ${sale.method}`,
+            `📦 Productos:\n${items}`,
+            `─────────────────`,
+            `📊 Acumulado hoy: *$${parseFloat(dailyTotal).toFixed(2)} USD*`
+        ].join('\n');
+        await whatsappClient.sendMessage(chatId, msg);
+        logWA(`📤 Alerta de venta enviada a jefe`);
+        return { success: true };
+    } catch (e) {
+        logWA(`❌ Error en alerta de venta: ${e.message}`);
+        return { success: false, error: e.message };
+    }
+});
+
 // HEARTBEAT: Verificar conexión real cada 2 minutos
 setInterval(async () => {
     if (isWhatsappReady && whatsappClient) {
@@ -406,12 +632,12 @@ setInterval(async () => {
         } catch (e) {
             logWA(`💔 Heartbeat fallido: ${e.message}`);
             
-            // Si el heartbeat detecta el motor muerto, auto-reiniciar
+            // Si el heartbeat detecta el motor muerto, auto-reiniciar (con límite)
             if (e.message.includes('detached Frame') || e.message.includes('Session closed') || e.message.includes('Target closed')) {
-                logWA('🚨 Heartbeat detectó CRASH FATAL. Reiniciando...');
+                logWA('🚨 Heartbeat detectó CRASH FATAL.');
                 isWhatsappReady = false;
                 updateWAStatus({ status: 'error', error: 'Motor caído. Reiniciando en background...' });
-                initWhatsApp();
+                safeRestartWhatsApp('heartbeat-crash');
             } else {
                 isWhatsappReady = false;
                 updateWAStatus({ status: 'error', error: 'Motor no responde' });
@@ -461,11 +687,13 @@ async function getPublicIP() {
 }
 
 
-function updateDiscovery(localIP, tunnelUrl) {
-    const businessId = 'cajafresh_pos_v2_778899_remote'; 
+async function updateDiscovery(localIP, tunnelUrl) {
+    const storeId = await licenseSystem.getStoreId();
+    const businessId = storeId && storeId !== 'demo_store' ? `puntopila_pos_${storeId}` : 'cajafresh_pos_v2_778899_remote';
+    
     const fullUrl = tunnelUrl ? (tunnelUrl.startsWith('http') ? tunnelUrl : `https://${tunnelUrl}`) : `http://${localIP}:3000`;
     
-    const mobileUrl = `${fullUrl.replace(/\/$/, '')}/mobile`;
+    const mobileUrl = `${fullUrl.replace(/\/$/, '')}/mobile#bid=${businessId}`;
 
     // Mensajes y diseño adaptativo (Local vs Remoto)
     const isLocal = !tunnelUrl;
@@ -487,10 +715,10 @@ function updateDiscovery(localIP, tunnelUrl) {
     const req = https.request(options, (res) => {
         if (res.statusCode < 400) {
             lastDiscoveryUrl = fullUrl; // Guardar solo si se envió con éxito
-            console.log(`📡 Señal de descubrimiento enviada: ${fullUrl}`);
+            console.log(`📡 Señal de descubrimiento enviada [Topic: ${businessId}]: ${fullUrl}`);
         }
         if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('sync-status', { ok: res.statusCode < 400 });
+            mainWindow.webContents.send('sync-status', { ok: res.statusCode < 400, bid: businessId });
         }
     });
 
@@ -618,9 +846,83 @@ function startServer() {
     const serverApp = express();
     serverApp.use(cors());
     serverApp.use(express.json());
+
+    // ==========================================
+    // BOSS APP — Panel de Control del Dueño
+    // ==========================================
+    serverApp.use('/boss', express.static(path.join(__dirname, 'boss')));
+
+    // ==========================================
+    // BOSS DASHBOARD — Panel del Jefe (Local)
+    // ==========================================
+    // Panel del Jefe — sirve boss/ sin redireccionamientos que rompan Cloudflare
+    const bossMultiPath = path.join(__dirname, 'boss-multi');
+    const bossMultiIndex = path.join(bossMultiPath, 'index.html');
+    const bossMultiExists = (() => { try { return fs.existsSync(bossMultiIndex) && fs.statSync(bossMultiIndex).isFile(); } catch(e) { return false; } })();
+
+    function serveJefeFile(req, res) {
+        if (!bossMultiExists) {
+            return res.redirect('/boss');
+        }
+
+        const fileName = req.params.file || 'index.html';
+        const filePath = path.join(bossMultiPath, fileName);
+
+        try {
+            if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+                return res.sendFile(bossMultiIndex);
+            }
+        } catch (e) {
+            return res.sendFile(bossMultiIndex);
+        }
+
+        const noCacheHeaders = {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Surrogate-Control': 'no-store'
+        };
+        Object.entries(noCacheHeaders).forEach(([k, v]) => res.setHeader(k, v));
+
+        const ext = path.extname(filePath).toLowerCase();
+        const contentTypes = {
+            '.html': 'text/html; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+            '.json': 'application/json; charset=utf-8'
+        };
+        res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.status(500).send('Error reading file');
+            } else {
+                res.send(data);
+            }
+        });
+    }
+
+    serverApp.get('/jefe', (req, res, next) => {
+        const rawPath = req.originalUrl.split('?')[0];
+        if (rawPath === '/jefe') {
+            const query = req.originalUrl.substring(rawPath.length);
+            return res.redirect('/jefe/' + query);
+        }
+        next();
+    }, serveJefeFile);
+    serverApp.get('/jefe/', serveJefeFile);
+    serverApp.get('/jefe/:file', serveJefeFile);
+
+    // Servir Landing Page, Interfaz móvil y Apps de Jefe
+    logStartup('DEBUG: Configurando servidor [' + new Date().toLocaleTimeString() + '] con Landing Page en raíz (/).');
+    serverApp.get('/', (req, res) => {
+        logStartup('DEBUG: Petición recibida en raíz (/). Sirviendo landing/index.html');
+        res.sendFile(path.join(__dirname, 'landing', 'index.html'));
+    });
     
-    // Servir la interfaz móvil de forma estática y redirección de raíz
+    serverApp.use('/', express.static(path.join(__dirname, 'landing')));
     serverApp.use('/mobile', express.static(path.join(__dirname, 'mobile')));
+    serverApp.use('/assets', express.static(path.join(__dirname, 'assets')));
     serverApp.get('/health', (req, res) => res.json({ status: 'ok', timestamp: Date.now() }));
     
     // Rutas para servir Imágenes Estáticas de la Landing
@@ -635,11 +937,6 @@ function startServer() {
     });
     serverApp.get('/movil-demo.mp4', (req, res) => {
         res.sendFile(path.join(__dirname, 'movil-demo.mp4'));
-    });
-
-    // Ruta de Página de Descarga de APK
-    serverApp.get('/download', (req, res) => {
-        res.sendFile(path.join(__dirname, 'download.html'));
     });
 
     // Ruta de Propuesta Comercial Pro (Landing de Ventas)
@@ -663,8 +960,6 @@ function startServer() {
             `);
         }
     });
-
-    serverApp.get('/', (req, res) => res.redirect('/mobile'));
 
     // Endpoint Receptor de SMS / Email para Pago Móvil
     serverApp.post('/api/sms-payment', (req, res) => {
@@ -720,20 +1015,18 @@ function startServer() {
         res.sendFile(path.join(__dirname, 'dashboard.html'));
     });
 
-    // ==========================================
-    // BOSS APP — Panel de Control del Dueño
-    // ==========================================
-    serverApp.use('/boss', express.static(path.join(__dirname, 'boss')));
-
-    // ==========================================
-    // BOSS MULTI-SUCURSAL — Panel del Jefe
-    // ==========================================
-    serverApp.use('/jefe', express.static(path.join(__dirname, 'boss-multi')));
-
     // DASHBOARD API: Datos en tiempo real
     let lastDashboardData = null;
     serverApp.get('/api/dashboard-data', (req, res) => {
         res.json(lastDashboardData || { today: { totalVES: 0, totalUSD: 0, tickets: 0, items: 0 }, recentSales: [], alerts: { lowStock: [], outOfStock: [] }, inventory: { total: 0 } });
+    });
+
+    serverApp.get('/api/boss/config', (req, res) => {
+        const userSettings = getPersistentSettings();
+        res.json({
+            supabaseUrl: userSettings.supabaseUrl || '',
+            supabaseKey: userSettings.supabaseKey || ''
+        });
     });
 
     // BOSS API: Summary (usa datos del renderer)
@@ -760,7 +1053,8 @@ function startServer() {
     // BOSS API: Sales (directo de SQLite)
     serverApp.get('/api/boss/sales', async (req, res) => {
         try {
-            const sales = await dbApi.getSales(300);
+            const settings = getPersistentSettings();
+            const sales = await dbApi.getSales(settings.storeId || '', 300);
             const parsed = sales.map(s => {
                 if (typeof s.items === 'string') {
                     try { s.items = JSON.parse(s.items); } catch(e) { s.items = []; }
@@ -777,7 +1071,8 @@ function startServer() {
     // BOSS API: Inventory (directo de SQLite)
     serverApp.get('/api/boss/inventory', async (req, res) => {
         try {
-            const products = await dbApi.getProducts();
+            const settings = getPersistentSettings();
+            const products = await dbApi.getProducts(settings.storeId || '');
             res.json(products);
         } catch(e) {
             console.error('Boss API inventory error:', e.message);
@@ -788,7 +1083,8 @@ function startServer() {
     // BOSS API: Credits (directo de SQLite)
     serverApp.get('/api/boss/credits', async (req, res) => {
         try {
-            const credits = await dbApi.getCredits();
+            const settings = getPersistentSettings();
+            const credits = await dbApi.getCredits(settings.storeId || '');
             res.json(credits);
         } catch(e) {
             console.error('Boss API credits error:', e.message);
@@ -799,8 +1095,9 @@ function startServer() {
     // BOSS API: Update product remotely
     serverApp.post('/api/boss/update-product', async (req, res) => {
         try {
+            const settings = getPersistentSettings();
             const product = req.body;
-            await dbApi.saveProduct(product);
+            await dbApi.saveProduct(settings.storeId || '', product);
             // Notificar al POS para que recargue
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('product-updated-remote', product);
@@ -837,6 +1134,7 @@ function startServer() {
 
     const server = http.createServer(serverApp);
     io = new Server(server, {
+        maxHttpBufferSize: 1e8, // Allow up to 100MB payloads for images
         cors: {
             origin: "*",
             methods: ["GET", "POST"],
@@ -940,9 +1238,17 @@ function notifyTunnel(url, provider) {
 async function tryCloudflare() {
     return new Promise((resolve) => {
         const userSettings = getPersistentSettings();
-        const cfToken = userSettings.cloudflareToken;
+        let cfToken = userSettings.cloudflareToken;
 
         if (cfToken) {
+            // Limpieza automática y robusta del token de Cloudflare
+            const match = cfToken.match(/(eyJh[A-Za-z0-9_-]+)/);
+            if (match) {
+                cfToken = match[1];
+            } else {
+                cfToken = cfToken.trim();
+            }
+
             console.log('☁️  Iniciando Cloudflare Tunnel Autenticado (Dominio Propio)...');
             const cf = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${serverPort}`, 'run', '--token', cfToken], {
                 env: cleanEnv(),
@@ -954,6 +1260,17 @@ async function tryCloudflare() {
             const domain = userSettings.cloudflareDomain || 'puntopila.emprende.ve';
             const url = `https://${domain}`;
             
+            cf.stdout.on('data', (data) => {
+                console.log(`[CLOUDFLARE-AUTH] ${data.toString().trim()}`);
+            });
+            cf.stderr.on('data', (data) => {
+                const msg = data.toString().trim();
+                console.error(`[CLOUDFLARE-AUTH-ERR] ${msg}`);
+                if (msg.includes('Registered tunnel connector')) {
+                    console.log('✅ [CLOUDFLARE-AUTH] Túnel autenticado registrado y activo');
+                }
+            });
+
             // Damos unos segundos para que conecte y notificamos
             setTimeout(() => {
                 notifyTunnel(url, 'cloudflare-auth');
@@ -1157,51 +1474,58 @@ async function startTunnelChain() {
 
     console.log('--- 🚀 INICIANDO TÚNEL REMOTO ---');
 
-    // 1. Matar procesos huérfanos de forma SÍNCRONA para evitar errores 3200 de Ngrok
     try {
-        const { execSync } = require('child_process');
-        if (/^win/.test(process.platform)) {
-            // Usamos quiet mode para no llenar la consola si no hay procesos
-            try { execSync('taskkill /F /IM cloudflared.exe /T', { stdio: 'ignore' }); } catch(e) {}
-            try { execSync('taskkill /F /IM ssh.exe /T', { stdio: 'ignore' }); } catch(e) {}
-            try { execSync('taskkill /F /IM ngrok.exe /T', { stdio: 'ignore' }); } catch(e) {}
-            try { execSync('taskkill /F /IM lt.exe /T', { stdio: 'ignore' }); } catch(e) {}
-        } else {
-            try { execSync('killall -9 cloudflared ssh ngrok lt', { stdio: 'ignore' }); } catch(e) {}
+        // 1. Matar procesos huérfanos de forma SÍNCRONA para evitar errores 3200 de Ngrok
+        try {
+            const { execSync } = require('child_process');
+            if (/^win/.test(process.platform)) {
+                try { execSync('taskkill /F /IM cloudflared.exe /T', { stdio: 'ignore' }); } catch(e) {}
+                try { execSync('taskkill /F /IM ssh.exe /T', { stdio: 'ignore' }); } catch(e) {}
+                try { execSync('taskkill /F /IM ngrok.exe /T', { stdio: 'ignore' }); } catch(e) {}
+                try { execSync('taskkill /F /IM lt.exe /T', { stdio: 'ignore' }); } catch(e) {}
+            } else {
+                try { execSync('killall -9 cloudflared ssh ngrok lt', { stdio: 'ignore' }); } catch(e) {}
+            }
+        } catch (e) {}
+
+        // Pausa garantizada para que el SO libere los recursos
+        await new Promise(r => setTimeout(r, 2000));
+
+        const userSettings = getPersistentSettings();
+        
+        // 1. Ngrok (Si hay token)
+        if (userSettings.ngrokAuthToken) {
+            if (await tryNgrok()) { isStartingTunnel = false; return; }
         }
-    } catch (e) {}
 
-    // Pausa garantizada para que el SO libere los recursos
-    await new Promise(r => setTimeout(r, 2000));
+        // 2. Cloudflare (Muy estable, sin bypass)
+        if (await tryCloudflare()) { isStartingTunnel = false; return; }
+        if (currentTunnelUrl) { isStartingTunnel = false; return; }
 
-    const userSettings = getPersistentSettings();
-    
-    // 1. Ngrok (Si hay token)
-    if (userSettings.ngrokAuthToken) {
-        if (await tryNgrok()) return;
+        // 3. Serveo
+        if (await tryServeo()) { isStartingTunnel = false; return; }
+        if (currentTunnelUrl) { isStartingTunnel = false; return; }
+
+        // 4. Localtunnel (Último recurso)
+        if (await tryLocaltunnel()) { isStartingTunnel = false; return; }
+        if (currentTunnelUrl) { isStartingTunnel = false; return; }
+
+        // Fallback final: Intentar Ngrok básico
+        if (!userSettings.ngrokAuthToken) {
+            await tryNgrok();
+        }
+    } finally {
+        isStartingTunnel = false;
     }
-
-    // 2. Cloudflare (Muy estable, sin bypass)
-    if (await tryCloudflare()) return;
-    if (currentTunnelUrl) return;
-
-    // 3. Serveo
-    if (await tryServeo()) return;
-    if (currentTunnelUrl) return;
-
-    // 4. Localtunnel (Último recurso)
-    if (await tryLocaltunnel()) return;
-    if (currentTunnelUrl) return;
-
-    // Fallback final: Intentar Ngrok básico
-    if (!userSettings.ngrokAuthToken) {
-        await tryNgrok();
-    }
-    
-    isStartingTunnel = false;
 }
 
+let _createWindowCount = 0;
 function createWindow() {
+    _createWindowCount++;
+    logStartup(`🏗️ createWindow() called (#${_createWindowCount})`);
+    if (_createWindowCount > 1) {
+        logStartup(`⚠️ WARNING: createWindow called ${_createWindowCount} times! Stack: ${new Error().stack?.split('\n').slice(2,6).join(' | ')}`);
+    }
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -1217,28 +1541,42 @@ function createWindow() {
         }
     });
 
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+        console.log(`[RENDERER] [lvl:${level}] [${sourceId}:${line}] ${message}`);
+    });
+
+    mainWindow.webContents.on('did-navigate', (event, url, httpResponseCode, httpStatusText) => {
+        logStartup(`🌐 NAVIGATION: window navigated to "${url}" (${httpResponseCode} ${httpStatusText})`);
+    });
+    mainWindow.webContents.on('did-navigate-in-page', (event, url, isMainFrame) => {
+        if (isMainFrame) logStartup(`🌐 IN-PAGE NAV: window navigated to "${url}"`);
+    });
+
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
     mainWindow.maximize();
 
-    // Al cargar, enviar la info de red al frontend de la PC
     mainWindow.webContents.on('did-finish-load', async () => {
         const ip = getLocalIP();
-        const mobileUrl = `http://${ip}:${serverPort}/mobile`;
+        const storeId = await licenseSystem.getStoreId();
+        const businessId = storeId && storeId !== 'demo_store' ? `puntopila_pos_${storeId}` : 'cajafresh_pos_v2_778899_remote';
+        
+        const mobileUrl = `http://${ip}:${serverPort}/mobile#bid=${businessId}`;
         const qrData = await QRCode.toDataURL(mobileUrl);
         
-        mainWindow.webContents.send('server-info', { ip, port: serverPort, url: mobileUrl, qr: qrData });
+        mainWindow.webContents.send('server-info', { ip, port: serverPort, url: mobileUrl, qr: qrData, bid: businessId });
         
         // Si el túnel ya estaba listo, enviarlo también
         if (currentTunnelUrl) {
             const isCloudflare = currentTunnelUrl.includes('cloudflare');
             if (isCloudflare) {
-                mainWindow.webContents.send('tunnel-info', { url: currentTunnelUrl, provider: 'cloudflare' });
+                mainWindow.webContents.send('tunnel-info', { url: currentTunnelUrl, provider: 'cloudflare', bid: businessId });
             } else {
                 getPublicIP().then(ip => {
                     mainWindow.webContents.send('tunnel-info', { 
                         url: currentTunnelUrl, 
                         provider: 'localtunnel',
-                        publicIP: ip 
+                        publicIP: ip,
+                        bid: businessId
                     });
                 });
             }
@@ -1255,9 +1593,9 @@ let activationWindow = null;
 
 function createActivationWindow() {
     activationWindow = new BrowserWindow({
-        width: 640,
-        height: 600,
-        resizable: false,
+        width: 680,
+        height: 720,
+        resizable: true,
         frame: true,
         title: 'Punto Pila POS — Activación',
         icon: path.join(__dirname, 'icon.ico'),
@@ -1269,14 +1607,20 @@ function createActivationWindow() {
             preload: path.join(__dirname, 'preload.js')
         }
     });
+    activationWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+        console.log(`[ACTIVATION-RENDERER] [lvl:${level}] [${sourceId}:${line}] ${message}`);
+    });
     activationWindow.loadFile(path.join(__dirname, 'activation.html'));
 }
 
 // (Duplicate license-get-id handler removed)
 // IPC: el frontend envía la clave para activar
-ipcMain.handle('license-activate', async (event, key) => {
-    // Puede lanzar excepciones — el renderer las captura
-    return await licenseSystem.activateLicense(key);
+ipcMain.handle('license-activate', async (event, key, storeName) => {
+    // Valida la clave (local HMAC + heartbeat remoto opcional)
+    const result = await licenseSystem.activateLicense(key, storeName);
+    // Auto-configurar el Supabase del proveedor para este cliente
+    autoConfigVendorCloud(result.storeId, storeName || result.clientName);
+    return result;
 });
 
 // IPC: obtener estado actual (para el cuadro de trial)
@@ -1313,6 +1657,7 @@ ipcMain.on('license-activated', () => {
     initWhatsApp();
     startServer();
     createWindow();
+    setTimeout(initCloudSync, 3000);
 });
 
 app.whenReady().then(async () => {
@@ -1371,39 +1716,11 @@ app.whenReady().then(async () => {
 
     // Licencia válida → arrancar todo normalmente
     console.log(`[LICENSE] Acceso concedido. Cliente: ${licCheck.clientName || 'Desconocido'}`);
+    createDesktopShortcut();
     initWhatsApp();
     startServer();
     createWindow();
-
-    // === AUTO-UPDATER: IPC Handlers y chequeo programado ===
-    if (autoUpdater && mainWindow) {
-        const sendUpdateStatus = (payload) => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('update-status', payload);
-            }
-        };
-
-        autoUpdater.on('checking-for-update', () => sendUpdateStatus({ status: 'checking' }));
-        autoUpdater.on('update-available', (info) => sendUpdateStatus({ status: 'available', version: info.version }));
-        autoUpdater.on('update-not-available', () => sendUpdateStatus({ status: 'up-to-date' }));
-        autoUpdater.on('download-progress', (prog) => sendUpdateStatus({ status: 'downloading', percent: Math.round(prog.percent) }));
-        autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ status: 'downloaded', version: info.version }));
-        autoUpdater.on('error', (err) => sendUpdateStatus({ status: 'error', message: err.message }));
-
-        ipcMain.handle('check-for-updates', async () => {
-            try { return await autoUpdater.checkForUpdates(); } catch(e) { return { error: e.message }; }
-        });
-        ipcMain.handle('download-update', async () => {
-            try { return await autoUpdater.downloadUpdate(); } catch(e) { return { error: e.message }; }
-        });
-        ipcMain.handle('install-update', () => {
-            autoUpdater.quitAndInstall(false, true);
-        });
-
-        // Chequear actualizaciones 30s después del arranque, y luego cada 4 horas
-        setTimeout(() => { try { autoUpdater.checkForUpdates(); } catch(e) {} }, 30000);
-        setInterval(() => { try { autoUpdater.checkForUpdates(); } catch(e) {} }, 4 * 60 * 60 * 1000);
-    }
+    setTimeout(initCloudSync, 3000);
 });
 
 app.on('window-all-closed', () => {
@@ -1423,13 +1740,29 @@ ipcMain.on('sync-products', (event, data) => {
             return;
         }
 
-        // SEGURIDAD: No sobreescribir cache con una lista vacía si ya tenemos datos
-        if (data.products && data.products.length > 0) {
+        // SI CAMBIÓ LA SUCURSAL, DESCARTAR EL CACHE ANTERIOR COMPLETAMENTE
+        if (lastSyncedProducts && lastSyncedProducts.storeId !== data.storeId) {
+            console.log(`🔄 Cambio de sucursal detectado (${lastSyncedProducts.storeId} -> ${data.storeId}). Descartando cache anterior.`);
+            lastSyncedProducts = null;
+        }
+
+        // Si la carga inicial del renderer terminó (isLoaded === true), confiamos plenamente
+        // en lo que mande el cliente, incluso si es una lista vacía de productos.
+        if (data.isLoaded) {
+            console.log(`📦 Sincronización autorizada tras carga inicial: ${data.products ? data.products.length : 0} productos.`);
+            lastSyncedProducts = data;
+        } else if (data.products && data.products.length > 0) {
             console.log(`📦 Cache actualizado: ${data.products.length} productos listos para móviles.`);
             lastSyncedProducts = data;
         } else {
-            console.warn("⚠️ Sincronización recibida sin productos o lista vacía.");
-            if (!lastSyncedProducts) lastSyncedProducts = data;
+            console.warn("⚠️ Sincronización recibida sin productos antes de terminar la carga.");
+            if (lastSyncedProducts) {
+                // Conservar productos del cache anterior
+                data.products = lastSyncedProducts.products;
+            } else {
+                data.products = [];
+                lastSyncedProducts = data;
+            }
         }
         
         io.emit('products-updated', data);
@@ -1480,7 +1813,7 @@ ipcMain.handle('whatsapp-send-pdf', async (event, { phone, base64Data, filename 
         
         const target = phone.includes('@') ? phone : `${phone}@c.us`;
         logWA(`📄 Enviando PDF a ${target}: ${filename}`);
-        await whatsappClient.sendMessage(target, media);
+        await whatsappClient.sendMessage(target, media, { sendMediaAsDocument: true });
         logWA(`✅ PDF enviado a ${phone}: ${filename}`);
         return { success: true };
     } catch (error) {
@@ -1584,8 +1917,8 @@ ipcMain.on('request-tunnel-info', (event) => {
     event.reply('tunnel-info', { url: currentTunnelUrl, localIP: getLocalIP() });
 });
 
-ipcMain.on('restart-tunnels', async () => {
-    console.log('🔄 Reinicio de túneles solicitado...');
+async function restartTunnelsHelper() {
+    console.log('🔄 Reiniciando túneles...');
     try {
         if (tunnelProcess) {
             tunnelProcess.kill();
@@ -1594,27 +1927,14 @@ ipcMain.on('restart-tunnels', async () => {
         // Para Ngrok específicamente
         await ngrok.kill();
         currentTunnelUrl = null;
+        isStartingTunnel = false; // Reset flags to allow starting
         startTunnelChain();
     } catch (e) {
         console.error('Error reiniciando túneles:', e);
     }
-});
+}
 
-ipcMain.on('restart-tunnels', async () => {
-    console.log('🔄 Reinicio de túneles solicitado...');
-    try {
-        if (tunnelProcess) {
-            tunnelProcess.kill();
-            tunnelProcess = null;
-        }
-        // Para Ngrok específicamente
-        await ngrok.kill();
-        currentTunnelUrl = null;
-        startTunnelChain();
-    } catch (e) {
-        console.error('Error reiniciando túneles:', e);
-    }
-});
+ipcMain.on('restart-tunnels', restartTunnelsHelper);
 
 // IPC handler for silent printing
 // IPC Handler: Selección de imagen de fondo para el móvil
@@ -1659,66 +1979,21 @@ ipcMain.handle('print-ticket', async (event) => {
     }
 });
 
-let cloudflareProcess = null;
-
-function startCloudflareTunnel(inputToken) {
-    if (!inputToken) return;
-    
-    // Extraer token si pegaron el comando completo
-    let token = inputToken.trim();
-    if (token.includes(' ')) {
-        const parts = token.split(' ');
-        token = parts[parts.length - 1]; // El token suele ser la última parte
-    }
-    
-    if (cloudflareProcess) {
-        try { cloudflareProcess.kill(); } catch(e) {}
-    }
-    // Matar procesos zombies de Cloudflare para evitar conflictos de túnel
-    try { execSync('taskkill /F /IM cloudflared.exe', { stdio: 'ignore' }); } catch(e) {}
-
-    const cloudflaredPath = path.join(process.resourcesPath, 'bin', 'cloudflared.exe');
-    const localPath = path.join(__dirname, 'cloudflared.exe');
-    const exePath = fs.existsSync(cloudflaredPath) ? cloudflaredPath : (fs.existsSync(localPath) ? localPath : null);
-
-    if (!exePath) {
-        console.error('[CLOUDFLARE] ❌ No se encontró cloudflared.exe en ' + localPath);
-        if (mainWindow) {
-            mainWindow.webContents.send('cloud-sync-error', 'No se encontró cloudflared.exe. Por favor, descárgalo y ponlo en la carpeta del programa.');
-        }
-        return;
-    }
-
-    console.log(`[CLOUDFLARE] ☁️ Iniciando túnel con token: ${token.substring(0, 10)}...`);
-    
+// Fiscal Printer: Write file to IntiPOS spooler folder
+ipcMain.handle('write-fiscal-file', async (event, spoolerPath, filename, content) => {
     try {
-        const { spawn } = require('child_process');
-        // Protocolo 'https' (Legacy) para saltar firewalls de universidades/corporativos
-        const batPath = path.join(__dirname, 'lanzar_tunel.bat');
-        logStartup('🚀 Lanzando Túnel vía BAT: ' + batPath);
-        
-        cloudflareProcess = spawn('cmd.exe', ['/c', batPath, token], {
-            env: cleanEnv(),
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
-
-        cloudflareProcess.stdout.on('data', (data) => console.log(`[CLOUDFLARE] ${data}`));
-        cloudflareProcess.stderr.on('data', (data) => {
-            const msg = data.toString();
-            console.error(`[CLOUDFLARE-ERR] ${msg}`);
-            if (msg.includes('Registered tunnel connector')) {
-                console.log('✅ [CLOUDFLARE] Túnel registrado y activo');
-            }
-        });
-
-        cloudflareProcess.on('close', (code) => {
-            console.log(`[CLOUDFLARE] Túnel cerrado con código ${code}`);
-            cloudflareProcess = null;
-        });
-    } catch (e) {
-        console.error('[CLOUDFLARE] Error al iniciar el proceso:', e);
+        if (!fs.existsSync(spoolerPath)) {
+            fs.mkdirSync(spoolerPath, { recursive: true });
+        }
+        const fullPath = path.join(spoolerPath, filename);
+        fs.writeFileSync(fullPath, content, 'utf8');
+        console.log(`[FISCAL] Archivo escrito: ${fullPath}`);
+        return { success: true, path: fullPath };
+    } catch (error) {
+        console.error('[FISCAL] Error:', error);
+        return { success: false, error: error.message };
     }
-}
+});
 
 ipcMain.handle('cloud-sync-configure', async (event, cfg) => {
     try {
@@ -1741,11 +2016,11 @@ ipcMain.handle('cloud-sync-configure', async (event, cfg) => {
         if (cloudSync) {
             cloudSync.configure(cfg);
             await cloudSync.registerStore();
-            syncCatalogToCloud();
+            syncCatalogToCloud(cfg.storeId);
         }
 
         if (cfg.cloudflareToken) {
-            startCloudflareTunnel(cfg.cloudflareToken);
+            restartTunnelsHelper();
         }
 
         return { success: true };
@@ -1755,12 +2030,34 @@ ipcMain.handle('cloud-sync-configure', async (event, cfg) => {
 });
 
 ipcMain.handle('cloud-sync-status', async () => {
-    return cloudSync ? cloudSync.getStatus() : { enabled: false };
+    if (!cloudSync) return { enabled: false, storeId: null, url: null, supabaseKey: null };
+    const base = cloudSync.getStatus ? cloudSync.getStatus() : {};
+    return {
+        ...base,
+        enabled: cloudSync.enabled,
+        storeId: cloudSync.storeId,
+        url: cloudSync.supabaseUrl,
+        supabaseKey: cloudSync.supabaseKey
+    };
 });
 
 ipcMain.handle('cloud-sync-push-sale', async (event, saleData) => {
-    if (cloudSync && cloudSync.enabled) {
+    const logFile = path.join(app.getPath('userData'), 'startup_debug.log');
+    try {
+        if (!cloudSync) {
+            fs.appendFileSync(logFile, `[${new Date().toISOString()}] [IPC] push-sale: cloudSync es NULL\n`);
+            return { success: false, error: 'cloudSync no inicializado' };
+        }
+        if (!cloudSync.enabled) {
+            fs.appendFileSync(logFile, `[${new Date().toISOString()}] [IPC] push-sale: cloudSync DESHABILITADO (url=${!!cloudSync.supabaseUrl} key=${!!cloudSync.supabaseKey} storeId=${cloudSync.storeId})\n`);
+            return { success: false, error: 'cloudSync deshabilitado' };
+        }
+        fs.appendFileSync(logFile, `[${new Date().toISOString()}] [IPC] push-sale: Recibido ticket=${saleData.ticket || saleData.id} total=$${saleData.totalUSD || saleData.total || 0}\n`);
         await cloudSync.pushSale(saleData);
+        return { success: true };
+    } catch (e) {
+        try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] [IPC] push-sale ERROR: ${e.message}\n`); } catch(_){}
+        return { success: false, error: e.message };
     }
 });
 
@@ -1770,22 +2067,106 @@ ipcMain.handle('cloud-sync-push-alerts', async (event, products) => {
     }
 });
 
+ipcMain.handle('cloud-sync-push-expense', async (event, expenseData) => {
+    if (cloudSync && cloudSync.enabled) {
+        try {
+            await cloudSync.pushExpense(expenseData);
+            return { success: true };
+        } catch (e) {
+            console.error('[CLOUD-SYNC] Error pushing expense:', e.message);
+            return { success: false, error: e.message };
+        }
+    }
+    return { success: false, error: 'cloudSync no disponible' };
+});
+
+ipcMain.handle('cloud-sync-log', async (event, message) => {
+    const logFile = path.join(app.getPath('userData'), 'startup_debug.log');
+    try {
+        fs.appendFileSync(logFile, `[${new Date().toISOString()}] [FRONTEND] ${message}\n`);
+    } catch(e){}
+});
+
 ipcMain.handle('cloud-sync-push-live', async (event, cart, totals, view) => {
     if (cloudSync && cloudSync.enabled) {
         await cloudSync.pushLiveState(cart, totals, view);
     }
 });
 
+ipcMain.handle('cloud-sync-push-catalog', async (event, products) => {
+    if (cloudSync && cloudSync.enabled) {
+        await cloudSync.pushCatalog(products);
+    }
+});
+
+// ── Auto-configurar Supabase del proveedor para un cliente nuevo ──
+function autoConfigVendorCloud(storeId, storeName) {
+    if (!storeId) return;
+    if (!VENDOR_SUPABASE_URL || VENDOR_SUPABASE_URL.includes('TU_SUPABASE')) {
+        console.log('[VENDOR] ⚠️ Credenciales del proveedor no configuradas en main.js');
+        return;
+    }
+
+    const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+    let settings = {};
+    try {
+        if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    } catch(e) {}
+
+    // Solo sobreescribir si no tiene URL propia ya configurada
+    if (!settings.supabaseUrl || settings.supabaseUrl.includes('TU_SUPABASE')) {
+        settings.supabaseUrl = VENDOR_SUPABASE_URL;
+        settings.supabaseKey = VENDOR_SUPABASE_KEY;
+        settings.storeId    = storeId;
+        if (storeName && !settings.storeName) settings.storeName = storeName;
+        try {
+            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+            console.log(`[VENDOR] ✅ Cloud configurado automáticamente para store: ${storeId}`);
+        } catch(e) { console.error('[VENDOR] Error guardando settings:', e.message); }
+
+        // Re-inicializar cloud sync con la nueva configuración
+        if (cloudSync) {
+            cloudSync.configure({
+                supabaseUrl: VENDOR_SUPABASE_URL,
+                supabaseKey: VENDOR_SUPABASE_KEY,
+                storeId,
+                storeName: storeName || 'Mi Tienda'
+            });
+            cloudSync.registerStore().catch(() => {});
+            syncCatalogToCloud(storeId);
+        }
+    }
+}
+
 // Initialize cloud sync on startup
-function initCloudSync() {
+async function initCloudSync() {
+    if (cloudSync) return;
     const settings = getPersistentSettings();
+
+    // Si no hay URL configurada pero SÍ hay credenciales de proveedor,
+    // usar el store_id de la licencia activa automáticamente.
+    let supaUrl = settings.supabaseUrl || '';
+    let supaKey = settings.supabaseKey || '';
+    let storeId = settings.storeId || '';
+
+    if ((!supaUrl || supaUrl.includes('TU_SUPABASE')) &&
+        VENDOR_SUPABASE_URL && !VENDOR_SUPABASE_URL.includes('TU_SUPABASE')) {
+        const licStoreId = licenseSystem.getStoreId();
+        if (licStoreId) {
+            supaUrl  = VENDOR_SUPABASE_URL;
+            supaKey  = VENDOR_SUPABASE_KEY;
+            storeId  = licStoreId;
+            console.log(`[VENDOR] 🔗 Usando Supabase del proveedor para store: ${storeId}`);
+        }
+    }
+
     cloudSync = new CloudSync({
-        supabaseUrl: settings.supabaseUrl || '',
-        supabaseKey: settings.supabaseKey || '',
-        storeId: settings.storeId || '',
-        storeName: settings.storeName || 'Mi Tienda',
-        brandName: settings.brandName || 'Caja Fresh',
-        queuePath: app.getPath('userData'),
+        supabaseUrl: supaUrl,
+        supabaseKey: supaKey,
+        storeId:     storeId,
+        storeName:   settings.storeName || 'Mi Tienda',
+        brandName:   settings.brandName || 'Caja Fresh',
+        queuePath:   app.getPath('userData'),
         onStatusChange: (status) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('cloud-sync-status', status);
@@ -1795,16 +2176,59 @@ function initCloudSync() {
 
     if (cloudSync.enabled) {
         cloudSync.registerStore();
-        syncCatalogToCloud();
+        
+        // Sincronización inicial: PULL (metadata) → PUSH (stock)
+        try {
+            logStartup('[CLOUD-SYNC] 🔄 Sincronizando catálogo inicial...');
+            
+            // 1. Siempre intentar traer lo último del Jefe (Precios, Imágenes, Nombres)
+            // Esto evita que el POS sobreescriba cambios remotos al iniciar.
+            await cloudSync.pullCatalogFromCloud();
+            
+            // 2. Luego subir nuestro estado actual (principalmente Stock)
+            await syncCatalogToCloud(storeId);
+
+            logStartup('[CLOUD-SYNC] ✅ Sincronización inicial completada');
+        } catch(e) {
+            logStartup('[CLOUD-SYNC] ⚠️ Error en sincronización inicial: ' + e.message);
+            // Si el pull falla, al menos intentamos el push
+            syncCatalogToCloud(storeId);
+        }
+
         console.log('[CLOUD-SYNC] 🚀 Iniciado correctamente');
+        logStartup('[CLOUD-SYNC] 🚀 Iniciado correctamente para storeId: ' + storeId);
     } else {
         console.log('[CLOUD-SYNC] ⏸️ No configurado — el POS funciona en modo local');
-    }
-
-    if (settings.cloudflareToken) {
-        startCloudflareTunnel(settings.cloudflareToken);
+        logStartup('[CLOUD-SYNC] ⏸️ No configurado — faltan credenciales o storeId. supaUrl: ' + !!supaUrl + ' supaKey: ' + !!supaKey + ' storeId: ' + !!storeId);
     }
 }
 
-// Call initCloudSync after app is ready and server starts
-setTimeout(initCloudSync, 3000);
+// initCloudSync is called after app is ready and license is verified
+
+ipcMain.handle('export-to-pdf', async (event) => {
+    try {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const { filePath } = await dialog.showSaveDialog(win, {
+            title: 'Exportar Expediente Financiero a PDF',
+            defaultPath: 'CajaFresh_Expediente.pdf',
+            filters: [{ name: 'Archivos PDF', extensions: ['pdf'] }]
+        });
+        
+        if (!filePath) return { success: false, cancelled: true };
+        
+        // Hide UI elements not meant for printing via CSS injection or by letting CSS print media handle it.
+        // We'll rely on the default printToPDF which uses @media print if defined.
+        const pdfData = await win.webContents.printToPDF({
+            printBackground: true,
+            landscape: true,
+            pageSize: 'A4',
+            margins: { marginType: 'default' }
+        });
+        
+        fs.writeFileSync(filePath, pdfData);
+        return { success: true, filePath };
+    } catch (e) {
+        console.error('Error exporting PDF:', e);
+        return { success: false, error: e.message };
+    }
+});

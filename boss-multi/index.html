@@ -18,7 +18,10 @@
     <!-- Pantalla de Login -->
     <div id="login-screen">
         <div class="app-header" style="background:none; color:var(--text); padding-bottom: 20px;">
-            <div class="brand">Caja <span>Fresh</span></div>
+            <div>
+                <div class="brand">Caja <span>Fresh</span></div>
+                <div class="app-slogan" id="hdr-slogan" style="font-size:11px; color:#64748b; font-weight:600; margin-top:2px;">Conectado a El Arca</div>
+            </div>
             <div class="subtitle">Executive Dashboard</div>
         </div>
         
@@ -60,15 +63,26 @@
             <span>Euro: <b id="rate-eur">Bs 0.00</b></span>
             <span>Mercado: <b id="rate-mkt">Bs 0.00</b></span>
         </div>
-        <button onclick="openRateModal()" style="background:rgba(255,255,255,0.1); border:none; color:white; width:30px; height:30px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-            <i class="fas fa-pen" style="font-size:12px;"></i>
-        </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <!-- Botón Sincronizar Nube -->
+            <button id="btn-cloud-sync" onclick="doCloudSync()" title="Sincronizar todas las sucursales con la nube"
+                style="background:rgba(255,255,255,0.15); border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+                <i class="fas fa-cloud-upload-alt" style="font-size:13px;"></i>
+            </button>
+            <button onclick="openRateModal()" title="Editar tasas de cambio"
+                style="background:rgba(255,255,255,0.1); border:none; color:white; width:30px; height:30px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <i class="fas fa-pen" style="font-size:12px;"></i>
+            </button>
+        </div>
     </div>
 
     <!-- App Principal -->
     <div id="app" style="display:none; padding:0; margin:0; max-width:100%">
         <header class="app-header">
-            <div class="brand" id="header-title">Panel de Control</div>
+            <div>
+                <div class="brand" id="header-title">Panel de Control</div>
+                <div class="app-slogan" id="main-hdr-slogan" style="font-size:11px; color:#64748b; font-weight:600; margin-top:2px;">Conectado a El Arca</div>
+            </div>
             <button class="header-btn" onclick="toggleConfig()"><i class="fas fa-cog"></i></button>
         </header>
 
@@ -233,7 +247,17 @@
                 <label>PIN de Acceso</label>
                 <input type="number" id="cfg-pin" placeholder="0000">
             </div>
-            <button class="btn-action" onclick="saveConfig()">Guardar Cambios</button>
+            <button class="btn-action" onclick="saveConfig()" style="margin-bottom: 20px;">Guardar Cambios</button>
+
+            <div style="border-top: 1px dashed var(--border); padding-top: 20px;">
+                <div class="modal-title" style="font-size: 14px; margin-bottom: 10px;">Herramientas Avanzadas</div>
+                <button class="btn-action" onclick="forceAllSync()" style="background: var(--text-muted); width: 100%; font-size: 11px; margin-bottom: 10px;">
+                    <i class="fas fa-sync-alt"></i> Forzar Sincronización en Todas las Cajas
+                </button>
+                <button class="btn-action" onclick="logoutBoss()" style="background: var(--danger); width: 100%; font-size: 11px;">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión (Borrar todo)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -355,6 +379,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

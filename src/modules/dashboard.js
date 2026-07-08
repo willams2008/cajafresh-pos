@@ -14,10 +14,14 @@ window.Dashboard = window.Dashboard || {};
             return;
         }
 
-        var today = new Date().toISOString().slice(0, 10);
+        var now = new Date();
+        var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
         var allSales = window.sales || [];
         var todaySales = allSales.filter(function(s) {
-            return s.date && s.date.slice(0, 10) === today && s.status !== 'voided' && s.status !== 'void';
+            if (!s.date) return false;
+            var d = new Date(s.date);
+            var sDateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            return sDateStr === todayStr && s.status !== 'voided' && s.status !== 'void';
         });
 
         var grossUSD = todaySales.reduce(function(s, sale) { return s + (Number(sale.totalUSD) || 0); }, 0);
