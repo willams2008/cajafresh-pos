@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Proveedor — Punto Pila POS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0b0f1a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 32px 20px;
+        }
+        .header {
+            max-width: 800px; margin: 0 auto 32px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .logo-icon {
+            width: 48px; height: 48px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: white;
+        }
+        h1 { font-size: 22px; font-weight: 900; color: white; }
+        h1 span { color: #8b5cf6; }
+        .subtitle { font-size: 12px; color: #64748b; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+        .card {
+            max-width: 800px; margin: 0 auto 20px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 24px;
+        }
+        .card-title {
+            font-size: 13px; font-weight: 800; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label {
+            font-size: 11px; font-weight: 700; color: #64748b;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .form-group input, .form-group select {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px; font-weight: 600;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #3b82f6;
+        }
+        .form-group select option { background: #1e293b; }
+
+        .btn {
+            width: 100%; margin-top: 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border: none; border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px; font-weight: 800; color: white;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1.5px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(59,130,246,0.35); }
+
+        /* Resultado */
+        #result { display: none; }
+        .key-box {
+            background: rgba(16,185,129,0.08);
+            border: 1px solid rgba(16,185,129,0.25);
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 14px;
+        }
+        .key-label { font-size: 10px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+        .key-value {
+            font-family: 'Courier New', monospace;
+            font-size: 22px; font-weight: 900;
+            color: white; letter-spacing: 3px;
+            cursor: pointer; user-select: all;
+        }
+        .key-meta {
+            display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 14px;
+        }
+        .key-meta-item {
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px; padding: 10px 12px;
+        }
+        .key-meta-item .label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .key-meta-item .value { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+
+        .copy-btn {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; padding: 8px 16px;
+            color: #94a3b8; font-family: 'Outfit', sans-serif;
+            font-size: 12px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            transition: all 0.15s;
+        }
+        .copy-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+        .copy-btn.copied { background: rgba(16,185,129,0.15); color: #34d399; border-color: rgba(16,185,129,0.3); }
+
+        .instruction {
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.2);
+            border-radius: 12px; padding: 16px 18px;
+            font-size: 12px; line-height: 1.7; color: #fbbf24;
+        }
+        .instruction strong { color: white; }
+        .instruction ol { padding-left: 18px; margin-top: 6px; }
+
+        /* Cloudflare steps */
+        .cf-box {
+            background: rgba(249,115,22,0.07);
+            border: 1px solid rgba(249,115,22,0.25);
+            border-radius: 14px; padding: 20px 22px;
+            margin-bottom: 14px;
+        }
+        .cf-title { font-size: 11px; font-weight: 800; color: #fb923c; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 14px; display:flex; align-items:center; gap:8px; }
+        .cf-step { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
+        .cf-num { min-width:24px; height:24px; background:rgba(249,115,22,0.2); border-radius:50%; font-size:11px; font-weight:900; color:#fb923c; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+        .cf-text { font-size:12px; line-height:1.6; color:#cbd5e1; }
+        .cf-text strong { color:white; }
+        .cf-code {
+            background: rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px; padding:10px 14px; margin-top:6px;
+            font-family: 'Courier New', monospace; font-size:12px; color:#67e8f9;
+            word-break: break-all; cursor:pointer; user-select:all;
+        }
+        .url-badge {
+            background: rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3);
+            border-radius:10px; padding:10px 16px; margin-bottom:14px;
+            display:flex; align-items:center; justify-content:space-between; gap:10px;
+        }
+        .url-badge .url-text { font-size:14px; font-weight:800; color:#60a5fa; font-family:monospace; }
+        /* Historial */
+        .history-item {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .history-item:last-child { border: none; }
+        .history-name { font-size: 14px; font-weight: 700; }
+        .history-key { font-size: 11px; font-family: monospace; color: #64748b; }
+        .history-store { font-size: 10px; color: #3b82f6; }
+        .history-exp {
+            font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px;
+            background: rgba(16,185,129,0.1); color: #34d399;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo-icon"><i class="fas fa-key"></i></div>
+    <div>
+        <h1>Panel <span>Proveedor</span></h1>
+        <div class="subtitle">Punto Pila POS — Uso Interno</div>
+    </div>
+</div>
+
+<!-- Generador -->
+<div class="card">
+    <div class="card-title"><i class="fas fa-plus-circle"></i> Generar Nueva Clave de Cliente</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>Nombre del Cliente</label>
+            <input id="clientName" type="text" placeholder="Ej: Bodega La Catia">
+        </div>
+        <div class="form-group">
+            <label>ID de Tienda (sin espacios, máx 8)</label>
+            <input id="storeRef" type="text" placeholder="Ej: catia01" maxlength="8">
+        </div>
+        <div class="form-group">
+            <label>Subdominio (para QR permanente)</label>
+            <input id="subdomain" type="text" placeholder="Ej: catia" maxlength="30"
+                style="font-family:monospace;"
+                oninput="updateUrlPreview()">
+        </div>
+        <div class="form-group">
+            <label>Duración</label>
+            <select id="duration">
+                <option value="1">1 mes</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses (anual)</option>
+                <option value="24">24 meses (2 años)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Notas (uso interno)</label>
+            <input id="notes" type="text" placeholder="Ej: Cliente referido por Juan">
+        </div>
+    </div>
+    <div id="urlPreview" style="display:none; margin-top:12px;" class="url-badge">
+        <span style="font-size:11px;color:#64748b;font-weight:700;">🔗 URL PERMANENTE:</span>
+        <span class="url-text" id="urlPreviewText"></span>
+        <span style="font-size:10px;color:#475569;">QR fijo ✅</span>
+    </div>
+    <button class="btn" onclick="generateKey()">
+        <i class="fas fa-key"></i> Generar Clave de Activación
+    </button>
+</div>
+
+<!-- Resultado -->
+<div class="card" id="result">
+    <div class="card-title"><i class="fas fa-check-circle" style="color:#34d399;"></i> Clave Generada</div>
+    <div class="key-box">
+        <div class="key-label">Clave de Activación</div>
+        <div class="key-value" id="keyDisplay" title="Clic para seleccionar">—</div>
+        <div class="key-meta">
+            <div class="key-meta-item">
+                <div class="label">Store ID</div>
+                <div class="value" id="storeIdDisplay">—</div>
+            </div>
+            <div class="key-meta-item">
+                <div class="label">Cliente</div>
+                <div class="value" id="clientDisplay">—</div>
+            </div>
+            <div class="key-meta-item">
+                <div class="label">Vencimiento</div>
+                <div class="value" id="expiryDisplay">—</div>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom:16px;">
+        <button class="copy-btn" id="copyBtn" onclick="copyKey()">
+            <i class="fas fa-copy"></i> Copiar Clave
+        </button>
+        <button class="copy-btn" onclick="copySQL()">
+            <i class="fas fa-database"></i> Copiar SQL para Supabase
+        </button>
+    </div>
+    <div class="instruction">
+        <strong>⚠️ Checklist antes de entregar al cliente:</strong>
+        <ol>
+            <li>Ejecuta el SQL en tu <strong>Supabase → SQL Editor</strong>.</li>
+            <li>Crea el túnel en Cloudflare (instrucciones abajo ↓).</li>
+            <li>Instala el <code>.exe</code> en la PC del cliente.</li>
+            <li>El cliente escribe su nombre + clave. ¡Listo!</li>
+        </ol>
+    </div>
+</div>
+
+<!-- Instrucciones Cloudflare -->
+<div class="card" id="cfCard" style="display:none;">
+    <div class="card-title"><i class="fab fa-cloudflare" style="color:#fb923c;"></i> Configurar Túnel Cloudflare (QR Permanente)</div>
+    <div class="url-badge" style="margin-bottom:18px;">
+        <span style="font-size:11px;color:#64748b;font-weight:700;">URL PERMANENTE DEL CLIENTE:</span>
+        <span class="url-text" id="cfUrlDisplay">—</span>
+        <button class="copy-btn" onclick="copyUrl()" style="padding:4px 12px;">
+            <i class="fas fa-copy"></i> C    <div class="cf-box">
+        <div class="cf-title"><i class="fas fa-list-ol"></i> Pasos que DEBES hacer TÚ como proveedor (1 sola vez por cliente)</div>
+        <div class="cf-step">
+            <div class="cf-num">1</div>
+            <div class="cf-text">Entra a <strong>tu cuenta</strong> de Cloudflare → <strong>dash.cloudflare.com</strong> → en el menú izquierdo busca <strong>Zero Trust</strong> (ya la tienes configurada).</div>
+        </div>
+        <div class="cf-step">
+            <div class="cf-num">2</div>
+            <div class="cf-text">Ve a <strong>Networks → Tunnels → Create a tunnel</strong> → Selecciona <strong>"Cloudflared"</strong> → Nombre del túnal: <span id="cfTunnelName" style="color:#fb923c;font-weight:700;">puntopila-cliente</span> → <strong>Save tunnel</strong></div>
+        </div>
+        <div class="cf-step">
+            <div class="cf-num">3</div>
+            <div class="cf-text">Copia el <strong>token</strong> que aparece en pantalla. ¡No lo cierres! Lo necesitas en el Paso 5.</div>
+        </div>
+        <div class="cf-step">
+            <div class="cf-num">4</div>
+            <div class="cf-text">Clic en <strong>"Next"</strong> → En "Public Hostname" configura así con <strong>TU dominio</strong>:
+                <div class="cf-code" onclick="selectAll(this)">Subdomain: <span id="cfSubText">cliente</span><br>Domain: puntopila.emprende.ve<br>Service: http://localhost:3000</div>
+            </div>
+        </div>
+        <div class="cf-step">
+            <div class="cf-num">5</div>
+            <div class="cf-text">En el POS del cliente (ya instalado): abre la pantalla de <strong>Configuración</strong> → campo <strong>"Token Cloudflare"</strong> → pega el token del Paso 3 → <strong>Guardar</strong>.<br>
+            <span style="color:#94a3b8;font-size:11px;">(ℹ️ El cliente no necesita cuenta de Cloudflare. Solo tú creas el túnal en tu cuenta.)</span>
+            </div>
+        </div>
+        <div class="cf-step">
+            <div class="cf-num">6</div>
+            <div class="cf-text">¡Listo! Cuando el POS arranque, el link <strong id="cfUrlFinal" style="color:#60a5fa;"></strong> estará activo permanentemente. Imprímelo como QR y dáselo al cliente para que lo pegue en su local.</div>
+        </div>
+    </div>mprímelo como QR para los compradores.</div>
+        </div>
+    </div>
+    <button class="copy-btn" onclick="copyCFInstructions()" style="width:100%;justify-content:center;padding:10px;">
+        <i class="fas fa-copy"></i> Copiar instrucciones completas (para enviárselas al cliente)
+    </button>
+</div>
+
+<!-- Historial -->
+<div class="card">
+    <div class="card-title"><i class="fas fa-history"></i> Historial de Claves Generadas</div>
+    <div id="historyList"><div style="color:#475569; font-size:13px;">No hay claves generadas aún.</div></div>
+</div>
+
+<script>
+// ── CRYPTO (Web Crypto API) ────────────────────────────────────
+const CHARS      = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const BASE_DATE  = new Date('2025-01-01T00:00:00Z');
+const HMAC_SECRET = 'cajafresh_puntopila_vendor_2025_x9z';
+
+async function hmac256(secret, message) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function hexToBase64Chars(hex) {
+    const bytes = hex.match(/.{2}/g).map(h => parseInt(h,16));
+    const b64 = btoa(String.fromCharCode(...bytes));
+    return b64.replace(/[^A-Z0-9]/gi, '').toUpperCase().substring(0, 8);
+}
+
+function monthsToCode(months) {
+    const n = Math.max(0, Math.min(months, CHARS.length * CHARS.length - 1));
+    return CHARS[Math.floor(n / CHARS.length)] + CHARS[n % CHARS.length];
+}
+
+function randomChars(len) {
+    let r = '';
+    const arr = new Uint8Array(len * 2);
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < len; i++) r += CHARS[arr[i] % CHARS.length];
+    return r;
+}
+
+const DOMAIN = 'puntopila.emprende.ve';
+
+function updateUrlPreview() {
+    const sub = document.getElementById('subdomain').value.trim().toLowerCase().replace(/[^a-z0-9\-]/g,'');
+    const prev = document.getElementById('urlPreview');
+    const txt  = document.getElementById('urlPreviewText');
+    if (sub) {
+        txt.textContent = `${sub}.${DOMAIN}`;
+        prev.style.display = 'flex';
+    } else {
+        prev.style.display = 'none';
+    }
+}
+
+async function generateKey() {
+    const clientName = document.getElementById('clientName').value.trim();
+    const storeRef   = document.getElementById('storeRef').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'').substring(0,8);
+    const subdomain  = document.getElementById('subdomain').value.trim().toLowerCase().replace(/[^a-z0-9\-]/g,'');
+    const months     = parseInt(document.getElementById('duration').value);
+
+    if (!clientName) { alert('Ingresa el nombre del cliente.'); return; }
+
+    const storePart = storeRef ? storeRef.padEnd(8, randomChars(1)) : randomChars(8);
+    const now = new Date();
+    const monthsSinceBase = (now.getFullYear() - BASE_DATE.getFullYear()) * 12
+        + (now.getMonth() - BASE_DATE.getMonth());
+    const expireAt = monthsSinceBase + months;
+    const expCode  = monthsToCode(expireAt);
+    const hex  = await hmac256(HMAC_SECRET, `${storePart}:${expCode}`);
+    const hmac = hexToBase64Chars(hex);
+
+    const key     = `PILA-${storePart}-${expCode}-${hmac}`;
+    const storeId = `store_${storePart.toLowerCase()}`;
+    const expDate = new Date(BASE_DATE);
+    expDate.setMonth(expDate.getMonth() + expireAt);
+    const expiryStr = expDate.toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
+    const clientUrl = subdomain ? `https://${subdomain}.${DOMAIN}` : null;
+
+    // Mostrar resultado
+    document.getElementById('keyDisplay').textContent     = key;
+    document.getElementById('storeIdDisplay').textContent = storeId;
+    document.getElementById('clientDisplay').textContent  = clientName;
+    document.getElementById('expiryDisplay').textContent  = expiryStr;
+    document.getElementById('result').style.display = 'block';
+
+    // Mostrar sección Cloudflare si hay subdominio
+    if (subdomain) {
+        const url = `${subdomain}.${DOMAIN}`;
+        document.getElementById('cfCard').style.display      = 'block';
+        document.getElementById('cfUrlDisplay').textContent  = `https://${url}`;
+        document.getElementById('cfUrlFinal').textContent    = `https://${url}`;
+        document.getElementById('cfSubText').textContent     = subdomain;
+        document.getElementById('cfTunnelName').textContent  = `puntopila-${subdomain}`;
+    } else {
+        document.getElementById('cfCard').style.display = 'none';
+    }
+
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    saveHistory({ key, storeId, clientName, expiryStr, months, subdomain, clientUrl, notes: document.getElementById('notes').value.trim() });
+    renderHistory();
+    window._lastGenerated = { key, storeId, clientName, expDate: expDate.toISOString().split('T')[0], months, subdomain, clientUrl };
+}
+
+function copyKey() {
+    const key = document.getElementById('keyDisplay').textContent;
+    navigator.clipboard.writeText(key).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i> Copiar Clave';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+function copySQL() {
+    const d = window._lastGenerated;
+    if (!d) return;
+    const sql = `-- Registrar tienda en Supabase\nINSERT INTO stores (id, name, status, last_seen)\nVALUES ('${d.storeId}', '${d.clientName}', 'active', NOW())\nON CONFLICT (id) DO UPDATE SET name = '${d.clientName}', status = 'active';`;
+    navigator.clipboard.writeText(sql).then(() => alert('✅ SQL copiado al portapapeles. Pégalo en Supabase → SQL Editor.'));
+}
+
+function copyUrl() {
+    const url = document.getElementById('cfUrlDisplay').textContent;
+    navigator.clipboard.writeText(url).then(() => alert('✅ URL copiada: ' + url));
+}
+
+function copyCFInstructions() {
+    const d = window._lastGenerated;
+    if (!d || !d.subdomain) return;
+    const url = `https://${d.subdomain}.${DOMAIN}`;
+    const txt = `📌 INSTRUCCIONES CLOUDFLARE PARA: ${d.clientName}\n\n`
+        + `URL PERMANENTE DEL CLIENTE: ${url}\n`
+        + `(Esta URL nunca cambia aunque reinicien el POS)\n\n`
+        + `⚠️ ESTO LO HACE EL PROVEEDOR (tú), NO EL CLIENTE:\n\n`
+        + `1. Entra a dash.cloudflare.com → Zero Trust → Networks → Tunnels → Create a tunnel\n`
+        + `2. Selecciona "Cloudflared" → Nombre: puntopila-${d.subdomain} → Save tunnel\n`
+        + `3. Copia el TOKEN que aparece\n`
+        + `4. En "Public Hostname" pon:\n`
+        + `   Subdomain: ${d.subdomain}\n`
+        + `   Domain: puntopila.emprende.ve\n`
+        + `   Service: http://localhost:3000\n`
+        + `5. Instala el POS en la PC del cliente\n`
+        + `6. Abre Configuración en el POS → "Token Cloudflare" → pega el token → Guardar\n\n`
+        + `🔑 Clave de activación del cliente: ${d.key || document.getElementById('keyDisplay').textContent}\n`
+        + `🆔 Store ID: ${d.storeId}\n`
+        + `📅 Vence: ${document.getElementById('expiryDisplay').textContent}\n\n`
+        + `ℹ️ El cliente NO necesita cuenta de Cloudflare. Solo tú creas el túnal.`;
+    navigator.clipboard.writeText(txt).then(() => alert('✅ Instrucciones copiadas. Puedes enviárselas al cliente por WhatsApp.'));
+}
+
+// ── HISTORIAL (localStorage) ───────────────────────────────────
+function saveHistory(item) {
+    const history = JSON.parse(localStorage.getItem('pila_vendor_history') || '[]');
+    history.unshift({ ...item, createdAt: new Date().toLocaleDateString('es-VE') });
+    localStorage.setItem('pila_vendor_history', JSON.stringify(history.slice(0, 50)));
+}
+
+function renderHistory() {
+    const history = JSON.parse(localStorage.getItem('pila_vendor_history') || '[]');
+    const el = document.getElementById('historyList');
+    if (!history.length) {
+        el.innerHTML = '<div style="color:#475569; font-size:13px;">No hay claves generadas aún.</div>';
+        return;
+    }
+    el.innerHTML = history.map(h => `
+        <div class="history-item">
+            <div>
+                <div class="history-name">${h.clientName}</div>
+                <div class="history-key">${h.key}</div>
+                <div class="history-store">${h.storeId}${h.notes ? ' · ' + h.notes : ''}</div>
+                ${h.clientUrl ? `<div style="font-size:11px;color:#60a5fa;margin-top:2px;"><i class="fas fa-link"></i> ${h.clientUrl}</div>` : ''}
+                <div style="font-size:10px;color:#475569;margin-top:2px;">Generada: ${h.createdAt}</div>
+            </div>
+            <div style="text-align:right;">
+                <div class="history-exp">Vence: ${h.expiryStr}</div>
+                <button onclick="navigator.clipboard.writeText('${h.key}')" style="margin-top:6px;font-size:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 10px;color:#94a3b8;cursor:pointer;font-family:Outfit,sans-serif;">
+                    <i class="fas fa-copy"></i> Copiar clave
+                </button>
+                ${h.clientUrl ? `<br><button onclick="navigator.clipboard.writeText('${h.clientUrl}')" style="margin-top:4px;font-size:10px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:6px;padding:4px 10px;color:#60a5fa;cursor:pointer;font-family:Outfit,sans-serif;">
+                    <i class="fas fa-link"></i> Copiar URL
+                </button>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+renderHistory();
+</script>
+</body>
+</html>

@@ -2735,10 +2735,7 @@ function processPayment() {
 }
 
 // ==========================================
-// REPORTS & CHARTS
-// ==========================================
-// ==========================================
-// REPORTS & CHARTS
+// REPORTS
 // ==========================================
 
 function renderReports() {
@@ -6083,56 +6080,63 @@ function settleCredit(creditId, maxAmount) {
 // EXPENSE MANAGEMENT
 // ==========================================
 function renderExpenses() {
-    const tableBody = document.getElementById('expenses-table-body');
-    if (!tableBody) return;
-
-    tableBody.innerHTML = '';
-    expenses.forEach(exp => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="px-6 py-4 text-sm font-medium text-slate-500">${new Date(exp.date).toLocaleDateString()}</td>
-            <td class="px-6 py-4 font-bold text-slate-700">${exp.description}</td>
-            <td class="px-6 py-4 text-right font-black text-rose-500">${formatUSD(exp.amountUSD)}</td>
-            <td class="px-6 py-4 text-center">
-                <button onclick="deleteExpense('${exp.id}')" class="text-rose-400 hover:text-rose-600 transition-colors">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </td>
-        `;
-        tableBody.appendChild(row);
-    });
+    if (window.POSExtensions && POSExtensions.renderExpensesAdvanced) {
+        POSExtensions.renderExpensesAdvanced(window.expenses, 'expenses-table-body');
+    } else {
+        var tableBody = document.getElementById('expenses-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+        (window.expenses || []).forEach(function(exp) {
+            var row = document.createElement('tr');
+            row.innerHTML = [
+                '<td class="px-6 py-4 text-sm font-medium text-slate-500">', new Date(exp.date).toLocaleDateString(), '</td>',
+                '<td class="px-6 py-4 font-bold text-slate-700">', exp.description, '</td>',
+                '<td class="px-6 py-4 text-right font-black text-rose-500">', formatUSD(exp.amountUSD), '</td>',
+                '<td class="px-6 py-4 text-center">',
+                    '<button onclick="deleteExpense(\'', exp.id, '\')" class="text-rose-400 hover:text-rose-600 transition-colors">',
+                        '<i class="fas fa-trash-alt"></i>',
+                    '</button>',
+                '</td>'
+            ].join('');
+            tableBody.appendChild(row);
+        });
+    }
 }
 
 function openExpenseModal() {
-    Swal.fire({
-        title: 'Registrar Gasto',
-        html: `
-            <input id="exp-desc" class="swal2-input" placeholder="Descripción del gasto">
-            <input id="exp-amount" type="number" step="0.01" class="swal2-input" placeholder="Monto en USD">
-        `,
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: 'Guardar Gasto',
-        preConfirm: () => {
-            return {
-                description: document.getElementById('exp-desc').value,
-                amountUSD: parseFloat(document.getElementById('exp-amount').value)
+    if (window.POSExtensions && POSExtensions.openExpenseModalAdvanced) {
+        POSExtensions.openExpenseModalAdvanced();
+    } else {
+        Swal.fire({
+            title: 'Registrar Gasto',
+            html: [
+                '<input id="exp-desc" class="swal2-input" placeholder="Descripción del gasto">',
+                '<input id="exp-amount" type="number" step="0.01" class="swal2-input" placeholder="Monto en USD">'
+            ].join(''),
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar Gasto',
+            preConfirm: function() {
+                return {
+                    description: document.getElementById('exp-desc').value,
+                    amountUSD: parseFloat(document.getElementById('exp-amount').value)
+                };
             }
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const data = result.value;
-            if (!data.description || isNaN(data.amountUSD)) return Swal.fire('Error', 'Ingresa datos válidos', 'error');
-            expenses.push({ id: 'exp_' + Date.now(), date: new Date().toISOString(), ...data });
-            saveExpenses();
-            renderExpenses();
-            Swal.fire('¡Guardado!', '', 'success');
-        }
-    });
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                var data = result.value;
+                if (!data.description || isNaN(data.amountUSD)) return Swal.fire('Error', 'Ingresa datos válidos', 'error');
+                expenses.push({ id: 'exp_' + Date.now(), date: new Date().toISOString(), description: data.description, amountUSD: data.amountUSD });
+                saveExpenses();
+                renderExpenses();
+                Swal.fire('¡Guardado!', '', 'success');
+            }
+        });
+    }
 }
 
 function deleteExpense(id) {
-    expenses = expenses.filter(e => e.id !== id);
+    expenses = expenses.filter(function(e) { return e.id !== id; });
     saveExpenses();
     renderExpenses();
 }

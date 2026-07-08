@@ -13,8 +13,54 @@ dist_v40.1/
 dist_v48.1/
 build_v2/
 build_v3/
+dist_FINAL/
+dist_FIX/
+dist_NUEVO/
+dist_SOLUCION/
 *.log
 *.lnk
 .DS_Store
 Thumbs.db
 wwebjs_session/
+
+# Secrets
+.env
+.env.local
+
+# Databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Build artifacts
+*.bundle.js
+app.bundle.js
+*.exe
+cloudflared.exe
+*.asar
+*.apk
+
+# Temp / debug
+scratch/
+temp_*/
+diff_*.txt
+old_index_diff.txt
+original_index.html
+package_build.json
+check_*.js
+tmp_*.ps1
+test-*.js
+!test-discover.js
+!test-env-vars.js
+
+# Media / demos
+*.mp4
+movil-pantalla.png
+pos-pantalla.png
+
+# Other
+Pendrive/
+_features_backup/
+pos_local.db
+pos_data.db

@@ -1,0 +1,106 @@
+name: CI — Caja Fresh POS
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'Caja Fresh/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: Caja Fresh
+
+      - name: Lint
+        run: npm run lint
+        working-directory: Caja Fresh
+        continue-on-error: true  # No bloquear CI si hay warnings de lint
+
+      - name: Run tests
+        run: npm test
+        working-directory: Caja Fresh
+
+      - name: Build renderer
+        run: npm run build:renderer
+        working-directory: Caja Fresh
+
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.node-version }}
+          path: Caja Fresh/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'Caja Fresh/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: Caja Fresh
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+        working-directory: Caja Fresh
+        continue-on-error: true  # No bloquear por vulnerabilidades conocidas
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔍 Buscando secrets hardcodeados..."
+          ! grep -r "SUPABASE_KEY\|supabaseKey.*=.*eyJ" --include="*.js" --exclude-dir=node_modules --exclude-dir=.git --exclude="*.test.js" . | grep -v "process.env\|config.supabase\|settings.supabaseKey"
+        working-directory: Caja Fresh
+        continue-on-error: true
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, security-scan]
+    if: failure() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Notify failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 CI Falló en main: ${context.sha.slice(0, 7)}`,
+              body: `## Fallo en CI
+
+            El pipeline de CI falló en el commit ${context.sha}.
+
+            [Ver detalles](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+
+            ### Job fallido:
+            ${context.job}`,
+              labels: ['ci-failure'],
+            });

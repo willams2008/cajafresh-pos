@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.trycloudflare.perspectives_frame_sequence_assumption.twa",
+        "sha256_cert_fingerprints": ["C4:54:99:E2:BF:13:C1:3B:2D:00:0A:DC:17:EE:74:3D:F7:E4:F9:F8:F0:61:48:DA:B8:F5:9E:75:09:03:AA:36"]
+      }
+    }]

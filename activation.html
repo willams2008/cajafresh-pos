@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto Pila POS — Activación</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0b0f1a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            position: relative;
+            padding: 40px 20px;
+        }
+
+        /* ── Fondo animado ─────────────────────────────── */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.25;
+            pointer-events: none;
+            animation: float 8s ease-in-out infinite;
+        }
+        .bg-orb-1 { width: 400px; height: 400px; background: #3b82f6; top: -100px; left: -100px; animation-delay: 0s; }
+        .bg-orb-2 { width: 300px; height: 300px; background: #8b5cf6; bottom: -80px; right: -80px; animation-delay: 3s; }
+        .bg-orb-3 { width: 200px; height: 200px; background: #10b981; top: 50%; left: 50%; animation-delay: 6s; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-20px) scale(1.05); }
+        }
+
+        /* ── Tarjeta principal ─────────────────────────── */
+        .card {
+            position: relative;
+            z-index: 10;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 28px;
+            padding: 48px 52px;
+            width: 520px;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+        }
+
+        /* Logo */
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 36px;
+        }
+        .logo-icon {
+            width: 52px; height: 52px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; color: white;
+            box-shadow: 0 8px 24px rgba(59,130,246,0.4);
+        }
+        .logo-text h1 { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px; }
+        .logo-text p { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Título */
+        .heading { margin-bottom: 8px; font-size: 26px; font-weight: 800; color: white; }
+        .subheading { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 32px; line-height: 1.6; }
+
+        /* Campo de licencia */
+        .input-label {
+            font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4);
+            text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;
+        }
+        .input-wrap { position: relative; margin-bottom: 16px; }
+        .input-wrap i {
+            position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+            color: rgba(255,255,255,0.25); font-size: 14px;
+        }
+        input#licenseKey {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 16px 18px 16px 46px;
+            font-family: 'Outfit', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 2px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        input#licenseKey::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 1px; font-weight: 400; }
+        input#licenseKey:focus {
+            border-color: #3b82f6;
+            background: rgba(59,130,246,0.08);
+            box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+        }
+        input#licenseKey.valid {
+            border-color: #10b981;
+            background: rgba(16,185,129,0.08);
+            box-shadow: 0 0 0 4px rgba(16,185,129,0.10);
+        }
+        input#licenseKey.invalid {
+            border-color: #ef4444;
+            background: rgba(239,68,68,0.06);
+        }
+        .key-status {
+            font-size: 11px; font-weight: 700;
+            margin-top: 6px; height: 16px;
+            transition: color 0.2s;
+        }
+        .key-status.valid  { color: #34d399; }
+        .key-status.invalid { color: #f87171; }
+        .key-status.neutral { color: transparent; }
+
+        /* Campo nombre de tienda */
+        input#storeName {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 16px 18px 16px 46px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: white;
+            outline: none;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+        input#storeName::placeholder { color: rgba(255,255,255,0.2); font-weight: 400; }
+        input#storeName:focus {
+            border-color: #3b82f6;
+            background: rgba(59,130,246,0.08);
+            box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+        }
+
+        /* Botón activar */
+        button#activateBtn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border: none;
+            border-radius: 14px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 800;
+            color: white;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 8px 24px rgba(59,130,246,0.35);
+            margin-top: 8px;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        button#activateBtn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(59,130,246,0.45); }
+        button#activateBtn:active:not(:disabled) { transform: scale(0.98); }
+        button#activateBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Mensajes de error/éxito */
+        #message {
+            margin-top: 16px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none;
+            gap: 10px;
+            align-items: center;
+        }
+        #message.error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2); color: #f87171; display: flex; }
+        #message.success { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.2); color: #34d399; display: flex; }
+        #message.warning { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.2); color: #fbbf24; display: flex; }
+
+        /* Machine ID */
+        .machine-id-box {
+            margin-top: 24px;
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+        }
+        .machine-id-box p:first-child { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+        .machine-id-box p:last-child { font-size: 12px; font-family: monospace; color: rgba(255,255,255,0.5); word-break: break-all; }
+
+        /* Footer */
+        .footer { margin-top: 28px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.2); }
+        .footer a { color: rgba(255,255,255,0.35); text-decoration: none; }
+        .footer a:hover { color: white; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fa-spin-custom { animation: spin 0.8s linear infinite; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+
+    <div class="card">
+        <div class="logo">
+            <div class="logo-icon"><i class="fas fa-cash-register"></i></div>
+            <div class="logo-text">
+                <h1>Punto Pila</h1>
+                <p>Sistema Inteligente POS</p>
+            </div>
+        </div>
+
+        <h2 class="heading">Activa tu licencia</h2>
+        <p class="subheading">Ingresa la clave de activación que te proporcionó tu proveedor. La licencia quedará vinculada a este equipo.</p>
+
+        <div class="input-label">Nombre de tu Tienda o Negocio</div>
+        <div class="input-wrap">
+            <i class="fas fa-store"></i>
+            <input id="storeName" type="text" placeholder="Ej: Bodega La Catia, Licores El Palmar..." maxlength="40" autocomplete="off">
+        </div>
+
+        <div class="input-label" style="margin-top:16px;">Clave de Activación</div>
+        <div class="input-wrap">
+            <i class="fas fa-key"></i>
+            <input id="licenseKey" type="text" placeholder="PILA-XXXXXXXX-XX-XXXXXXXX" maxlength="28" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="keyStatus" class="key-status neutral">&nbsp;</div>
+
+        <button id="activateBtn" onclick="activar()">
+            <i class="fas fa-unlock-alt"></i>
+            Activar Sistema
+        </button>
+
+        <div id="message"></div>
+
+        <div class="machine-id-box">
+            <p>ID de este equipo (para soporte)</p>
+            <p id="machineIdDisplay">Cargando...</p>
+        </div>
+
+        <div class="footer">
+            ¿Problemas con tu clave? Contacta a <a href="#">tu proveedor de Punto Pila</a>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar Machine ID via contextBridge (seguro)
+        window.electronAPI.getMachineId().then(id => {
+            document.getElementById('machineIdDisplay').textContent = id || 'No disponible';
+        }).catch(() => {
+            document.getElementById('machineIdDisplay').textContent = 'Error al obtener ID';
+        });
+
+        // ── Validación LOCAL en tiempo real mientras se escribe ──
+        const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const BASE_DATE = new Date('2025-01-01T00:00:00Z');
+        const HMAC_SECRET = 'cajafresh_puntopila_vendor_2025_x9z';
+
+        // Implementación simple de HMAC-SHA256 en browser (Web Crypto API)
+        async function hmac256(secret, message) {
+            const enc = new TextEncoder();
+            const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+            return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,'0')).join('');
+        }
+
+        function hexToBase64Chars(hex) {
+            // Convertir hex a base64 y luego filtrar a chars válidos (mismo proceso que Node)
+            const bytes = hex.match(/.{2}/g).map(h => parseInt(h,16));
+            const b64 = btoa(String.fromCharCode(...bytes));
+            return b64.replace(/[^A-Z0-9]/gi, '').toUpperCase().substring(0, 8);
+        }
+
+        function codeToMonths(code) {
+            const c1 = CHARS.indexOf(code[0]?.toUpperCase());
+            const c2 = CHARS.indexOf(code[1]?.toUpperCase());
+            if (c1 < 0 || c2 < 0) return null;
+            return c1 * CHARS.length + c2;
+        }
+
+        async function validateKeyClient(key) {
+            const clean = key.trim().toUpperCase().replace(/\s/g, '');
+            
+            // Permitir claves maestras/legacy (FRESH-)
+            if (clean.startsWith('FRESH-') || clean === 'TRIAL-30-DAYS') {
+                return { valid: true, expiry: null, storeId: null, isLegacy: true };
+            }
+
+            const parts = clean.split('-');
+            if (parts.length !== 4 || parts[0] !== 'PILA') return { valid: false, reason: 'formato' };
+            const [, storePart, expCode, providedHmac] = parts;
+            if (storePart.length !== 8 || expCode.length !== 2 || providedHmac.length !== 8) return { valid: false, reason: 'formato' };
+            const hex = await hmac256(HMAC_SECRET, `${storePart}:${expCode}`);
+            const expectedHmac = hexToBase64Chars(hex);
+            if (providedHmac !== expectedHmac) return { valid: false, reason: 'invalida' };
+            const months = codeToMonths(expCode);
+            if (months === null) return { valid: false, reason: 'vencimiento' };
+            const expiry = new Date(BASE_DATE);
+            expiry.setMonth(expiry.getMonth() + months);
+            if (expiry <= new Date()) return { valid: false, reason: 'vencida', expiry };
+            return { valid: true, expiry, storeId: `store_${storePart.toLowerCase()}` };
+        }
+
+        // Formatear y validar la clave mientras se escribe
+        document.getElementById('licenseKey').addEventListener('input', async (e) => {
+            let val = e.target.value.replace(/[^A-Z0-9\-]/gi, '').toUpperCase();
+            e.target.value = val;
+            const statusEl = document.getElementById('keyStatus');
+            const input = e.target;
+
+            // Solo validar si tiene la longitud completa
+            if (val.length < 22) {
+                input.className = '';
+                statusEl.textContent = '\u00a0';
+                statusEl.className = 'key-status neutral';
+                return;
+            }
+
+            const result = await validateKeyClient(val);
+            if (result.valid) {
+                input.className = 'valid';
+                if (result.isLegacy) {
+                    statusEl.textContent = `\u2705 Licencia Maestra detectada \u2014 Activaci\u00f3n instant\u00e1nea`;
+                } else {
+                    const exp = result.expiry.toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
+                    statusEl.textContent = `\u2705 Clave v\u00e1lida \u2014 Vence el ${exp}`;
+                }
+                statusEl.className = 'key-status valid';
+            } else if (result.reason === 'vencida') {
+                input.className = 'invalid';
+                statusEl.textContent = '\u26a0\ufe0f Esta clave ya venci\u00f3. Contacta a tu proveedor.';
+                statusEl.className = 'key-status invalid';
+            } else if (result.reason === 'formato') {
+                input.className = '';
+                statusEl.textContent = '\u00a0';
+                statusEl.className = 'key-status neutral';
+            } else {
+                input.className = 'invalid';
+                statusEl.textContent = '\u274c Clave inv\u00e1lida. Verifica que est\u00e9 escrita correctamente.';
+                statusEl.className = 'key-status invalid';
+            }
+        });
+
+        async function activar() {
+            const key = document.getElementById('licenseKey').value.trim();
+            const storeName = document.getElementById('storeName').value.trim();
+            const btn = document.getElementById('activateBtn');
+            const msg = document.getElementById('message');
+
+            if (!storeName) {
+                showMsg('Por favor ingresa el nombre de tu negocio.', 'error');
+                document.getElementById('storeName').focus();
+                return;
+            }
+
+            if (!key || key.length < 22) {
+                showMsg('Ingresa una clave de activación válida.', 'error');
+                return;
+            }
+
+            // Verificar localmente antes de enviar
+            const localCheck = await validateKeyClient(key);
+            if (!localCheck.valid) {
+                const msgs = {
+                    'invalida': 'Clave inválida. Verifica que esté escrita correctamente.',
+                    'vencida': 'Esta clave ya venció. Contacta a tu proveedor.',
+                    'vencimiento': 'Error en la clave (vencimiento). Contacta soporte.',
+                };
+                showMsg(msgs[localCheck.reason] || 'Clave no válida.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin-custom"></i> Activando sistema...';
+            msg.className = '';
+            msg.style.display = 'none';
+
+            try {
+                const result = await window.electronAPI.activateLicense(key, storeName);
+                showMsg(`✅ ¡Activación exitosa! Bienvenido, ${storeName}. Iniciando sistema...`, 'success');
+
+                setTimeout(() => {
+                    window.electronAPI.licenseActivated();
+                }, 1800);
+
+            } catch (err) {
+                const errores = {
+                    'SIN_INTERNET': 'No hay conexión a internet. La clave ya fue validada localmente, intenta de nuevo.',
+                    'REVOKED': 'Esta licencia ha sido suspendida. Contacta a tu proveedor.',
+                    'EXPIRED': 'Esta licencia ha vencido. Contacta a tu proveedor para renovarla.',
+                    'MACHINE_MISMATCH': 'Esta clave ya está activada en otro equipo.',
+                };
+                const errMsg = errores[err.message] || `Error: ${err.message}`;
+                showMsg(errMsg, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-unlock-alt"></i> Activar Sistema';
+            }
+        }
+
+        function showMsg(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = type;
+            msg.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

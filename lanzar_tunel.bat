@@ -1,0 +1,6 @@
+@echo off
+cd /d "%~dp0"
+echo [TUNNEL] Matando procesos viejos...
+taskkill /F /IM cloudflared.exe >nul 2>&1
+echo [TUNNEL] Iniciando Cloudflare para Punto Pila...
+.\cloudflared.exe tunnel --url http://localhost:3000 run --token %1

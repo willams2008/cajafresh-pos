@@ -117,7 +117,30 @@ window.POS = window.POS || {};
 
     /**
      * Registra atajos de teclado adicionales a los existentes.
+     * Ctrl+F → Buscar producto, F12 → Abrir checkout.
      */
+    function registerShortcuts() {
+        if (shortcutsRegistered) return;
+        document.addEventListener('keydown', function(e) {
+            var viewPos = document.getElementById('view-pos');
+            if (!viewPos || viewPos.classList.contains('hidden')) return;
+
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                var searchInput = document.getElementById('search-product');
+                if (searchInput) { searchInput.focus(); searchInput.select(); }
+                return;
+            }
+
+            if (e.key === 'F12') {
+                e.preventDefault();
+                var checkoutBtn = document.getElementById('show-checkout-btn');
+                if (checkoutBtn && !checkoutBtn.disabled) checkoutBtn.click();
+                return;
+            }
+        });
+        shortcutsRegistered = true;
+    }
 
 
     // ── Inicialización ──
@@ -142,6 +165,9 @@ window.POS = window.POS || {};
         setTimeout(function() {
             NS.restoreCart();
         }, 1000);
+
+        // Registrar atajos de teclado
+        registerShortcuts();
 
         console.log('[POS Module] Inicializado. Atajos, cart persistente y namespace listos.');
     };

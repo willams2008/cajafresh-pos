@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Remoto — POS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Inter',sans-serif; background:#0f172a; color:#e2e8f0; min-height:100vh; }
+        
+        .container { max-width:480px; margin:0 auto; padding:16px; }
+        
+        /* Header */
+        .header { text-align:center; padding:24px 0 16px; }
+        .header h1 { font-size:20px; font-weight:900; letter-spacing:-0.5px; }
+        .header h1 span { color:#3b82f6; }
+        .header .badge { display:inline-block; margin-top:6px; padding:3px 10px; background:#1e293b; border:1px solid #334155; border-radius:20px; font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1.5px; }
+        .header .live-dot { display:inline-block; width:6px; height:6px; background:#22c55e; border-radius:50%; margin-right:4px; animation:pulse 2s infinite; }
+        
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+        
+        /* Cards */
+        .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+        .kpi { background:#1e293b; border:1px solid #334155; border-radius:16px; padding:16px; position:relative; overflow:hidden; }
+        .kpi.highlight { background:linear-gradient(135deg,#1e3a5f,#1e293b); border-color:#3b82f6; }
+        .kpi.profit { background:linear-gradient(135deg,#064e3b,#1e293b); border-color:#10b981; }
+        .kpi .label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:1.5px; color:#64748b; margin-bottom:4px; }
+        .kpi .value { font-size:22px; font-weight:900; color:#f1f5f9; line-height:1.1; }
+        .kpi .sub { font-size:10px; font-weight:600; color:#475569; margin-top:4px; }
+        .kpi.highlight .value { color:#60a5fa; }
+        .kpi.profit .value { color:#34d399; }
+        
+        /* Section */
+        .section { background:#1e293b; border:1px solid #334155; border-radius:16px; margin-bottom:12px; overflow:hidden; }
+        .section-header { padding:14px 16px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:8px; }
+        .section-header i { color:#3b82f6; font-size:12px; }
+        .section-header h3 { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; }
+        
+        /* Sales list */
+        .sale-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #1e293b; }
+        .sale-row:last-child { border-bottom:none; }
+        .sale-row:nth-child(odd) { background:#1a2536; }
+        .sale-info { flex:1; }
+        .sale-ticket { font-size:12px; font-weight:800; color:#e2e8f0; }
+        .sale-meta { font-size:10px; color:#64748b; font-weight:600; margin-top:2px; }
+        .sale-amount { font-size:14px; font-weight:900; color:#f1f5f9; text-align:right; }
+        .sale-method { font-size:9px; font-weight:700; padding:2px 8px; border-radius:8px; display:inline-block; margin-top:2px; }
+        .method-cash-usd { background:#064e3b; color:#34d399; }
+        .method-cash-ves { background:#1e3a5f; color:#60a5fa; }
+        .method-card-ves { background:#312e81; color:#a78bfa; }
+        
+        /* Alerts */
+        .alert-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid #1e293b; }
+        .alert-item:last-child { border-bottom:none; }
+        .alert-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .alert-dot.warning { background:#f59e0b; }
+        .alert-dot.danger { background:#ef4444; animation:pulse 1.5s infinite; }
+        .alert-text { font-size:11px; font-weight:600; color:#cbd5e1; flex:1; }
+        .alert-count { font-size:10px; font-weight:800; color:#64748b; }
+        
+        /* Empty state */
+        .empty { text-align:center; padding:24px; color:#475569; font-size:11px; font-weight:600; font-style:italic; }
+        
+        /* Footer */
+        .footer { text-align:center; padding:20px; color:#334155; font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+        
+        /* Refresh animation */
+        .refreshing { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .refresh-btn { position:fixed; bottom:20px; right:20px; width:48px; height:48px; background:#3b82f6; color:white; border:none; border-radius:50%; font-size:18px; cursor:pointer; box-shadow:0 4px 20px rgba(59,130,246,0.4); z-index:10; }
+        
+        /* Last update */
+        .last-update { text-align:center; font-size:9px; color:#475569; font-weight:600; padding:8px 0 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="dash-company">Caja <span>Fresh</span></h1>
+            <div class="badge"><span class="live-dot"></span> Dashboard en Vivo</div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div class="kpi highlight">
+                <div class="label">Ventas Hoy</div>
+                <div class="value" id="d-total-ves">Bs 0</div>
+                <div class="sub" id="d-total-usd">$0.00 USD</div>
+            </div>
+            <div class="kpi profit">
+                <div class="label">Tickets</div>
+                <div class="value" id="d-tickets">0</div>
+                <div class="sub" id="d-items">0 artículos</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Productos</div>
+                <div class="value" id="d-products">0</div>
+                <div class="sub">en inventario</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Tasa</div>
+                <div class="value" id="d-rate">0</div>
+                <div class="sub">Bs/USD</div>
+            </div>
+        </div>
+
+        <!-- Últimas Ventas -->
+        <div class="section">
+            <div class="section-header">
+                <i class="fas fa-receipt"></i>
+                <h3>Últimas Ventas</h3>
+            </div>
+            <div id="d-sales-list">
+                <div class="empty">Esperando datos del POS...</div>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div class="section">
+            <div class="section-header">
+                <i class="fas fa-bell"></i>
+                <h3>Alertas de Inventario</h3>
+            </div>
+            <div id="d-alerts-list">
+                <div class="empty">Sin alertas</div>
+            </div>
+        </div>
+
+        <div class="last-update">Última actualización: <span id="d-last-update">--</span></div>
+        <div class="footer">Powered by Caja Fresh POS</div>
+    </div>
+
+    <button class="refresh-btn" onclick="fetchData()" title="Actualizar"><i class="fas fa-sync-alt" id="refresh-icon"></i></button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const methodLabels = {
+            'cash-usd': ['Efec $', 'method-cash-usd'],
+            'cash-ves': ['Efec Bs', 'method-cash-ves'],
+            'card-ves': ['Punto', 'method-card-ves']
+        };
+
+        function formatVES(n) { return 'Bs ' + Math.round(n).toLocaleString('es-VE'); }
+        function formatUSD(n) { return '$' + Number(n).toFixed(2); }
+
+        function renderDashboard(data) {
+            if (!data) return;
+            
+            // Company name
+            const compEl = document.getElementById('dash-company');
+            if (data.companyName && compEl) {
+                const words = data.companyName.split(' ');
+                compEl.innerHTML = words.length > 1 
+                    ? `${words[0]} <span>${words.slice(1).join(' ')}</span>` 
+                    : `<span>${data.companyName}</span>`;
+            }
+            
+            // KPIs
+            document.getElementById('d-total-ves').textContent = formatVES(data.today?.totalVES || 0);
+            document.getElementById('d-total-usd').textContent = formatUSD(data.today?.totalUSD || 0) + ' USD';
+            document.getElementById('d-tickets').textContent = data.today?.tickets || 0;
+            document.getElementById('d-items').textContent = (data.today?.items || 0) + ' artículos';
+            document.getElementById('d-products').textContent = data.inventory?.total || 0;
+            document.getElementById('d-rate').textContent = (data.exchangeRate || 0).toFixed(2);
+            
+            // Sales
+            const salesEl = document.getElementById('d-sales-list');
+            if (data.recentSales?.length > 0) {
+                salesEl.innerHTML = data.recentSales.map(s => {
+                    const [label, cls] = methodLabels[s.method] || ['Otro', ''];
+                    return `<div class="sale-row">
+                        <div class="sale-info">
+                            <div class="sale-ticket">#${s.ticket} — ${s.client}</div>
+                            <div class="sale-meta">${s.time} · <span class="sale-method ${cls}">${label}</span></div>
+                        </div>
+                        <div class="sale-amount">${formatVES(s.totalVES)}</div>
+                    </div>`;
+                }).join('');
+            } else {
+                salesEl.innerHTML = '<div class="empty">No hay ventas registradas hoy</div>';
+            }
+            
+            // Alerts
+            const alertsEl = document.getElementById('d-alerts-list');
+            let alertsHTML = '';
+            
+            if (data.alerts?.outOfStock?.length > 0) {
+                data.alerts.outOfStock.forEach(p => {
+                    alertsHTML += `<div class="alert-item"><div class="alert-dot danger"></div><div class="alert-text">${p.name}</div><div class="alert-count">AGOTADO</div></div>`;
+                });
+            }
+            if (data.alerts?.lowStock?.length > 0) {
+                data.alerts.lowStock.forEach(p => {
+                    alertsHTML += `<div class="alert-item"><div class="alert-dot warning"></div><div class="alert-text">${p.name}</div><div class="alert-count">${p.stock} uds</div></div>`;
+                });
+            }
+            
+            alertsEl.innerHTML = alertsHTML || '<div class="empty">Sin alertas de inventario</div>';
+            
+            // Timestamp
+            document.getElementById('d-last-update').textContent = new Date().toLocaleTimeString('es-VE');
+        }
+
+        // Fetch via HTTP fallback
+        async function fetchData() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('refreshing');
+            try {
+                const res = await fetch('/api/dashboard-data');
+                const data = await res.json();
+                renderDashboard(data);
+            } catch(e) { console.log('Fetch failed, waiting for socket...'); }
+            setTimeout(() => icon.classList.remove('refreshing'), 800);
+        }
+
+        // Socket.io real-time
+        try {
+            const socket = io();
+            socket.on('dashboard-update', (data) => renderDashboard(data));
+            socket.on('connect', () => console.log('Dashboard conectado en vivo'));
+        } catch(e) { console.log('Socket.io no disponible'); }
+
+        // Initial load + auto-refresh
+        fetchData();
+        setInterval(fetchData, 30000);
+    </script>
+</body>
+</html>
