@@ -29,6 +29,9 @@ export const state = {
         analytics: false,
         server: false,
     },
+    // Provisionar - Materia prima, CAD, cortes
+    provisionarMateriales: [],
+    provisionarCotizaciones: [],
 };
 
 /** Carga inicial desde localStorage */

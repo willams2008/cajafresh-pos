@@ -228,7 +228,7 @@
     <!-- Sidebar Navigation -->
     <aside
         id="main-sidebar"
-        class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between z-20 shadow-sm relative shrink-0 h-full initial-hidden">
+        class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm relative shrink-0 h-full overflow-hidden initial-hidden">
         <div class="flex-1 overflow-y-auto custom-scrollbar">
             <div
                 class="h-16 flex items-center justify-center lg:justify-start lg:px-5 border-b border-slate-100 sticky top-0 bg-white z-10">
@@ -364,6 +364,11 @@
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-box-open text-lg"></i></div>
                         <span class="hidden lg:block font-semibold text-sm truncate">Inventario</span>
+                    </a>
+                    <a href="#" id="nav-provisionar"
+                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-all cursor-pointer">
+                        <div class="w-8 flex justify-center shrink-0"><i class="fas fa-cubes text-lg"></i></div>
+                        <span class="hidden lg:block font-semibold text-sm truncate">Provisionar</span>
                     </a>
                     <a href="#" id="nav-audit"
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer">
@@ -768,6 +773,367 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- === VISTA PROVISIONAR (Cortador Láser / Materia Prima) === -->
+        <section id="view-provisionar"
+            class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm shrink-0 border-b border-slate-200 flex flex-col gap-4 sticky top-0 z-10">
+                <div class="flex justify-between items-center w-full">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800"><i class="fas fa-cubes text-amber-500 mr-2"></i>Provisionar</h2>
+                        <p class="text-sm text-slate-500 mt-1">Materia prima, carga de planos CAD, optimización de cortes y costeo</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span id="provisionar-dirty-indicator" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-black uppercase border border-amber-100 hidden"><i class="fas fa-pen-to-square mr-1"></i> Sin guardar</span>
+                    </div>
+                </div>
+                <!-- Tabs -->
+                <div class="flex gap-6 mt-2" id="provisionar-tabs">
+                    <button onclick="window.Provisionar.switchTab('materiales')" id="provisionar-tab-materiales" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-amber-600 text-amber-600 transition-colors uppercase tracking-wider">
+                        <i class="fas fa-database mr-2"></i>Materia Prima
+                    </button>
+                    <button onclick="window.Provisionar.switchTab('cad')" id="provisionar-tab-cad" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                        <i class="fas fa-draw-polygon mr-2"></i>Carga CAD
+                    </button>
+                    <button onclick="window.Provisionar.switchTab('cortes')" id="provisionar-tab-cortes" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                        <i class="fas fa-scissors mr-2"></i>Optimizar Cortes
+                    </button>
+                    <button onclick="window.Provisionar.switchTab('costos')" id="provisionar-tab-costos" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                        <i class="fas fa-file-invoice-dollar mr-2"></i>Costeo y Cotización
+                    </button>
+                </div>
+            </header>
+
+            <div class="p-6 flex-1 space-y-6">
+
+                <!-- ========== TAB: MATERIA PRIMA ========== -->
+                <div id="provisionar-content-materiales" class="provisionar-tab-content">
+                    <!-- Header actions -->
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-slate-700 flex items-center"><i class="fas fa-cubes text-amber-500 mr-2"></i> Inventario de Materia Prima</h3>
+                        <button onclick="window.Provisionar.abrirModalNuevoMaterial()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Nuevo Material
+                        </button>
+                    </div>
+
+                    <!-- Tabla de Materiales -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[900px]">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200">
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Material</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Propiedades</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Longitud (m)</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Ancho (m)</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Espesor (mm)</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Costo x m²</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">Stock</th>
+                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm divide-y divide-slate-100" id="materiales-table-body">
+                                    <tr id="materiales-empty-row">
+                                        <td colspan="8" class="py-12 text-center text-slate-400">
+                                            <i class="fas fa-box-open text-3xl mb-2 block"></i>
+                                            <p class="font-medium">No hay materiales registrados</p>
+                                            <p class="text-xs">Agrega materia prima para empezar a cotizar</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== TAB: CARGA CAD ========== -->
+                <div id="provisionar-content-cad" class="provisionar-tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Drop Zone -->
+                        <div>
+                            <div id="cad-dropzone"
+                                class="border-4 border-dashed border-slate-200 rounded-[40px] p-12 text-center hover:border-amber-400 hover:bg-amber-50/30 transition-all cursor-pointer group/drop relative overflow-hidden">
+                                <input type="file" id="cad-file-input" class="hidden" accept=".dxf,.dwg,.pdf,.svg,.step,.stp,.sldprt,.sldasm,.stl">
+                                <div class="relative z-10">
+                                    <div class="w-24 h-24 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover/drop:scale-110 group-hover/drop:rotate-6 transition-all duration-500">
+                                        <i class="fas fa-draw-polygon text-4xl"></i>
+                                    </div>
+                                    <h3 class="text-xl font-black text-slate-800 mb-2">Subir archivo CAD</h3>
+                                    <p class="text-slate-500 font-medium">DXF, DWG, SVG, STEP, SLDPRT, PDF</p>
+                                    <p class="text-xs text-slate-400 mt-2">Arrastra o haz clic para seleccionar</p>
+                                </div>
+                            </div>
+                            <!-- Info del archivo cargado -->
+                            <div id="cad-file-info" class="hidden mt-4 bg-white rounded-2xl border border-slate-200 p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                                            <i class="fas fa-file-circle-check text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-bold text-slate-700" id="cad-filename">archivo.dxf</p>
+                                            <p class="text-xs text-slate-400" id="cad-filesize">0 KB</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="window.Provisionar.removerArchivoCAD()" class="text-rose-400 hover:text-rose-600 p-2">
+                                        <i class="fas fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview Panel -->
+                        <div>
+                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden h-full flex flex-col">
+                                <div class="bg-slate-800 px-4 py-3 flex items-center justify-between">
+                                    <h4 class="text-sm font-bold text-white flex items-center"><i class="fas fa-eye mr-2 text-amber-400"></i> Previsualización</h4>
+                                    <span id="cad-entities-count" class="text-xs text-slate-400 font-mono">0 entidades</span>
+                                </div>
+                                <div id="cad-preview-canvas" class="flex-1 bg-slate-900 min-h-[300px] flex items-center justify-center relative">
+                                    <canvas id="cad-canvas" class="w-full h-full absolute inset-0"></canvas>
+                                    <div id="cad-preview-placeholder" class="text-slate-600 text-center">
+                                        <i class="fas fa-image text-4xl mb-2 block"></i>
+                                        <p class="text-sm">Vista previa del plano</p>
+                                        <p class="text-xs">Carga un archivo CAD para visualizar</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Materiales detectados en el CAD -->
+                    <div id="cad-materials-section" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden mt-6">
+                        <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                            <h4 class="text-sm font-bold text-slate-700"><i class="fas fa-list-check mr-2 text-amber-500"></i> Materiales identificados en el plano</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[600px]">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200">
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Seleccionar</th>
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Pieza</th>
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Largo (mm)</th>
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Ancho (mm)</th>
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Cantidad</th>
+                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Material asignado</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm divide-y divide-slate-100" id="cad-pieces-table-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== TAB: OPTIMIZAR CORTES ========== -->
+                <div id="provisionar-content-cortes" class="provisionar-tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Configuración -->
+                        <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <h4 class="text-sm font-bold text-slate-700 flex items-center"><i class="fas fa-sliders mr-2 text-amber-500"></i> Configuración de Corte</h4>
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Material a usar</label>
+                                <select id="opt-material-select" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                    <option value="">-- Seleccionar material --</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Plancha / Lámina disponible</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 font-medium">Largo (mm)</label>
+                                        <input type="number" id="opt-lamina-largo" value="2440" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-400 font-medium">Ancho (mm)</label>
+                                        <input type="number" id="opt-lamina-ancho" value="1220" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Grosor de corte (mm)</label>
+                                <input type="number" id="opt-kerf" value="0.15" step="0.01" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Costo operativo por hora ($)</label>
+                                <input type="number" id="opt-costo-hora" value="15" step="0.5" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                            </div>
+
+                            <button onclick="window.Provisionar.optimizarCortes()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                                <i class="fas fa-calculator"></i> Calcular Optimización
+                            </button>
+                        </div>
+
+                        <!-- Resultados -->
+                        <div class="lg:col-span-2 space-y-4">
+                            <!-- Resumen -->
+                            <div id="opt-resumen" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Piezas a cortar</p>
+                                    <p class="text-2xl font-black text-slate-800" id="opt-total-piezas">0</p>
+                                </div>
+                                <div class="bg-white rounded-xl border border-slate-200 p-4">
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Planchas necesarias</p>
+                                    <p class="text-2xl font-black text-slate-800" id="opt-planchas-necesarias">0</p>
+                                </div>
+                                <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
+                                    <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Material usado</p>
+                                    <p class="text-2xl font-black text-emerald-700" id="opt-uso-pct">0%</p>
+                                </div>
+                                <div class="bg-rose-50 rounded-xl border border-rose-100 p-4">
+                                    <p class="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Desperdicio</p>
+                                    <p class="text-2xl font-black text-rose-700" id="opt-desperdicio-pct">0%</p>
+                                </div>
+                            </div>
+
+                            <!-- Layout de corte -->
+                            <div id="opt-layout-container" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                <div class="bg-slate-800 px-6 py-3 flex items-center justify-between">
+                                    <h4 class="text-sm font-bold text-white">Layout de Corte</h4>
+                                    <span class="text-xs text-amber-400 font-mono">Distribución óptima</span>
+                                </div>
+                                <div class="p-4 bg-slate-900 min-h-[300px] relative" id="opt-layout-canvas-wrapper">
+                                    <canvas id="opt-canvas" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Tabla de cortes -->
+                            <div id="opt-resultados-tabla" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                <div class="bg-slate-50 border-b border-slate-200 px-6 py-3">
+                                    <h4 class="text-sm font-bold text-slate-700">Detalle de cortes por plancha</h4>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse min-w-[500px]">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-200">
+                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Plancha #</th>
+                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Área total (mm²)</th>
+                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Área usada (mm²)</th>
+                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Desperdicio (mm²)</th>
+                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">% Uso</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-sm divide-y divide-slate-100" id="opt-planchas-table-body">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== TAB: COSTEO Y COTIZACIÓN ========== -->
+                <div id="provisionar-content-costos" class="provisionar-tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <!-- Config costos -->
+                        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <h4 class="text-sm font-bold text-slate-700 flex items-center"><i class="fas fa-file-invoice-dollar mr-2 text-emerald-500"></i> Parámetros de Costeo</h4>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Resultados de optimización</label>
+                                <div id="costeo-resumen-material" class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                    <p class="text-xs text-slate-500">Ejecuta primero la optimización de cortes</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Costo material (por plancha)</label>
+                                <input type="number" id="costeo-costo-plancha" step="0.01" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="0.00">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Costo de corte total ($)</label>
+                                <input type="number" id="costeo-costo-corte" step="0.01" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="0.00" readonly>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Margen de Ganancia (%)</label>
+                                <div class="flex gap-2 items-center">
+                                    <input type="range" id="costeo-margen" min="0" max="200" value="30" step="5" class="flex-1 accent-amber-500" oninput="window.Provisionar.actualizarCotizacion()">
+                                    <span id="costeo-margen-label" class="text-sm font-black text-slate-700 min-w-[50px] text-right">30%</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Gastos adicionales ($)</label>
+                                <input type="number" id="costeo-gastos-adicionales" value="0" step="0.01" oninput="window.Provisionar.actualizarCotizacion()" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                            </div>
+
+                            <button onclick="window.Provisionar.actualizarCotizacion()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                                <i class="fas fa-calculator"></i> Recalcular Costos
+                            </button>
+                        </div>
+
+                        <!-- Cotización final -->
+                        <div class="lg:col-span-3 space-y-4">
+                            <div id="costeo-tarjeta" class="hidden bg-white rounded-2xl border-2 border-emerald-200 overflow-hidden shadow-xl">
+                                <div class="bg-emerald-600 px-6 py-4">
+                                    <h4 class="text-lg font-black text-white flex items-center">
+                                        <i class="fas fa-file-invoice mr-2"></i> Cotización Final
+                                    </h4>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Costo Material</p>
+                                            <p class="text-xl font-black text-slate-800" id="costeo-total-material">$0.00</p>
+                                        </div>
+                                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Costo Corte</p>
+                                            <p class="text-xl font-black text-slate-800" id="costeo-total-corte">$0.00</p>
+                                        </div>
+                                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gastos Adicionales</p>
+                                            <p class="text-xl font-black text-slate-800" id="costeo-total-adicionales">$0.00</p>
+                                        </div>
+                                        <div class="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                                            <p class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Costo Total Producción</p>
+                                            <p class="text-xl font-black text-amber-700" id="costeo-total-produccion">$0.00</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="border-t border-slate-200 pt-4">
+                                        <div class="flex justify-between items-end">
+                                            <div>
+                                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Margen Aplicado</p>
+                                                <p class="text-lg font-black text-emerald-600" id="costeo-margen-aplicado">30%</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Ganancia Estimada</p>
+                                                <p class="text-lg font-black text-emerald-600" id="costeo-ganancia-estimada">$0.00</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">PRECIO DE VENTA SUGERIDO</p>
+                                                <p class="text-3xl font-black text-slate-900" id="costeo-precio-venta">$0.00</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="border-t border-slate-200 pt-4 flex gap-3">
+                                        <button onclick="window.Provisionar.guardarCotizacion()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                                            <i class="fas fa-floppy-disk"></i> Guardar Cotización
+                                        </button>
+                                        <button onclick="window.Provisionar.imprimirCotizacion()" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                                            <i class="fas fa-print"></i> Imprimir
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="costeo-placeholder" class="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
+                                <i class="fas fa-file-invoice-dollar text-4xl text-slate-300 mb-3 block"></i>
+                                <p class="text-slate-400 font-medium">Completa la optimización de cortes</p>
+                                <p class="text-xs text-slate-300">para generar la cotización</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </section>
 
@@ -4001,6 +4367,7 @@
     <script src="src/modules/auto-update.js"></script>
     <script src="src/renderer/analytics-financiero.js"></script>
     <script src="src/features/calculadora.js"></script>
+    <script src="src/features/provisionar.js"></script>
 </body>
 
 </html>

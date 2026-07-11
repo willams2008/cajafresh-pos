@@ -93,6 +93,26 @@ window.renderCategoryOptions = () => {
     }
 };
 
+// --- Top-level IPC handler for server-info (registered early, before window.onload) ---
+if (window.electronAPI) {
+    window.electronAPI.onServerInfo(function(info) {
+        var u = 'http://' + info.ip + ':' + info.port + '/mobile';
+        window._provisionarLocalUrl = u;
+        window._provisionarServerQr = info.qr;
+        var ipEl = document.getElementById('server-ip-display');
+        if (ipEl) ipEl.textContent = u;
+        var sqr = document.getElementById('server-qr-display');
+        if (sqr) sqr.src = info.qr;
+        var dot = document.getElementById('server-status-dot');
+        if (dot) dot.classList.replace('bg-slate-300', 'bg-emerald-500');
+        if (typeof window._generarQRLocal === 'function') {
+            window._generarQRLocal();
+        }
+        var downloadUrl = 'http://' + info.ip + ':' + info.port + '/download';
+        window.electronAPI.generateDownloadQR(downloadUrl);
+    });
+}
+
 window.addCategory = async () => {
     const { value: newCat } = await Swal.fire({
         title: 'Nueva Categoría',
@@ -1442,6 +1462,7 @@ function initNavigation() {
         'nav-dashboard': 'view-dashboard',
         'nav-pos': 'view-pos',
         'nav-inventory': 'view-inventory',
+        'nav-provisionar': 'view-provisionar',
         'nav-clients': 'view-clients',
         'nav-reports': 'view-reports',
         'nav-analytics': 'view-analytics',
@@ -1496,6 +1517,7 @@ function initNavigation() {
         if (viewId === 'view-dashboard' && window.Dashboard) Dashboard.render();
         if (viewId === 'view-pos') renderProducts();
         if (viewId === 'view-inventory') renderInventory();
+        if (viewId === 'view-provisionar') { if (window.Provisionar && window.Provisionar.init) window.Provisionar.init(); }
         if (viewId === 'view-clients') renderClients();
         if (viewId === 'view-reports') renderReports();
         if (viewId === 'view-analytics') renderAnalytics();
@@ -4329,35 +4351,40 @@ function initMobileServer() {
         let activeTunnelUrl = null;
         const TOPIC = 'puntopila_caja_pos_tunnel_url_secret_eb6044';
 
-        // Inicializar QR Permanente inmediatamente
-        const canvasMobile = document.getElementById('qr-mobile');
-        if (canvasMobile && typeof QRCode !== 'undefined') {
-            // SMART START: Si tenemos un dominio estático configurado, empezar con ese link directo
-            // de lo contrario, usar ntfy.sh como puente.
-            const initialLink = (settings.ngrokDomain) ? `https://${settings.ngrokDomain}/mobile` : `https://ntfy.sh/${TOPIC}`;
-            
-            QRCode.toCanvas(canvasMobile, initialLink, { margin: 2, scale: 4, color: { dark: '#000000', light: '#ffffff' } }, (err) => {
-                if (err) console.error(err);
-            });
-        }
+        // Esperar a que llegue la IP real para generar QR
+        var generarQRenCanvas = function(canvasId, url, labelId) {
+            var c = document.getElementById(canvasId);
+            if (!c || typeof QRCode === 'undefined') return;
+            try {
+                QRCode.toCanvas(c, url, { margin: 2, scale: 4, width: 200, color: { dark: '#000000', light: '#ffffff' } }, function(err) {
+                    if (!err) {
+                        var lbl = document.getElementById(labelId);
+                        if (lbl) lbl.textContent = url;
+                    }
+                });
+            } catch(e) { console.error('[QR] Error:', e); }
+        };
+        window._generarQRLocal = function() {
+            var u = window._provisionarLocalUrl;
+            if (!u || !u.includes('http')) return;
+            var b = u.replace(/\/mobile$/, '').replace(/\/$/, '');
+            generarQRenCanvas('qr-mobile', b + '/mobile', 'link-mobile-display');
+            generarQRenCanvas('qr-jefe', b + '/mobile', 'link-jefe-display');
+            generarQRenCanvas('qr-download', b + '/download', 'link-download-display');
+        };
 
-        // Solicitar actualización inmediata de discovery para reflejar cambios en ntfy.sh
         window.electronAPI.requestDiscoveryUpdate();
 
-        // Recibir información del servidor desde electron
-        window.electronAPI.onServerInfo((info) => {
-            const localMobileUrl = `http://${info.ip}:${info.port}/mobile`;
-            document.getElementById('server-ip-display').textContent = localMobileUrl;
-
-            const sqr = document.getElementById('server-qr-display');
-            if (sqr) sqr.src = info.qr;
-            document.getElementById('server-status-dot').classList.replace('bg-slate-300', 'bg-emerald-500');
-
-            // Solo generar QR de descarga con IP local si NO hay túnel aún
-            if (!activeTunnelUrl) {
-                window.electronAPI.generateDownloadQR(localMobileUrl);
-            }
-        });
+        if (window._provisionarLocalUrl) {
+            var pu = window._provisionarLocalUrl;
+            var pipEl = document.getElementById('server-ip-display');
+            if (pipEl) pipEl.textContent = pu;
+            var psqr = document.getElementById('server-qr-display');
+            if (psqr && window._provisionarServerQr) psqr.src = window._provisionarServerQr;
+            var pdot = document.getElementById('server-status-dot');
+            if (pdot) pdot.classList.replace('bg-slate-300', 'bg-emerald-500');
+            window._generarQRLocal();
+        }
 
         // Mostrar estado "Conectando..." hasta que el túnel real se establezca.
         const remoteUrlEl = document.getElementById('remote-url-display');
@@ -4400,22 +4427,31 @@ function initMobileServer() {
                     if (canvasMobile) {
                         const targetUrl = settings.launcherUrl 
                             ? (settings.launcherUrl.startsWith('http') ? settings.launcherUrl : `https://${settings.launcherUrl}`) 
-                            : urlClean + "/mobile";
+                            : (urlClean + "/mobile");
 
-                        QRCode.toCanvas(canvasMobile, targetUrl, { margin: 2, scale: 4, color: { dark: '#000000', light: '#ffffff' } }, (err) => {
-                            if (!err) {
-                                const idDisplay = canvasMobile.closest('div').nextElementSibling.querySelector('p.font-mono');
-                                if (idDisplay) idDisplay.textContent = settings.launcherUrl ? "LANZADOR PERMANENTE ACTIVO" : "TUNEL PROFESIONAL ACTIVO (DIRECTO)";
-                            }
+                        QRCode.toCanvas(canvasMobile, targetUrl, { margin: 2, scale: 4, color: { dark: '#000000', light: '#ffffff' } }, function(err) {
+                            if (err) { console.error('[QR] mobile:', err); return; }
+                            var displayEl = document.getElementById('link-mobile-display');
+                            if (displayEl) displayEl.textContent = settings.launcherUrl ? "LANZADOR PERMANENTE: " + targetUrl : urlClean + "/mobile";
                         });
                     }
-                    // 2. QR Remoto (anywhere)
+                    // 2. QR Remoto (Panel del Jefe)
                     if (canvasJefe) {
-                        QRCode.toCanvas(canvasJefe, urlClean + "/mobile", { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, (err) => {});
+                        var jefeUrl = urlClean + "/mobile";
+                        QRCode.toCanvas(canvasJefe, jefeUrl, { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, function(err) {
+                            if (err) { console.error('[QR] jefe:', err); return; }
+                            var displayEl = document.getElementById('link-jefe-display');
+                            if (displayEl) displayEl.textContent = jefeUrl;
+                        });
                     }
                     // 3. QR de Descarga
                     if (canvasDownload) {
-                        QRCode.toCanvas(canvasDownload, urlClean + '/download', { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, (err) => {});
+                        var downloadUrl = urlClean + '/download';
+                        QRCode.toCanvas(canvasDownload, downloadUrl, { margin: 2, scale: 4, color: { dark: '#4f46e5', light: '#ffffff' } }, function(err) {
+                            if (err) { console.error('[QR] download:', err); return; }
+                            var displayEl = document.getElementById('link-download-display');
+                            if (displayEl) displayEl.textContent = downloadUrl;
+                        });
                     }
                 }
 
