@@ -131,7 +131,10 @@
                 <div id="global-stats-container"></div>
 
                 <div class="card">
-                    <div class="card-title">Sucursales <span class="badge-count" id="stores-count">0</span></div>
+                    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Sucursales <span class="badge-count" id="stores-count">0</span></span>
+                        <button onclick="openAddStoreModal()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;"><i class="fas fa-plus"></i> Añadir</button>
+                    </div>
                     <div id="stores-list"></div>
                 </div>
             </div>
@@ -139,17 +142,23 @@
             <!-- INVENTORY TAB -->
             <div id="view-inventory" class="tab-view hidden">
                 <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px;">
-                    <div class="title" style="font-size: 20px;">Inventario Global</div>
-                    <div class="subtitle">Stock consolidado de todas tus sedes.</div>
+                    <div class="title" style="font-size: 20px;">Inventario</div>
+                    <div class="subtitle">Stock de tus tiendas.</div>
                 </div>
                 
+                <div class="card" style="padding: 12px; margin-bottom: 10px;">
+                    <select id="inv-store-filter" onchange="filterGlobalInventoryByStore(this.value)" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:13px;font-weight:700;">
+                        <option value="">Todas las tiendas</option>
+                    </select>
+                </div>
+
                 <div class="card" style="padding: 12px; margin-bottom: 16px;">
                     <div style="position:relative">
                         <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px"></i>
                         <input 
                             type="text" 
                             id="global-inv-search" 
-                            placeholder="Buscar en todas las tiendas..." 
+                            placeholder="Buscar producto..." 
                             oninput="filterGlobalInventory(this.value)"
                             style="width:100%;padding:10px 10px 10px 36px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:14px;"
                         >
@@ -180,6 +189,39 @@
                     Próximamente: Vista en tiempo real de las cajas activas.
                 </div>
             </div>
+
+            <!-- ORDERS TAB -->
+            <div id="view-orders" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px; background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.3);">
+                    <div class="title" style="font-size: 20px;">Pedidos al Almacén</div>
+                    <div class="subtitle">Órdenes de compra entre sucursales.</div>
+                </div>
+                <div id="orders-content">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+
+            <!-- MOVEMENTS TAB -->
+            <div id="view-movements" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px; background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%); box-shadow: 0 10px 25px -5px rgba(8, 145, 178, 0.3);">
+                    <div class="title" style="font-size: 20px;">Movimientos</div>
+                    <div class="subtitle">Todas las transacciones del día — ventas, gastos y pedidos.</div>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+                    <select id="mov-filter-store" onchange="filterMovements()" style="flex:1; min-width:120px; padding:10px 12px; background:var(--bg); border:1px solid var(--outline); border-radius:10px; font-size:13px; font-weight:700;">
+                        <option value="">Todas las sucursales</option>
+                    </select>
+                    <select id="mov-filter-type" onchange="filterMovements()" style="flex:1; min-width:100px; padding:10px 12px; background:var(--bg); border:1px solid var(--outline); border-radius:10px; font-size:13px; font-weight:700;">
+                        <option value="">Todos los tipos</option>
+                        <option value="sale">Ventas</option>
+                        <option value="expense">Gastos</option>
+                        <option value="order">Pedidos</option>
+                    </select>
+                </div>
+                <div id="movements-content">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Bottom Navigation -->
@@ -191,6 +233,14 @@
             <div class="nav-item" onclick="switchMainTab('inventory', this)">
                 <i class="fas fa-boxes"></i>
                 <span>Stock</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('orders', this)">
+                <i class="fas fa-cart-shopping"></i>
+                <span>Pedidos</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('movements', this)">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Movimientos</span>
             </div>
             <div class="nav-item" onclick="switchMainTab('financial', this)">
                 <i class="fas fa-chart-line"></i>
@@ -214,6 +264,7 @@
             <div id="tab-performance" class="tab-btn" onclick="setTab('performance')">Rendimiento</div>
             <div id="tab-expenses" class="tab-btn" onclick="setTab('expenses')">Gastos</div>
             <div class="tab-btn" id="tab-inventory" onclick="setTab('inventory')">Inventario</div>
+            <div class="tab-btn" id="tab-orders" onclick="setTab('orders')">Pedidos</div>
         </div>
         <div id="detail-content" class="detail-content"></div>
     </div>
@@ -336,6 +387,49 @@
                 <button class="btn-save" id="btn-save-product" onclick="saveProductEdits()">
                     <i class="fas fa-save"></i> Guardar Producto
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Añadir Sucursal -->
+    <div class="modal" id="add-store-modal">
+        <div class="modal-content">
+            <div class="modal-title">Añadir Sucursal</div>
+            <div class="field">
+                <label>Nombre de la Sucursal</label>
+                <input type="text" id="new-store-name" placeholder="Ej. Sucursal Centro">
+            </div>
+            <div class="field">
+                <label>ID (deja vacío para auto-generar)</label>
+                <input type="text" id="new-store-id" placeholder="Ej. store_centro">
+            </div>
+            <div class="field">
+                <label>Tipo</label>
+                <select id="new-store-type" style="width:100%;padding:12px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:14px;font-weight:700;">
+                    <option value="kiosko">Kiosko</option>
+                    <option value="warehouse">Almacén</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-cancel" style="flex:1;" onclick="closeAddStoreModal()">Cancelar</button>
+                <button class="btn-action" style="flex:1; margin-top:0;" onclick="addStore()">Crear Sucursal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmar Eliminación -->
+    <div class="modal" id="delete-store-modal">
+        <div class="modal-content">
+            <div class="modal-title" style="color:var(--error);">Eliminar Sucursal</div>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px;text-align:center;">
+                ¿Estás seguro de eliminar <b id="delete-store-name">esta sucursal</b>?
+            </p>
+            <p style="font-size:11px;color:var(--error);margin-bottom:20px;text-align:center;background:rgba(239,68,68,0.1);padding:10px;border-radius:10px;">
+                <i class="fas fa-exclamation-triangle"></i> Se eliminarán TODOS los datos asociados: ventas, gastos, productos, pedidos y backups. Esta acción no se puede deshacer.
+            </p>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-cancel" style="flex:1;" onclick="closeDeleteStoreModal()">Cancelar</button>
+                <button class="btn-action" style="flex:1; margin-top:0; background:var(--error);" onclick="confirmDeleteStore()">Eliminar Permanentemente</button>
             </div>
         </div>
     </div>

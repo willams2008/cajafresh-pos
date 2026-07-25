@@ -203,7 +203,7 @@
             #sidebar-toggle-btn { left: 80px; }
             #sidebar-toggle-btn.collapsed { left: 0; }
         }
-        canvas {
+        canvas { display: none; }
 </style>
 </head>
 
@@ -308,11 +308,6 @@
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-file-invoice-dollar text-lg"></i></div>
                         <span class="hidden lg:block font-semibold text-sm truncate">Gestión de Gastos</span>
                     </a>
-                    <a href="#" id="nav-client-history"
-                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-cyan-50 hover:text-cyan-600 transition-all cursor-pointer">
-                        <div class="w-8 flex justify-center shrink-0"><i class="fas fa-clock-rotate-left text-lg"></i></div>
-                        <span class="hidden lg:block font-semibold text-sm truncate">Historial x Cliente</span>
-                    </a>
                     <a href="#" id="nav-movements"
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-orange-50 hover:text-orange-600 transition-all cursor-pointer">
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-arrows-spin text-lg"></i></div>
@@ -369,6 +364,16 @@
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-all cursor-pointer">
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-cubes text-lg"></i></div>
                         <span class="hidden lg:block font-semibold text-sm truncate">Provisionar</span>
+                    </a>
+                    <a href="#" id="nav-transfers"
+                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-cyan-50 hover:text-cyan-600 transition-all cursor-pointer">
+                        <div class="w-8 flex justify-center shrink-0"><i class="fas fa-right-left text-lg"></i></div>
+                        <span class="hidden lg:block font-semibold text-sm truncate">Transferencias</span>
+                    </a>
+                    <a href="#" id="nav-purchase-orders"
+                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all cursor-pointer">
+                        <div class="w-8 flex justify-center shrink-0"><i class="fas fa-cart-shopping text-lg"></i></div>
+                        <span class="hidden lg:block font-semibold text-sm truncate">Pedidos</span>
                     </a>
                     <a href="#" id="nav-audit"
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer">
@@ -787,6 +792,9 @@
                     </div>
                     <div class="flex gap-2">
                         <span id="provisionar-dirty-indicator" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-black uppercase border border-amber-100 hidden"><i class="fas fa-pen-to-square mr-1"></i> Sin guardar</span>
+                        <button onclick="window.syncProvisionarToPOS()" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-xs font-black uppercase border border-emerald-400 transition-all flex items-center gap-1.5 shadow-sm" title="Sincronizar materiales de Provisionar al catálogo del POS">
+                            <i class="fas fa-cloud-arrow-up"></i> Sincronizar al POS
+                        </button>
                     </div>
                 </div>
                 <!-- Tabs -->
@@ -797,8 +805,8 @@
                     <button onclick="window.Provisionar.switchTab('cad')" id="provisionar-tab-cad" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
                         <i class="fas fa-draw-polygon mr-2"></i>Carga CAD
                     </button>
-                    <button onclick="window.Provisionar.switchTab('cortes')" id="provisionar-tab-cortes" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
-                        <i class="fas fa-scissors mr-2"></i>Optimizar Cortes
+                    <button onclick="window.Provisionar.switchTab('diseno')" id="provisionar-tab-diseno" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                        <i class="fas fa-pen-ruler mr-2"></i>Diseño
                     </button>
                     <button onclick="window.Provisionar.switchTab('costos')" id="provisionar-tab-costos" class="provisionar-tab px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
                         <i class="fas fa-file-invoice-dollar mr-2"></i>Costeo y Cotización
@@ -811,10 +819,31 @@
                 <!-- ========== TAB: MATERIA PRIMA ========== -->
                 <div id="provisionar-content-materiales" class="provisionar-tab-content">
                     <!-- Header actions -->
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold text-slate-700 flex items-center"><i class="fas fa-cubes text-amber-500 mr-2"></i> Inventario de Materia Prima</h3>
-                        <button onclick="window.Provisionar.abrirModalNuevoMaterial()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all flex items-center gap-2">
-                            <i class="fas fa-plus"></i> Nuevo Material
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-cubes text-amber-500"></i> Inventario de Materia Prima y Sobrantes
+                            </h3>
+                            <p class="text-xs text-slate-500">Gestiona tus láminas principales e inventario de retazos o sobrantes reutilizables.</p>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <button onclick="window.Provisionar.abrirModalNuevoSobrante()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center gap-2 text-xs border border-amber-300">
+                                <i class="fas fa-scissors"></i> + Registrar Retazo / Sobrante
+                            </button>
+                            <button onclick="window.Provisionar.abrirModalNuevoMaterial()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all flex items-center gap-2 text-xs">
+                                <i class="fas fa-plus"></i> + Nueva Lámina Entera
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sub-tabs: Láminas Enteras vs Sobrantes -->
+                    <div class="flex items-center gap-2 border-b border-slate-200 mb-4">
+                        <button id="mat-subtab-enteras" onclick="window.Provisionar.filtrarTipoMaterial('enteras')" class="py-2.5 px-4 font-bold text-xs border-b-2 border-amber-600 text-amber-600 flex items-center gap-2 transition-all">
+                            <i class="fas fa-layer-group"></i> Láminas Enteras <span id="badge-count-enteras" class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-extrabold">0</span>
+                        </button>
+                        <button id="mat-subtab-sobrantes" onclick="window.Provisionar.filtrarTipoMaterial('sobrantes')" class="py-2.5 px-4 font-bold text-xs border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2 transition-all">
+                            <i class="fas fa-recycle text-emerald-600"></i> Sobrantes / Retazos Reutilizables <span id="badge-count-sobrantes" class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-extrabold">0</span>
                         </button>
                     </div>
 
@@ -823,23 +852,24 @@
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse min-w-[900px]">
                                 <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Material</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Propiedades</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Longitud (m)</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Ancho (m)</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Espesor (mm)</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Costo x m²</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">Stock</th>
-                                        <th class="py-4 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-center">Acciones</th>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-xs">
+                                        <th class="py-3 px-4 w-8"></th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider w-16 text-center">Color</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider">Material / Retazo</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider">Tipo / Origen</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider text-right">Dimensiones (L x A)</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider text-right">Espesor</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider text-right">Costo Est.</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider text-center">Stock</th>
+                                        <th class="py-3 px-4 font-semibold text-slate-600 uppercase tracking-wider text-center">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody class="text-sm divide-y divide-slate-100" id="materiales-table-body">
                                     <tr id="materiales-empty-row">
-                                        <td colspan="8" class="py-12 text-center text-slate-400">
+                                        <td colspan="9" class="py-12 text-center text-slate-400">
                                             <i class="fas fa-box-open text-3xl mb-2 block"></i>
-                                            <p class="font-medium">No hay materiales registrados</p>
-                                            <p class="text-xs">Agrega materia prima para empezar a cotizar</p>
+                                            <p class="font-medium">No hay materiales ni sobrantes en esta categoría</p>
+                                            <p class="text-xs">Agrega láminas o registra retazos sobrantes para utilizarlos</p>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -850,178 +880,296 @@
 
                 <!-- ========== TAB: CARGA CAD ========== -->
                 <div id="provisionar-content-cad" class="provisionar-tab-content hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <!-- Drop Zone -->
-                        <div>
-                            <div id="cad-dropzone"
-                                class="border-4 border-dashed border-slate-200 rounded-[40px] p-12 text-center hover:border-amber-400 hover:bg-amber-50/30 transition-all cursor-pointer group/drop relative overflow-hidden">
-                                <input type="file" id="cad-file-input" class="hidden" accept=".dxf,.dwg,.pdf,.svg,.step,.stp,.sldprt,.sldasm,.stl">
-                                <div class="relative z-10">
-                                    <div class="w-24 h-24 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover/drop:scale-110 group-hover/drop:rotate-6 transition-all duration-500">
-                                        <i class="fas fa-draw-polygon text-4xl"></i>
+                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                        <!-- Columna 1: Capas y Subida (25%) -->
+                        <div class="xl:col-span-3 space-y-4">
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-file-arrow-up text-amber-500"></i> Cargar Planos
+                                </h4>
+                                <div id="cad-dropzone"
+                                    class="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-amber-400 hover:bg-amber-50/30 transition-all cursor-pointer group/drop relative overflow-hidden">
+                                    <input type="file" id="cad-file-input" class="hidden" accept=".dxf,.dwg,.pdf,.svg,.step,.stp,.sldprt,.sldasm,.stl" multiple>
+                                    <div class="relative z-10">
+                                        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover/drop:scale-110 transition-all">
+                                            <i class="fas fa-draw-polygon text-2xl"></i>
+                                        </div>
+                                        <p class="text-xs font-bold text-slate-700">Arrastra archivos aquí</p>
+                                        <p class="text-[10px] text-slate-400 mt-1">DXF, SVG, PDF</p>
                                     </div>
-                                    <h3 class="text-xl font-black text-slate-800 mb-2">Subir archivo CAD</h3>
-                                    <p class="text-slate-500 font-medium">DXF, DWG, SVG, STEP, SLDPRT, PDF</p>
-                                    <p class="text-xs text-slate-400 mt-2">Arrastra o haz clic para seleccionar</p>
                                 </div>
                             </div>
-                            <!-- Info del archivo cargado -->
-                            <div id="cad-file-info" class="hidden mt-4 bg-white rounded-2xl border border-slate-200 p-4">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                                            <i class="fas fa-file-circle-check text-xl"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-bold text-slate-700" id="cad-filename">archivo.dxf</p>
-                                            <p class="text-xs text-slate-400" id="cad-filesize">0 KB</p>
-                                        </div>
-                                    </div>
-                                    <button onclick="window.Provisionar.removerArchivoCAD()" class="text-rose-400 hover:text-rose-600 p-2">
-                                        <i class="fas fa-trash-can"></i>
-                                    </button>
+
+                            <!-- Lista de Capas (Archivos cargados) -->
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                                    <span><i class="fas fa-layer-group text-amber-500 mr-1.5"></i> Capas de Diseño</span>
+                                    <span id="cad-layers-count" class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-mono text-[10px]">0</span>
+                                </h4>
+                                <div id="cad-layers-list" class="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                                    <div class="text-center py-4 text-xs text-slate-400 italic">No hay archivos cargados</div>
                                 </div>
+                            </div>
+
+                            <!-- Planchas de Material en Lienzo -->
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                                    <span><i class="fas fa-border-all text-amber-500 mr-1.5"></i> Planchas en Lienzo</span>
+                                    <span id="cad-planchas-count" class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-mono text-[10px]">0</span>
+                                </h4>
+                                <div id="cad-planchas-list" class="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                                    <div class="text-center py-4 text-xs text-slate-400 italic">No hay planchas de material arrastradas</div>
+                                </div>
+                            </div>
+
+                            <!-- Parámetros de Optimización (Nesting) -->
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-scissors text-amber-500"></i> Optimizar Corte
+                                </h4>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Corte / Kerf (mm)</label>
+                                    <input type="number" id="opt-kerf" value="0.15" step="0.01" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none text-xs">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Costo de corte por hora ($)</label>
+                                    <input type="number" id="opt-costo-hora" value="15" step="0.5" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none text-xs">
+                                </div>
+                                <button id="btn-optimizar-cortes" onclick="window.Provisionar.optimizarCortes()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-xs">
+                                    <i class="fas fa-bolt"></i> Optimizar Corte
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Preview Panel -->
-                        <div>
-                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden h-full flex flex-col">
+                        <!-- Columna 2: Visor CAD (65%) -->
+                        <div class="xl:col-span-7">
+                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col h-full min-h-[450px]">
                                 <div class="bg-slate-800 px-4 py-3 flex items-center justify-between">
-                                    <h4 class="text-sm font-bold text-white flex items-center"><i class="fas fa-eye mr-2 text-amber-400"></i> Previsualización</h4>
-                                    <span id="cad-entities-count" class="text-xs text-slate-400 font-mono">0 entidades</span>
+                                    <h4 class="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                                        <i class="fas fa-eye text-amber-400"></i> Mesa de Corte Virtual
+                                    </h4>
+                                    <span id="cad-entities-count" class="text-xs text-slate-400 font-mono">0 elementos</span>
                                 </div>
-                                <div id="cad-preview-canvas" class="flex-1 bg-slate-900 min-h-[300px] flex items-center justify-center relative">
+                                <div id="cad-preview-canvas" class="flex-1 bg-slate-950 flex items-center justify-center relative min-h-[350px]">
                                     <canvas id="cad-canvas" class="w-full h-full absolute inset-0"></canvas>
-                                    <div id="cad-preview-placeholder" class="text-slate-600 text-center">
-                                        <i class="fas fa-image text-4xl mb-2 block"></i>
-                                        <p class="text-sm">Vista previa del plano</p>
-                                        <p class="text-xs">Carga un archivo CAD para visualizar</p>
+                                    <div id="cad-preview-placeholder" class="text-slate-500 text-center z-10">
+                                        <i class="fas fa-hand-pointer text-4xl mb-2 block"></i>
+                                        <p class="text-sm font-bold">Lienzo vacío</p>
+                                        <p class="text-xs">Arrastra materiales y diseños aquí</p>
+                                    </div>
+                                    <!-- Botones de Control Flotantes -->
+                                    <div class="absolute bottom-4 right-4 z-20 flex gap-2">
+                                        <button onclick="window.Provisionar.zoomCAD(1.2)" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Acercar"><i class="fas fa-plus"></i></button>
+                                        <button onclick="window.Provisionar.zoomCAD(0.8)" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Alejar"><i class="fas fa-minus"></i></button>
+                                        <button onclick="window.Provisionar.resetearVistaCAD()" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Ajustar Pantalla"><i class="fas fa-arrows-to-eye"></i></button>
+                                        <button onclick="window.Provisionar.toggleFullscreen('cad-preview-canvas')" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Maximizar Visor"><i class="fas fa-expand"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Resultados de Optimización (Nesting) Integrados -->
+                            <div id="opt-material-result-content" class="hidden space-y-4 mt-6">
+                                <h3 class="text-sm font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-scissors text-amber-500"></i> Plano de Corte Optimizado (Nesting)
+                                </h3>
+
+                                <!-- Pestañas por material para conmutar resultados -->
+                                <div class="flex gap-2 overflow-x-auto pb-1" id="opt-materials-tabs">
+                                    <!-- Se llena dinámicamente -->
+                                </div>
+
+                                <!-- Métricas del material seleccionado -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Piezas a cortar</p>
+                                        <p class="text-xl font-black text-slate-800" id="opt-mat-total-piezas">0</p>
+                                    </div>
+                                    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Láminas necesarias</p>
+                                        <p class="text-xl font-black text-slate-800" id="opt-mat-planchas-necesarias">0</p>
+                                    </div>
+                                    <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-4 shadow-sm">
+                                        <p class="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Material Usado</p>
+                                        <p class="text-xl font-black text-emerald-700" id="opt-mat-uso-pct">0%</p>
+                                    </div>
+                                    <div class="bg-rose-50 rounded-xl border border-rose-100 p-4 shadow-sm">
+                                        <p class="text-[9px] font-black text-rose-600 uppercase tracking-widest">Desperdicio</p>
+                                        <p class="text-xl font-black text-rose-700" id="opt-mat-desperdicio-pct">0%</p>
+                                    </div>
+                                </div>
+
+                                <!-- Layout de Corte y Controles de Navegación -->
+                                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <div class="bg-slate-800 px-4 py-3 flex items-center justify-between text-white">
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-xs font-black uppercase tracking-wider">Patrón de Corte</h4>
+                                            <span id="opt-layout-material-title" class="px-2 py-0.5 bg-slate-700 text-amber-400 rounded text-[10px] font-bold">Material</span>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <!-- Paginación de planchas -->
+                                            <div class="flex items-center gap-2">
+                                                <button onclick="window.Provisionar.cambiarPlancha(-1)" class="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xs"><i class="fas fa-chevron-left"></i></button>
+                                                <span class="text-xs font-mono font-bold" id="opt-plancha-page">Plancha 1/1</span>
+                                                <button onclick="window.Provisionar.cambiarPlancha(1)" class="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xs"><i class="fas fa-chevron-right"></i></button>
+                                            </div>
+                                            <!-- Switch Modo Vista (Vectores CAD vs Cajas) -->
+                                            <button id="btn-toggle-modo-vista" onclick="window.Provisionar.toggleModoVistaLayout()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-3 rounded text-xs flex items-center gap-1.5 transition-all" title="Alternar entre siluetas de vectores CAD y cuadros de ocupación">
+                                                <i class="fas fa-vector-square"></i> <span id="lbl-toggle-modo-vista">Vista: Vectores CAD</span>
+                                            </button>
+                                            <!-- Registrar Corte -->
+                                            <button onclick="window.Provisionar.confirmarRegistroDeCorte()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-3 rounded text-xs flex items-center gap-1.5 transition-all">
+                                                <i class="fas fa-square-check"></i> Registrar Corte
+                                            </button>
+                                            <!-- Editar Layout manualmente -->
+                                            <button id="btn-edit-layout" onclick="window.Provisionar.toggleLayoutEditMode()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-1 px-3 rounded text-xs flex items-center gap-1.5 transition-all">
+                                                <i class="fas fa-pen"></i> Editar Layout
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="p-4 bg-slate-950 flex items-center justify-center relative min-h-[380px]" id="opt-layout-canvas-wrapper">
+                                        <canvas id="opt-canvas" class="w-full h-full max-h-[500px]"></canvas>
+                                        <!-- Botones de Control Flotantes -->
+                                        <div class="absolute bottom-4 right-4 z-20 flex gap-2">
+                                            <button onclick="window.Provisionar.zoomLayout(1.2)" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Acercar"><i class="fas fa-plus"></i></button>
+                                            <button onclick="window.Provisionar.zoomLayout(0.8)" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Alejar"><i class="fas fa-minus"></i></button>
+                                            <button onclick="window.Provisionar.resetearVistaLayout()" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Ajustar Pantalla"><i class="fas fa-arrows-to-eye"></i></button>
+                                            <button onclick="window.Provisionar.toggleFullscreen('opt-layout-canvas-wrapper')" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 text-white flex items-center justify-center text-sm shadow border border-slate-700/50 backdrop-blur transition-all" title="Maximizar Visor"><i class="fas fa-expand"></i></button>
+                                        </div>
+                                        <!-- Badge: Modo Edición Activo -->
+                                        <div id="layout-edit-badge" class="hidden absolute top-3 left-3 z-20 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow animate-pulse">
+                                            <i class="fas fa-pen mr-1"></i> MODO EDICIÓN — Arrastra las piezas
+                                        </div>
+                                    </div>
+                                    <!-- Tabla editable de posiciones (colapsable) -->
+                                    <div id="layout-edit-table-wrapper" class="hidden border-t border-slate-200">
+                                        <div class="bg-amber-50 px-4 py-2 flex items-center justify-between">
+                                            <h5 class="text-[10px] font-black uppercase text-amber-700 tracking-wider">
+                                                <i class="fas fa-table-cells mr-1"></i> Posiciones de Piezas (Editable)
+                                            </h5>
+                                            <button onclick="window.Provisionar.confirmarCambiosLayout()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-1 px-3 rounded text-[10px] flex items-center gap-1">
+                                                <i class="fas fa-check"></i> Confirmar Cambios
+                                            </button>
+                                        </div>
+                                        <div class="overflow-x-auto max-h-[200px] overflow-y-auto custom-scrollbar">
+                                            <table class="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr class="bg-amber-50/50 border-b border-amber-200">
+                                                        <th class="py-2 px-3 font-bold text-amber-800">Pieza</th>
+                                                        <th class="py-2 px-3 font-bold text-amber-800 text-right">Ancho</th>
+                                                        <th class="py-2 px-3 font-bold text-amber-800 text-right">Alto</th>
+                                                        <th class="py-2 px-3 font-bold text-amber-800 text-right">X (mm)</th>
+                                                        <th class="py-2 px-3 font-bold text-amber-800 text-right">Y (mm)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="layout-edit-tbody"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Detalle por plancha -->
+                                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <div class="bg-slate-50 border-b border-slate-200 px-4 py-3">
+                                        <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider">Detalle del Plancha Seleccionada</h4>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50 border-b border-slate-200">
+                                                    <th class="py-2.5 px-4 font-bold text-slate-600">Material de Plancha</th>
+                                                    <th class="py-2.5 px-4 font-bold text-slate-600 text-right">Largo x Ancho</th>
+                                                    <th class="py-2.5 px-4 font-bold text-slate-600 text-right">Área Usada</th>
+                                                    <th class="py-2.5 px-4 font-bold text-slate-600 text-right">Sobrante Útil Estimado</th>
+                                                    <th class="py-2.5 px-4 font-bold text-slate-600 text-right">% Uso</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100" id="opt-planchas-table-body">
+                                                <!-- Llenado dinámico -->
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Materiales detectados en el CAD -->
-                    <div id="cad-materials-section" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden mt-6">
-                        <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
-                            <h4 class="text-sm font-bold text-slate-700"><i class="fas fa-list-check mr-2 text-amber-500"></i> Materiales identificados en el plano</h4>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse min-w-[600px]">
-                                <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Seleccionar</th>
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Pieza</th>
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Largo (mm)</th>
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Ancho (mm)</th>
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Cantidad</th>
-                                        <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Material asignado</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="text-sm divide-y divide-slate-100" id="cad-pieces-table-body">
-                                </tbody>
-                            </table>
+                        <!-- Columna 3: Paleta de Materiales (25%) -->
+                        <div class="xl:col-span-2">
+                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden h-full flex flex-col min-h-[450px]">
+                                <div class="bg-slate-50 border-b border-slate-200 px-4 py-3">
+                                    <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                                        <i class="fas fa-boxes-stacked text-amber-500"></i> Arrastrar Material
+                                    </h4>
+                                </div>
+                                <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="cad-material-palette">
+                                    <div class="text-center py-4 text-xs text-slate-400 italic">Cargando materiales...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ========== TAB: OPTIMIZAR CORTES ========== -->
-                <div id="provisionar-content-cortes" class="provisionar-tab-content hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Configuración -->
-                        <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                            <h4 class="text-sm font-bold text-slate-700 flex items-center"><i class="fas fa-sliders mr-2 text-amber-500"></i> Configuración de Corte</h4>
-                            
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Material a usar</label>
-                                <select id="opt-material-select" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                <!-- ========== TAB: DISEÑO ========== -->
+                <div id="provisionar-content-diseno" class="provisionar-tab-content hidden">
+                    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                        <!-- Columna izquierda: controles -->
+                        <div class="xl:col-span-3 space-y-4">
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-border-all text-amber-500"></i> Plancha / Material
+                                </h4>
+                                <select id="diseno-mat-select" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 text-xs focus:border-amber-500 outline-none">
                                     <option value="">-- Seleccionar material --</option>
                                 </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Plancha / Lámina disponible</label>
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label class="text-[10px] text-slate-400 font-medium">Largo (mm)</label>
-                                        <input type="number" id="opt-lamina-largo" value="2440" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                        <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Largo (mm)</label>
+                                        <input type="number" id="diseno-largo" readonly class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-600">
                                     </div>
                                     <div>
-                                        <label class="text-[10px] text-slate-400 font-medium">Ancho (mm)</label>
-                                        <input type="number" id="opt-lamina-ancho" value="1220" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                                        <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Ancho (mm)</label>
+                                        <input type="number" id="diseno-ancho" readonly class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-600">
                                     </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Grosor de corte (mm)</label>
-                                <input type="number" id="opt-kerf" value="0.15" step="0.01" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                                    <span><i class="fas fa-crop-alt text-amber-500 mr-1.5"></i> Piezas</span>
+                                    <span id="diseno-piezas-count" class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-mono text-[10px]">0</span>
+                                </h4>
+                                <button onclick="window.Provisionar.abrirModalNuevaPiezaDiseno()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-plus"></i> Agregar Pieza
+                                </button>
+                                <div id="diseno-piezas-list" class="space-y-1.5 max-h-[250px] overflow-y-auto custom-scrollbar">
+                                    <div class="text-center py-4 text-xs text-slate-400 italic">Selecciona un material y agrega piezas</div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Costo operativo por hora ($)</label>
-                                <input type="number" id="opt-costo-hora" value="15" step="0.5" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-amber-500 outline-none">
+                            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+                                <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider">Estadísticas</h4>
+                                <div id="diseno-stats">
+                                    <div class="text-center py-3 text-xs text-slate-400 italic">Agrega piezas para ver estadísticas</div>
+                                </div>
                             </div>
-
-                            <button onclick="window.Provisionar.optimizarCortes()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                                <i class="fas fa-calculator"></i> Calcular Optimización
-                            </button>
                         </div>
 
-                        <!-- Resultados -->
-                        <div class="lg:col-span-2 space-y-4">
-                            <!-- Resumen -->
-                            <div id="opt-resumen" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div class="bg-white rounded-xl border border-slate-200 p-4">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Piezas a cortar</p>
-                                    <p class="text-2xl font-black text-slate-800" id="opt-total-piezas">0</p>
+                        <!-- Columna derecha: canvas -->
+                        <div class="xl:col-span-9">
+                            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-border-all text-amber-500"></i>
+                                        <span class="text-xs font-bold text-slate-600">Visualizador de Plancha</span>
+                                        <span id="diseno-plancha-title" class="px-2 py-0.5 bg-slate-200 text-slate-500 rounded text-[10px] font-bold">Sin material</span>
+                                    </div>
+                                    <div class="flex gap-1.5">
+                                        <button onclick="window.Provisionar.zoomDiseno(1.2)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition-all" title="Acercar"><i class="fas fa-plus"></i></button>
+                                        <button onclick="window.Provisionar.zoomDiseno(0.8)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition-all" title="Alejar"><i class="fas fa-minus"></i></button>
+                                        <button onclick="window.Provisionar.resetDiseno()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition-all" title="Resetear vista"><i class="fas fa-expand"></i></button>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-xl border border-slate-200 p-4">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Planchas necesarias</p>
-                                    <p class="text-2xl font-black text-slate-800" id="opt-planchas-necesarias">0</p>
-                                </div>
-                                <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
-                                    <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Material usado</p>
-                                    <p class="text-2xl font-black text-emerald-700" id="opt-uso-pct">0%</p>
-                                </div>
-                                <div class="bg-rose-50 rounded-xl border border-rose-100 p-4">
-                                    <p class="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Desperdicio</p>
-                                    <p class="text-2xl font-black text-rose-700" id="opt-desperdicio-pct">0%</p>
-                                </div>
-                            </div>
-
-                            <!-- Layout de corte -->
-                            <div id="opt-layout-container" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                <div class="bg-slate-800 px-6 py-3 flex items-center justify-between">
-                                    <h4 class="text-sm font-bold text-white">Layout de Corte</h4>
-                                    <span class="text-xs text-amber-400 font-mono">Distribución óptima</span>
-                                </div>
-                                <div class="p-4 bg-slate-900 min-h-[300px] relative" id="opt-layout-canvas-wrapper">
-                                    <canvas id="opt-canvas" class="w-full h-full"></canvas>
-                                </div>
-                            </div>
-
-                            <!-- Tabla de cortes -->
-                            <div id="opt-resultados-tabla" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                <div class="bg-slate-50 border-b border-slate-200 px-6 py-3">
-                                    <h4 class="text-sm font-bold text-slate-700">Detalle de cortes por plancha</h4>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-left border-collapse min-w-[500px]">
-                                        <thead>
-                                            <tr class="bg-slate-50 border-b border-slate-200">
-                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider">Plancha #</th>
-                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Área total (mm²)</th>
-                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Área usada (mm²)</th>
-                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">Desperdicio (mm²)</th>
-                                                <th class="py-3 px-6 font-semibold text-slate-600 text-xs uppercase tracking-wider text-right">% Uso</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="text-sm divide-y divide-slate-100" id="opt-planchas-table-body">
-                                        </tbody>
-                                    </table>
+                                <div class="p-4 bg-slate-950 flex items-center justify-center relative min-h-[500px]" id="diseno-canvas-wrapper">
+                                    <canvas id="diseno-canvas" class="w-full h-full max-h-[600px]"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -1052,11 +1200,23 @@
                                 <input type="number" id="costeo-costo-corte" step="0.01" class="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="0.00" readonly>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 mb-1.5">Margen de Ganancia (%)</label>
-                                <div class="flex gap-2 items-center">
-                                    <input type="range" id="costeo-margen" min="0" max="200" value="30" step="5" class="flex-1 accent-amber-500" oninput="window.Provisionar.actualizarCotizacion()">
-                                    <span id="costeo-margen-label" class="text-sm font-black text-slate-700 min-w-[50px] text-right">30%</span>
+                            <div class="bg-amber-50/50 border border-amber-200 rounded-xl p-4 space-y-3">
+                                <h5 class="text-xs font-black uppercase text-amber-700 tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-percentage"></i> Márgenes de Ganancia
+                                </h5>
+                                <div class="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">% Material</label>
+                                        <input type="number" id="costeo-margen-mat" value="30" min="0" step="1" oninput="window.Provisionar.actualizarCotizacion()" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg font-bold text-slate-700 text-sm focus:border-amber-500 outline-none" placeholder="30">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">% Mano de Obra</label>
+                                        <input type="number" id="costeo-margen-mo" value="30" min="0" step="1" oninput="window.Provisionar.actualizarCotizacion()" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg font-bold text-slate-700 text-sm focus:border-amber-500 outline-none" placeholder="30">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-500 mb-1">$ Fijo Adicional</label>
+                                        <input type="number" id="costeo-margen-fijo" value="0" min="0" step="0.50" oninput="window.Provisionar.actualizarCotizacion()" class="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg font-bold text-slate-700 text-sm focus:border-emerald-500 outline-none" placeholder="0">
+                                    </div>
                                 </div>
                             </div>
 
@@ -1220,6 +1380,57 @@
                             <tbody class="text-sm divide-y divide-slate-100" id="reports-table-body">
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- === HISTORIAL POR CLIENTE === -->
+                <div class="mt-8 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-white">
+                        <h3 class="text-lg font-bold text-slate-800"><i class="fas fa-clock-rotate-left text-cyan-500 mr-2"></i>Historial por Cliente</h3>
+                        <p class="text-xs text-slate-500 mt-1">Consulta todas las compras realizadas por un cliente.</p>
+                    </div>
+                    <div class="p-6">
+                        <div class="max-w-xl mb-6">
+                            <label class="block text-xs font-bold text-slate-500 mb-2">Seleccionar Cliente</label>
+                            <select id="client-history-select" class="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-cyan-500 outline-none transition-all">
+                                <option value="">-- Seleccione un cliente --</option>
+                            </select>
+                        </div>
+                        <div id="client-history-content" class="hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Compras</p>
+                                    <p class="text-2xl font-black text-slate-800" id="ch-total-count">0</p>
+                                </div>
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Gastado USD</p>
+                                    <p class="text-2xl font-black text-emerald-600" id="ch-total-spent">$0.00</p>
+                                </div>
+                                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Última Compra</p>
+                                    <p class="text-lg font-black text-slate-800" id="ch-last-date">N/A</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-50/30">
+                                        <tr>
+                                            <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket</th>
+                                            <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                            <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total USD</th>
+                                            <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Método</th>
+                                            <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-50" id="client-history-table-body">
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="client-history-empty" class="hidden text-center py-20 opacity-40">
+                                <i class="fas fa-receipt text-5xl text-slate-300 mb-4"></i>
+                                <p class="font-bold text-slate-400">Este cliente no tiene compras registradas.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1840,6 +2051,7 @@
                             <div class="relative z-10 flex justify-center px-6 pb-4">
                                 <div class="bg-white rounded-[28px] p-4 shadow-2xl border-4 border-white/80">
                                     <canvas id="qr-mobile" class="w-36 h-36 block"></canvas>
+                                    <img id="permanent-qr-display" src="" class="w-40 h-40 object-contain" style="display:none">
                                 </div>
                             </div>
 
@@ -1884,6 +2096,7 @@
                             <div class="relative z-10 flex justify-center px-6 pb-4">
                                 <div class="bg-white rounded-[28px] p-4 shadow-2xl border-4 border-amber-200/60">
                                     <canvas id="qr-jefe" class="w-36 h-36 block"></canvas>
+                                    <img id="remote-qr-display" src="" class="w-40 h-40 object-contain" style="display:none">
                                 </div>
                             </div>
 
@@ -1924,6 +2137,7 @@
                             <div class="relative z-10 flex justify-center px-6 pb-4">
                                 <div class="bg-white rounded-[28px] p-4 shadow-2xl border-4 border-emerald-200/60">
                                     <canvas id="qr-download" class="w-36 h-36 block"></canvas>
+                                    <img id="download-qr-display" src="" class="w-44 h-44 object-contain" style="display:none">
                                 </div>
                             </div>
 
@@ -1936,9 +2150,27 @@
                                 <button onclick="shareLink('download')" class="w-full py-3 bg-white text-emerald-700 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-emerald-50 active:scale-95 transition-all shadow-lg">
                                     <i class="fab fa-whatsapp text-base text-green-500"></i> Compartir por WhatsApp
                                 </button>
+                                <div class="mt-3 flex gap-2">
+                                    <div class="flex-1 bg-white/10 backdrop-blur rounded-2xl px-3 py-2 border border-white/20 text-center">
+                                        <p class="text-[8px] text-emerald-100 font-black uppercase tracking-widest">Versi\u00f3n App</p>
+                                        <p id="app-version-display" class="text-xs font-mono font-bold text-white">--</p>
+                                    </div>
+                                    <button onclick="window.UpdateManager.check()" class="flex-1 bg-white/15 hover:bg-white/25 backdrop-blur rounded-2xl px-3 py-2 border border-white/20 text-center transition-all active:scale-95">
+                                        <p class="text-[8px] text-emerald-100 font-black uppercase tracking-widest">Buscar</p>
+                                        <p class="text-xs font-mono font-bold text-white flex items-center justify-center gap-1.5"><i class="fas fa-refresh"></i> Actualizaciones</p>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- QR LOCAL (Servidor Local) -->
+                    <div class="max-w-xs mx-auto mb-4 text-center">
+                        <div class="p-3 bg-white border-4 border-emerald-50 rounded-[28px] shadow-inner inline-block">
+                            <img id="server-qr-display" src="" class="w-32 h-32 object-contain">
+                        </div>
+                        <p class="text-[8px] text-emerald-600 font-bold uppercase tracking-widest mt-2">¡Para uso dentro del local!</p>
                     </div>
 
                     <!-- BARRA DE ACCIONES INFERIOR -->
@@ -2160,7 +2392,7 @@
                             <p class="text-xs text-slate-400 mt-0.5">Gestiona tu licencia y los datos de identificación de esta tienda</p>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div class="bg-indigo-50 rounded-2xl border border-indigo-100 p-5">
                             <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-building"></i> Identidad Sucursal</p>
                             <div id="store-id-display" class="text-base font-black text-indigo-700 truncate mb-1">Sin configurar</div>
@@ -2168,6 +2400,18 @@
                             <button onclick="openStoreIdentityModal()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
                                 <i class="fas fa-cog"></i> Configurar Identidad
                             </button>
+                        </div>
+                        <div class="bg-emerald-50 rounded-2xl border border-emerald-100 p-5">
+                            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-store"></i> Tipo de Sucursal</p>
+                            <p class="text-xs text-slate-500 mb-3">Define si esta sucursal es un <b>kiosko</b> (punto de venta) o un <b>almacén</b> (depósito/reabastecimiento).</p>
+                            <div class="flex gap-2">
+                                <button id="store-type-kiosko" onclick="window.setStoreType('kiosko')" class="flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-cart-shopping"></i> Kiosko
+                                </button>
+                                <button id="store-type-warehouse" onclick="window.setStoreType('warehouse')" class="flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-warehouse"></i> Almacén
+                                </button>
+                            </div>
                         </div>
                         <div class="bg-brand-50 rounded-2xl border border-brand-100 p-5 flex flex-col justify-between">
                             <div>
@@ -2979,6 +3223,8 @@
         </div>
 
         <div id="new-item-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+            <!-- content -->
+        </div>
 
         <!-- === VISTA ARQUEO DE CAJA === -->
         <section id="view-cashup" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
@@ -3052,62 +3298,6 @@
                             <!-- JS renders here -->
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- === VISTA HISTORIAL POR CLIENTE === -->
-        <section id="view-client-history" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
-            <header class="bg-white px-8 py-6 shadow-sm border-b border-cyan-100 shrink-0">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Historial de Compras por Cliente</h2>
-                    <p class="text-sm text-slate-500 mt-1">Consulta todas las compras realizadas por un cliente.</p>
-                </div>
-            </header>
-            <div class="p-8">
-                <div class="max-w-xl mb-8">
-                    <label class="block text-xs font-bold text-slate-500 mb-2">Seleccionar Cliente</label>
-                    <select id="client-history-select" class="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium focus:border-cyan-500 outline-none transition-all">
-                        <option value="">-- Seleccione un cliente --</option>
-                    </select>
-                </div>
-                <div id="client-history-content" class="hidden">
-                    <!-- Summary Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Compras</p>
-                            <p class="text-2xl font-black text-slate-800" id="ch-total-count">0</p>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Gastado USD</p>
-                            <p class="text-2xl font-black text-emerald-600" id="ch-total-spent">$0.00</p>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Última Compra</p>
-                            <p class="text-lg font-black text-slate-800" id="ch-last-date">N/A</p>
-                        </div>
-                    </div>
-                    <!-- Sales Table -->
-                    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50/30">
-                                <tr>
-                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket</th>
-                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total USD</th>
-                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Método</th>
-                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50" id="client-history-table-body">
-                                <!-- JS renders here -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="client-history-empty" class="hidden text-center py-20 opacity-40">
-                        <i class="fas fa-receipt text-5xl text-slate-300 mb-4"></i>
-                        <p class="font-bold text-slate-400">Este cliente no tiene compras registradas.</p>
-                    </div>
                 </div>
             </div>
         </section>
@@ -3208,6 +3398,93 @@
             </div>
         </section>
 
+        <!-- === VISTA TRANSFERENCIAS DE INVENTARIO === -->
+        <section id="view-transfers" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm border-b border-cyan-100 shrink-0 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800"><i class="fas fa-right-left text-cyan-500 mr-2"></i>Transferencias de Inventario</h2>
+                    <p class="text-sm text-slate-500 mt-1">Mueve stock entre sucursales o almacenes</p>
+                </div>
+                <button onclick="window.openTransferModal()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Nueva Transferencia
+                </button>
+            </header>
+            <div class="p-8">
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50/30">
+                                <tr>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Producto</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Cantidad</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Origen</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Destino</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50" id="transfers-table-body">
+                                <tr id="transfers-empty-row">
+                                    <td colspan="7" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-right-left text-3xl mb-2 block"></i>
+                                        <p class="font-medium">No hay transferencias registradas</p>
+                                        <p class="text-xs">Crea una nueva transferencia para mover stock entre sucursales</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- === VISTA PEDIDOS AL ALMACÉN === -->
+        <section id="view-purchase-orders" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
+            <header class="bg-white px-8 py-6 shadow-sm border-b border-emerald-100 shrink-0 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800"><i class="fas fa-cart-shopping text-emerald-500 mr-2"></i>Pedidos al Almacén</h2>
+                    <p class="text-sm text-slate-500 mt-1">Gestiona pedidos de compra a proveedores o almacén central</p>
+                </div>
+                <button onclick="window.openPOModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Nuevo Pedido
+                </button>
+            </header>
+            <div class="p-8">
+                <!-- Status Filter -->
+                <div class="flex gap-2 mb-6 flex-wrap">
+                    <button onclick="window.renderPurchaseOrders('all')" class="po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-brand-500 bg-brand-500 text-white transition-all" data-status="all">Todos</button>
+                    <button onclick="window.renderPurchaseOrders('PENDING')" class="po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-all" data-status="PENDING">Pendientes</button>
+                    <button onclick="window.renderPurchaseOrders('APPROVED')" class="po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all" data-status="APPROVED">Aprobados</button>
+                    <button onclick="window.renderPurchaseOrders('RECEIVED')" class="po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all" data-status="RECEIVED">Recibidos</button>
+                </div>
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50/30">
+                                <tr>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pedido #</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Items</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                    <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50" id="po-table-body">
+                                <tr id="po-empty-row">
+                                    <td colspan="6" class="py-12 text-center text-slate-400">
+                                        <i class="fas fa-cart-shopping text-3xl mb-2 block"></i>
+                                        <p class="font-medium">No hay pedidos registrados</p>
+                                        <p class="text-xs">Crea un nuevo pedido de compra para solicitar productos al almacén</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
 
     </main>
 
@@ -3586,6 +3863,8 @@
                             <input type="text" id="product-flavors" placeholder="Cola, Naranja, Limón..."
                                 class="w-full pl-11 pr-4 py-2.5 bg-purple-50 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all font-medium placeholder:text-purple-300">
                         </div>
+                        <div id="product-flavors-container" class="mt-2"></div>
+                        <div id="flavor-barcodes-container" class="mt-2" style="padding:8px;background:#f8fafc;border-radius:8px;"></div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4 advanced-field" style="display: none;">
@@ -3816,111 +4095,28 @@
     <!-- Secret Admin Modal -->
     <div id="secret-admin-modal"
         class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden relative max-h-[90vh]">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden relative max-h-[90vh]">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i
-                        class="fas fa-user-secret text-brand-600"></i> Admin Oculto</h3>
-                <button
-                    onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')"
-                    class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i class="fas fa-user-secret text-brand-600"></i> Admin Oculto</h3>
+                <button onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"><i class="fas fa-times"></i></button>
             </div>
-            <div class="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="font-bold text-slate-700 text-sm">Escáner de código de barras</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-scanner" class="sr-only peer"
-                            onchange="applySecretSettings()">
-                        <div
-                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
-                        </div>
-                    </label>
-                </div>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="font-bold text-slate-700 text-sm">Opción Móvil</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-mobile" class="sr-only peer" onchange="applySecretSettings()">
-                        <div
-                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
-                        </div>
-                    </label>
-                </div>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="font-bold text-slate-700 text-sm">Surtidor con IA</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-ai" class="sr-only peer" onchange="applySecretSettings()">
-                        <div
-                            class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500">
-                        </div>
-                    </label>
-                </div>
-
-                <!-- Sync Diagnostic Section -->
-                <div class="pt-4 border-t border-slate-100">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center justify-between">
-                        <span>Sincronización en la Nube</span>
-                        <i class="fas fa-cloud text-brand-500"></i>
-                    </p>
-                    <div id="sync-diagnostic-box" class="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2">
-                        <div class="flex justify-between items-center text-[10px] font-bold">
-                            <span class="text-slate-500 uppercase">Estado:</span>
-                            <span id="sync-status-badge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-500">Desconocido</span>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] font-bold">
-                            <span class="text-slate-500 uppercase">Sucursal ID:</span>
-                            <span id="sync-store-id" class="text-slate-700">No definido</span>
-                        </div>
-                        <button onclick="window.testCloudSyncManual()" class="w-full mt-2 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-lg text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-2">
-                            <i class="fas fa-sync-alt"></i> Probar Conexión Ahora
-                        </button>
-                    </div>
-                </div>
-                <!-- Business Branding Config -->
-                <div class="pt-4 border-t border-slate-100">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Marca Personalizada (White Label)</p>
-                    <div class="space-y-3">
-                        <div class="relative">
-                            <label class="text-[8px] font-black text-slate-400 uppercase absolute left-3 top-1.5 z-10">Nombre del Negocio</label>
-                            <input type="text" id="business-name-input" placeholder="Nombre de tu negocio"
-                                class="w-full bg-slate-100 border-2 border-transparent rounded-xl pt-5 pb-2 px-3 text-xs font-bold focus:bg-white focus:border-brand-500 transition-all outline-none"
-                                onchange="applySecretSettings()">
-                        </div>
-                        <div class="relative">
-                            <label class="text-[8px] font-black text-slate-400 uppercase absolute left-3 top-1.5 z-10">Teléfono Footer</label>
-                            <input type="text" id="business-phone-footer-input" placeholder="Ej: 0414-1234567"
-                                class="w-full bg-slate-100 border-2 border-transparent rounded-xl pt-5 pb-2 px-3 text-xs font-bold focus:bg-white focus:border-brand-500 transition-all outline-none"
-                                onchange="applySecretSettings()">
-                        </div>
-                    </div>
-                </div>
-                <!-- (Movidos a configuración normal) -->
-                <!-- Tutorial Reset -->
-                <div class="pt-4 border-t border-slate-100 space-y-3">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between">
-                        <span>Ayuda y Sistema</span>
-                        <i class="fas fa-circle-question text-slate-300"></i>
-                    </p>
-                    <button onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex'); setTimeout(() => window.startMasterTour(), 400);" class="w-full py-3.5 bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-black rounded-xl text-[10px] uppercase tracking-wider transition-all shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2">
-                        <i class="fas fa-route"></i> Recorrido Maestro Paso a Paso
-                    </button>
-                    <button onclick="window.resetTutorial()" class="w-full py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold rounded-xl text-[10px] uppercase tracking-wider transition-all shadow-sm border border-indigo-100 flex items-center justify-center gap-2">
-                        <i class="fas fa-wand-magic-sparkles"></i> Reiniciar Guía por Secciones
-                    </button>
-                    <p class="text-[8px] text-slate-400 mt-1 italic text-center leading-tight">El Recorrido Maestro te enseña todo: crear productos, vender y cerrar caja.</p>
+            <!-- Buscador -->
+            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="admin-search-input" placeholder="Buscar función..." oninput="window.renderAdminFeatures()" class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-2 border-transparent rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all">
                 </div>
             </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button
-                    onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')"
-                    class="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Guardar
-                    y Cerrar</button>
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar" id="admin-features-list">
+                <!-- Generado por JS -->
+                <div class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+                <div class="flex gap-2">
+                    <button onclick="window.adminToggleAll(true)" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-check-double mr-1"></i> Todo ON</button>
+                    <button onclick="window.adminToggleAll(false)" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-xmark mr-1"></i> Todo OFF</button>
+                </div>
+                <button onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')" class="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Cerrar</button>
             </div>
         </div>
     </div>
@@ -4147,17 +4343,17 @@
                     <p class="text-sm font-bold text-slate-500" id="cierre-date-display"></p>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4">
+                <div class="grid grid-cols-1 gap-3">
                     <!-- USD -->
-                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-dollar-sign"></i></div>
-                            <span class="font-bold text-slate-700">Efectivo USD</span>
+                            <div><span class="font-bold text-slate-700">Efectivo USD</span><span class="block text-[10px] text-slate-400">${txCount} transacciones</span></div>
                         </div>
                         <span id="cierre-total-usd" class="text-xl font-black text-emerald-600">$0.00</span>
                     </div>
                     <!-- VES -->
-                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-money-bill-wave"></i></div>
                             <span class="font-bold text-slate-700">Efectivo BS</span>
@@ -4165,18 +4361,42 @@
                         <span id="cierre-total-ves" class="text-xl font-black text-blue-600">Bs 0</span>
                     </div>
                     <!-- PUNTO -->
-                    <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-credit-card"></i></div>
                             <span class="font-bold text-slate-700">Punto de Venta</span>
                         </div>
                         <span id="cierre-total-card" class="text-xl font-black text-indigo-600">Bs 0</span>
                     </div>
+                    <!-- PAGO MÓVIL -->
+                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-mobile-screen-button"></i></div>
+                            <span class="font-bold text-slate-700">Pago Móvil</span>
+                        </div>
+                        <span id="cierre-total-pm" class="text-xl font-black text-sky-600">Bs 0</span>
+                    </div>
+                    <!-- TRANSFER -->
+                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-building-columns"></i></div>
+                            <span class="font-bold text-slate-700">Transferencia</span>
+                        </div>
+                        <span id="cierre-total-transfer" class="text-xl font-black text-teal-600">Bs 0</span>
+                    </div>
+                    <!-- TOTAL GENERAL -->
+                    <div class="bg-slate-900 p-5 rounded-3xl shadow-md flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-white/10 text-white rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-calculator"></i></div>
+                            <span class="font-bold text-white">TOTAL USD</span>
+                        </div>
+                        <span id="cierre-total-general" class="text-2xl font-black text-emerald-400">$0.00</span>
+                    </div>
                 </div>
 
                 <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-4">
                     <div class="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-sm"><i class="fas fa-whatsapp"></i></div>
-                    <p class="text-[10px] text-amber-800 font-bold leading-tight">Al confirmar, se enviará automáticamente este resumen al WhatsApp del Jefe.</p>
+                    <p class="text-[10px] text-amber-800 font-bold leading-tight">Al confirmar, se guarda el Corte Z en la base de datos y se envía el resumen al WhatsApp del Jefe.</p>
                 </div>
             </div>
 
@@ -4367,7 +4587,9 @@
     <script src="src/modules/auto-update.js"></script>
     <script src="src/renderer/analytics-financiero.js"></script>
     <script src="src/features/calculadora.js"></script>
+    <script src="vendor/dexie.min.js"></script>
     <script src="src/features/provisionar.js"></script>
+    <script src="src/renderer/funciones-pendientes.js"></script>
 </body>
 
 </html>

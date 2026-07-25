@@ -122,7 +122,7 @@ function showApp() {
 // Data Fetching
 async function sbGet(table, query = '') {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
         const res = await fetch(`${supabaseUrl}/rest/v1/${table}${query}`, {
             headers: {
@@ -137,6 +137,26 @@ async function sbGet(table, query = '') {
         clearTimeout(timeoutId);
         console.error('Fetch error:', e);
         return [];
+    }
+}
+
+async function sbFetch(table, method, data, query = '') {
+    try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/${table}${query}`, {
+            method,
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': method === 'POST' ? 'resolution=merge-duplicates,return=minimal' : 'return=minimal'
+            },
+            body: data ? JSON.stringify(data) : undefined
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+        return true;
+    } catch (e) {
+        console.error(`sbFetch error ${method} ${table}:`, e);
+        throw e;
     }
 }
 
@@ -180,6 +200,7 @@ async function loadDashboard() {
         // Cargar datos de otras pestañas si están activas
         if (currentAppTab === 'inventory') loadGlobalInventory();
         if (currentAppTab === 'financial') loadGlobalFinancial();
+        if (currentAppTab === 'orders') loadPurchaseOrders();
 
     } catch (e) {
         console.error('Error fetching data:', e);
@@ -224,14 +245,18 @@ function renderStores(storesToRender = allStores) {
         const profit = totalUSD - totalCost - totalExpUSD;
 
         return `
-        <div class="card" style="padding:16px; margin-bottom:12px; position:relative;" onclick="openDetail('${store.id}')">
+                <div class="card" style="padding:16px; margin-bottom:12px; position:relative;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <div style="font-weight:900; font-size:16px;">${store.name}</div>
-                <div style="font-size:9px; font-weight:900; color:${isOnline ? 'var(--primary)' : 'var(--text-muted)'}; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
-                    <div style="width:6px; height:6px; border-radius:50%; background:currentColor;"></div>
-                    ${isOnline ? 'En Línea' : 'Desconectado'}
+                <div style="font-weight:900; font-size:16px; cursor:pointer;" onclick="openDetail('${store.id}')">${store.name}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="font-size:9px; font-weight:900; color:${isOnline ? 'var(--primary)' : 'var(--text-muted)'}; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
+                        <div style="width:6px; height:6px; border-radius:50%; background:currentColor;"></div>
+                        ${isOnline ? 'En Línea' : 'Desconectado'}
+                    </div>
+                    <button onclick="event.stopPropagation();openDeleteStoreModal('${store.id}','${store.name}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;font-size:13px;" title="Eliminar sucursal"><i class="fas fa-trash-alt"></i></button>
                 </div>
             </div>
+            <div style="cursor:pointer;" onclick="openDetail('${store.id}')">
             
             <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
                 <div style="text-align:center; background:var(--bg); border-radius:8px; padding:8px;">
@@ -504,16 +529,19 @@ window.switchMainTab = function(tabId, el) {
     // Cambiar Título del Header
     const titles = {
         'panel': 'Panel de Control',
-        'inventory': 'Inventario Global',
+        'inventory': 'Inventario',
         'financial': 'Balance General',
-        'pos': 'Cajas en Vivo'
+        'pos': 'Cajas en Vivo',
+        'orders': 'Pedidos',
+        'movements': 'Movimientos'
     };
     document.getElementById('header-title').textContent = titles[tabId] || 'Punto Pila';
     
-    // Cargar datos específicos
     if (tabId === 'inventory') loadGlobalInventory();
     if (tabId === 'financial') loadGlobalFinancial();
     if (tabId === 'pos') loadLiveState();
+    if (tabId === 'orders') loadPurchaseOrders();
+    if (tabId === 'movements') loadMovements();
 };
 
 // Navigation
@@ -537,6 +565,8 @@ async function setTab(tab) {
     document.getElementById('tab-expenses').classList.toggle('active', tab === 'expenses');
     const perfTab = document.getElementById('tab-performance');
     if (perfTab) perfTab.classList.toggle('active', tab === 'performance');
+    const ordersTab = document.getElementById('tab-orders');
+    if (ordersTab) ordersTab.classList.toggle('active', tab === 'orders');
     
     const content = document.getElementById('detail-content');
     content.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
@@ -891,8 +921,55 @@ async function setTab(tab) {
             </div>
         `;
         loadExpenses(currentStoreId);
+    } else if (tab === 'orders') {
+        const orders = await sbGet('store_purchase_orders', `?order=timestamp.desc`);
+        const storeOrders = Array.isArray(orders) ? orders.filter(o => o.from_store === currentStoreId || o.to_store === currentStoreId) : [];
+        
+        if (storeOrders.length === 0) {
+            content.innerHTML = '<div class="empty">No hay pedidos para esta sucursal.</div>';
+            return;
+        }
+        
+        const storeMap = {};
+        allStores.forEach(s => { storeMap[s.id] = s.name; });
+        
+        content.innerHTML = storeOrders.map(po => {
+            let items = [];
+            try { items = JSON.parse(po.items_json || '[]'); } catch(e) {}
+            const totalItems = items.reduce((sum, it) => sum + (it.quantity || 0), 0);
+            
+            let badge = ''; let badgeColor = '';
+            if (po.status === 'PENDING') { badge = 'Pendiente'; badgeColor = '#f59e0b'; }
+            else if (po.status === 'APPROVED') { badge = 'Aprobado'; badgeColor = '#10b981'; }
+            else if (po.status === 'RECEIVED') { badge = 'Recibido'; badgeColor = '#3b82f6'; }
+            else { badge = po.status; badgeColor = '#6b7280'; }
+            
+            const fromName = storeMap[po.from_store] || po.from_store || '—';
+            const toName = storeMap[po.to_store] || po.to_store || '—';
+            const total = po.total_cost || items.reduce((sum, it) => sum + ((it.quantity||0)*(it.cost_price||0)), 0);
+            
+            return `
+            <div class="card" style="padding: 16px; margin-bottom: 12px; border-left: 4px solid ${badgeColor};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 800; font-size: 14px;">#${po.id.slice(-6).toUpperCase()}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${po.date ? new Date(po.date).toLocaleDateString() : '—'}</div>
+                    </div>
+                    <span style="background: ${badgeColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;">${badge}</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+                    <b style="color: var(--text);">${fromName}</b> → <b style="color: var(--text);">${toName}</b>
+                </div>
+                <div style="display: flex; gap: 16px; font-size: 13px;">
+                    <span>Items: <b>${totalItems}</b></span>
+                    <span>Total: <b>$${total.toFixed(2)}</b></span>
+                </div>
+                ${items.length > 0 ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--outline); font-size: 12px; color: var(--text-muted);">
+                    ${items.map(it => `<div>• ${it.product_name} x${it.quantity} — $${((it.quantity||0)*(it.cost_price||0)).toFixed(2)}</div>`).join('')}
+                </div>` : ''}
+            </div>`;
+        }).join('');
     } else {
-
         currentProducts = await sbGet('store_products', `?store_id=eq.${currentStoreId}&order=name.asc`);
         if (!Array.isArray(currentProducts) || currentProducts.length === 0) {
             content.innerHTML = '<div class="empty">No hay productos sincronizados o faltan tablas.</div>';
@@ -914,7 +991,6 @@ async function setTab(tab) {
             ${renderInventoryCards(currentProducts)}
         </div>`;
         }
-
     }
 }
 
@@ -1408,21 +1484,48 @@ async function loadGlobalInventory() {
     const list = document.getElementById('global-inventory-list');
     if (!list) return;
 
-    // Si ya tenemos productos cargados en loadDashboard (opcional, pero store_products es grande)
-    // Vamos a buscar todos los productos de todas las tiendas
     list.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
     
     try {
         const products = await sbGet('store_products', '?order=name.asc');
-        window.allGlobalProducts = Array.isArray(products) ? products : [];
+        const activeStoreIds = new Set(allStores.map(s => s.id));
+        window.allGlobalProducts = Array.isArray(products) ? products.filter(p => activeStoreIds.has(p.store_id)) : [];
+        
+        const sel = document.getElementById('inv-store-filter');
+        if (sel) {
+            const currentValue = sel.value;
+            sel.innerHTML = '<option value="">Todas las tiendas</option>' +
+                allStores.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            if (currentValue) sel.value = currentValue;
+        }
+        
         renderGlobalInventory(window.allGlobalProducts);
     } catch (e) {
-        list.innerHTML = '<div class="empty">Error cargando inventario global.</div>';
+        list.innerHTML = '<div class="empty">Error cargando inventario.</div>';
     }
+}
+
+function getFilteredProducts() {
+    if (!window.allGlobalProducts) return [];
+    const sel = document.getElementById('inv-store-filter');
+    const storeId = sel ? sel.value : '';
+    const searchEl = document.getElementById('global-inv-search');
+    const query = searchEl ? searchEl.value.toLowerCase().trim() : '';
+    
+    const activeStoreIds = new Set(allStores.map(s => s.id));
+    return window.allGlobalProducts.filter(p => {
+        if (!activeStoreIds.has(p.store_id)) return false;
+        if (storeId && p.store_id !== storeId) return false;
+        if (query && !p.name.toLowerCase().includes(query) &&
+            !(allStores.find(s => s.id === p.store_id)?.name || '').toLowerCase().includes(query)) return false;
+        return true;
+    });
 }
 
 function renderGlobalInventory(products) {
     const list = document.getElementById('global-inventory-list');
+    if (!products) products = getFilteredProducts();
+    
     if (products.length === 0) {
         list.innerHTML = '<div class="empty">No hay productos sincronizados.</div>';
         return;
@@ -1457,13 +1560,11 @@ function renderGlobalInventory(products) {
 }
 
 window.filterGlobalInventory = function(query) {
-    if (!window.allGlobalProducts) return;
-    const q = query.toLowerCase().trim();
-    const filtered = window.allGlobalProducts.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        (allStores.find(s => s.id === p.store_id)?.name || '').toLowerCase().includes(q)
-    );
-    renderGlobalInventory(filtered);
+    renderGlobalInventory(getFilteredProducts());
+};
+
+window.filterGlobalInventoryByStore = function(storeId) {
+    renderGlobalInventory(getFilteredProducts());
 };
 
 // ==========================================
@@ -1665,6 +1766,274 @@ window.saveRemoteRate = async function() {
         btn.innerText = 'Actualizar Todo';
         btn.disabled = false;
     }
+};
+
+// ==========================================
+// PEDIDOS / PURCHASE ORDERS
+// ==========================================
+async function loadPurchaseOrders() {
+    const container = document.getElementById('orders-content');
+    if (!container) return;
+    
+    try {
+        const orders = await sbGet('store_purchase_orders', '?order=timestamp.desc');
+        
+        if (!orders || orders.length === 0) {
+            container.innerHTML = `<div class="empty">
+                <i class="fas fa-cart-shopping" style="font-size: 40px; color: var(--outline); margin-bottom: 16px; display: block;"></i>
+                No hay pedidos registrados entre sucursales.
+            </div>`;
+            return;
+        }
+        
+        // Build store name map
+        const storeMap = {};
+        allStores.forEach(s => { storeMap[s.id] = s.name; });
+        
+        let html = '';
+        orders.forEach(po => {
+            let items = [];
+            try { items = JSON.parse(po.items_json || '[]'); } catch(e) {}
+            const totalItems = items.reduce((sum, it) => sum + (it.quantity || 0), 0);
+            
+            let badge = '';
+            let badgeColor = '';
+            if (po.status === 'PENDING') { badge = 'Pendiente'; badgeColor = '#f59e0b'; }
+            else if (po.status === 'APPROVED') { badge = 'Aprobado'; badgeColor = '#10b981'; }
+            else if (po.status === 'RECEIVED') { badge = 'Recibido'; badgeColor = '#3b82f6'; }
+            else { badge = po.status; badgeColor = '#6b7280'; }
+            
+            const fromName = storeMap[po.from_store] || po.from_store || '—';
+            const toName = storeMap[po.to_store] || po.to_store || '—';
+            const dateStr = po.date ? new Date(po.date).toLocaleDateString() : '—';
+            const total = po.total_cost || items.reduce((sum, it) => sum + ((it.quantity||0)*(it.cost_price||0)), 0);
+            
+            html += `<div class="card" style="padding: 16px; margin-bottom: 12px; border-left: 4px solid ${badgeColor};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <div>
+                        <div style="font-weight: 800; font-size: 14px;">#${po.id.slice(-6).toUpperCase()}</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${dateStr}</div>
+                    </div>
+                    <span style="background: ${badgeColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;">${badge}</span>
+                </div>
+                <div style="display: flex; gap: 16px; font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+                    <span><b style="color: var(--text);">${fromName}</b> → <b style="color: var(--text);">${toName}</b></span>
+                </div>
+                <div style="display: flex; gap: 16px; font-size: 13px;">
+                    <span>Items: <b>${totalItems}</b></span>
+                    <span>Total: <b>$${total.toFixed(2)}</b></span>
+                    <span>Creado por: <b>${po.created_by || '—'}</b></span>
+                </div>
+                ${items.length > 0 ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--outline); font-size: 12px; color: var(--text-muted);">
+                    ${items.map(it => `<div>• ${it.product_name} x${it.quantity} — $${((it.quantity||0)*(it.cost_price||0)).toFixed(2)}</div>`).join('')}
+                </div>` : ''}
+            </div>`;
+        });
+        
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = `<div class="empty" style="color: #ef4444;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 40px; margin-bottom: 16px; display: block;"></i>
+            Error al cargar pedidos: ${e.message}
+        </div>`;
+    }
+}
+
+// ==========================================
+// GESTIÓN DE SUCURSALES
+// ==========================================
+window.openAddStoreModal = function() {
+    document.getElementById('new-store-name').value = '';
+    document.getElementById('new-store-id').value = '';
+    document.getElementById('new-store-type').value = 'kiosko';
+    document.getElementById('add-store-modal').classList.add('active');
+};
+window.closeAddStoreModal = function() {
+    document.getElementById('add-store-modal').classList.remove('active');
+};
+window.addStore = async function() {
+    const name = document.getElementById('new-store-name').value.trim();
+    const customId = document.getElementById('new-store-id').value.trim();
+    const type = document.getElementById('new-store-type').value;
+    if (!name) { showToast('Ingresa un nombre para la sucursal', 'error'); return; }
+    const id = customId || 'store_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    try {
+        await sbFetch('stores', 'POST', {
+            id,
+            name,
+            store_type: type,
+            status: 'offline',
+            brand_name: businessName || 'Punto Pila POS',
+            last_seen: new Date().toISOString()
+        });
+        showToast('Sucursal creada: ' + name, 'success');
+        closeAddStoreModal();
+        loadDashboard();
+    } catch (e) {
+        showToast('Error al crear: ' + e.message, 'error');
+    }
+};
+
+window._deleteStoreId = null;
+window.openDeleteStoreModal = function(storeId, storeName) {
+    window._deleteStoreId = storeId;
+    document.getElementById('delete-store-name').textContent = storeName;
+    document.getElementById('delete-store-modal').classList.add('active');
+};
+window.closeDeleteStoreModal = function() {
+    document.getElementById('delete-store-modal').classList.remove('active');
+    window._deleteStoreId = null;
+};
+window.confirmDeleteStore = async function() {
+    const id = window._deleteStoreId;
+    if (!id) return;
+    try {
+        await sbFetch('stores', 'DELETE', null, `?id=eq.${encodeURIComponent(id)}`);
+        showToast('Sucursal eliminada', 'success');
+        closeDeleteStoreModal();
+        loadDashboard();
+    } catch (e) {
+        showToast('Error al eliminar: ' + e.message, 'error');
+    }
+};
+
+// ==========================================
+// MOVIMIENTOS (feed unificado)
+// ==========================================
+let _allMovements = [];
+let _movementRenderTimer = null;
+
+async function loadMovements() {
+    const container = document.getElementById('movements-content');
+    if (!container) return;
+    container.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
+    try {
+        const storeSelect = document.getElementById('mov-filter-store');
+        if (storeSelect && allStores.length > 0) {
+            storeSelect.innerHTML = '<option value="">Todas las sucursales</option>' +
+                allStores.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        }
+        const today = new Date().toISOString().split('T')[0];
+        const nextDay = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+        const [sales, expenses, orders] = await Promise.all([
+            sbGet('store_sales', `?date=gte.${today}&date=lt.${nextDay}&order=timestamp.desc&limit=200`),
+            sbGet('store_expenses', `?date=eq.${today}&order=created_at.desc&limit=200`),
+            sbGet('store_purchase_orders', `?order=timestamp.desc&limit=200`)
+        ]);
+        const storeMap = {};
+        allStores.forEach(s => storeMap[s.id] = s.name);
+        const list = [];
+        (Array.isArray(sales) ? sales : []).forEach(s => {
+            list.push({
+                id: s.id,
+                type: 'sale',
+                store_id: s.store_id,
+                store_name: storeMap[s.store_id] || s.store_id || '—',
+                label: 'Venta',
+                description: (s.items_json ? (() => { try { const items = JSON.parse(s.items_json); return items.map(i => i.product_name || i.name).join(', '); } catch(e) { return ''; } })() : '') || 'Venta #' + (s.ticket || s.id.slice(-6)),
+                amount: Number(s.total_usd) || 0,
+                currency: 'USD',
+                method: s.method || 'Efectivo',
+                date: s.date || s.created_at,
+                timestamp: s.timestamp || Date.parse(s.created_at) || Date.parse(s.date) || 0
+            });
+        });
+        (Array.isArray(expenses) ? expenses : []).forEach(e => {
+            list.push({
+                id: e.id,
+                type: 'expense',
+                store_id: e.store_id,
+                store_name: storeMap[e.store_id] || e.store_id || '—',
+                label: 'Gasto',
+                description: e.description || e.expense_type || 'Gasto',
+                amount: -(Number(e.amount_usd) || 0),
+                currency: 'USD',
+                method: e.payment_method || '',
+                date: e.date || e.created_at,
+                timestamp: Date.parse(e.created_at) || Date.parse(e.date) || 0
+            });
+        });
+        (Array.isArray(orders) ? orders : []).forEach(o => {
+            const fromName = storeMap[o.from_store] || o.from_store || '—';
+            const toName = storeMap[o.to_store] || o.to_store || '—';
+            list.push({
+                id: o.id,
+                type: 'order',
+                store_id: o.from_store || o.to_store,
+                store_name: fromName + ' → ' + toName,
+                label: o.status === 'PENDING' ? 'Pedido Pendiente' : o.status === 'APPROVED' ? 'Pedido Aprobado' : o.status === 'RECEIVED' ? 'Pedido Recibido' : 'Pedido',
+                description: o.notes || (o.items_json ? (() => { try { const items = JSON.parse(o.items_json); return items.map(i => i.product_name).join(', '); } catch(e) { return ''; } })() : ''),
+                amount: Number(o.total_cost) || 0,
+                currency: 'USD',
+                method: '',
+                date: o.date || o.created_at,
+                timestamp: o.timestamp || Date.parse(o.created_at) || Date.parse(o.date) || 0
+            });
+        });
+        list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        _allMovements = list;
+        renderMovements(list);
+    } catch (e) {
+        container.innerHTML = `<div class="empty" style="color:var(--error);">Error: ${e.message}</div>`;
+    }
+}
+
+function renderMovements(list) {
+    const container = document.getElementById('movements-content');
+    if (!container) return;
+    if (list.length === 0) {
+        container.innerHTML = '<div class="empty"><i class="fas fa-exchange-alt" style="font-size:40px;color:var(--outline);margin-bottom:16px;display:block;"></i>No hay movimientos hoy.</div>';
+        return;
+    }
+    const totalSales = list.filter(m => m.type === 'sale').reduce((s, m) => s + Math.abs(m.amount), 0);
+    const totalExpenses = list.filter(m => m.type === 'expense').reduce((s, m) => s + Math.abs(m.amount), 0);
+    const totalOrders = list.filter(m => m.type === 'order').reduce((s, m) => s + Math.abs(m.amount), 0);
+    container.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+            <div class="card" style="margin-bottom:0;text-align:center;padding:12px;">
+                <div style="font-size:18px;font-weight:900;color:var(--primary);">${fmtUSD(totalSales)}</div>
+                <div style="font-size:9px;font-weight:700;color:var(--text-muted);">Ventas</div>
+            </div>
+            <div class="card" style="margin-bottom:0;text-align:center;padding:12px;">
+                <div style="font-size:18px;font-weight:900;color:var(--error);">${fmtUSD(totalExpenses)}</div>
+                <div style="font-size:9px;font-weight:700;color:var(--text-muted);">Gastos</div>
+            </div>
+            <div class="card" style="margin-bottom:0;text-align:center;padding:12px;">
+                <div style="font-size:18px;font-weight:900;color:#7c3aed;">${fmtUSD(totalOrders)}</div>
+                <div style="font-size:9px;font-weight:700;color:var(--text-muted);">Pedidos</div>
+            </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+        ${list.map(m => {
+            let icon, color;
+            if (m.type === 'sale') { icon = 'fa-cash-register'; color = 'var(--primary)'; }
+            else if (m.type === 'expense') { icon = 'fa-receipt'; color = 'var(--error)'; }
+            else { icon = 'fa-cart-shopping'; color = '#7c3aed'; }
+            return `
+            <div class="card" style="padding:12px;margin-bottom:0;display:flex;align-items:center;gap:12px;" onclick="openDetail('${m.store_id}')">
+                <div style="width:36px;height:36px;border-radius:10px;background:${color}15;color:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:800;font-size:13px;">${m.label}</div>
+                    <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.store_name} · ${m.description}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-weight:900;font-size:14px;color:${m.amount < 0 ? 'var(--error)' : 'var(--primary)'};">${m.amount < 0 ? '-' : '+'}${fmtUSD(Math.abs(m.amount))}</div>
+                    <div style="font-size:9px;color:var(--text-muted);font-weight:600;">${m.method || m.type}</div>
+                </div>
+            </div>`;
+        }).join('')}
+        </div>`;
+}
+
+window.filterMovements = function() {
+    const storeFilter = document.getElementById('mov-filter-store')?.value || '';
+    const typeFilter = document.getElementById('mov-filter-type')?.value || '';
+    let filtered = _allMovements;
+    if (storeFilter) filtered = filtered.filter(m => m.store_id === storeFilter);
+    if (typeFilter) filtered = filtered.filter(m => m.type === typeFilter);
+    renderMovements(filtered);
 };
 
 init();

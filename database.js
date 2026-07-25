@@ -118,7 +118,8 @@ async function createTables() {
         'flavors TEXT',
         'expiryDate TEXT',
         'description TEXT',
-        'barcode TEXT'
+        'barcode TEXT',
+        'flavorBarcodes TEXT'
     ];
     for (const col of productCols) {
         try {
@@ -269,6 +270,18 @@ async function createTables() {
         )
     `);
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_usd REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_ves REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_pago_movil REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_transfer REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_card REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_eur REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN expenses_total REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN transaction_count INTEGER DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_usd REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_ves REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_ves REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN status TEXT DEFAULT 'open'`); } catch(e) {}
 
     // Tabla de Movimientos/Merma
     await runQuery(`
@@ -335,13 +348,55 @@ async function createTables() {
     `);
     try { await runQuery(`ALTER TABLE invoices ADD COLUMN store_id TEXT`); } catch(e) {}
 
+    // Tabla de Órdenes de Compra (Kiosko → Almacén)
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS purchase_orders (
+            id TEXT,
+            store_id TEXT,
+            order_type TEXT DEFAULT 'purchase',
+            from_store TEXT,
+            to_store TEXT,
+            status TEXT DEFAULT 'PENDING',
+            items TEXT,
+            notes TEXT,
+            total_cost REAL DEFAULT 0,
+            date TEXT,
+            timestamp INTEGER,
+            created_by TEXT,
+            approved_by TEXT,
+            received_date TEXT,
+            PRIMARY KEY (id, store_id)
+        )
+    `);
+    try { await runQuery(`ALTER TABLE purchase_orders ADD COLUMN store_id TEXT`); } catch(e) {}
+
+    // Tabla de Items de Órdenes de Compra
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS po_items (
+            id TEXT,
+            store_id TEXT,
+            po_id TEXT,
+            product_id TEXT,
+            product_name TEXT,
+            quantity REAL,
+            received_qty REAL DEFAULT 0,
+            cost_price REAL DEFAULT 0,
+            PRIMARY KEY (id, store_id)
+        )
+    `);
+    try { await runQuery(`ALTER TABLE po_items ADD COLUMN store_id TEXT`); } catch(e) {}
+
+    // Migración: añadir campos faltantes a stock_transfers
+    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN notes TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN po_id TEXT`); } catch(e) {}
+
     console.log('[DATABASE] Tablas inicializadas y migradas para Multi-Tenant.');
 }
 
 // API Exportada para el Frontend (Casi todos los métodos ahora requieren storeId)
 const api = {
     // --- PRODUCTOS ---
-    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? OR store_id IS NULL`, [storeId || '']),
+    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || '']),
     
     saveProduct: async (storeId, product) => {
         if (!product || !product.id) {
@@ -350,7 +405,7 @@ const api = {
         }
         const sid = storeId || '';
         return runQuery(
-            `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 product.id,
                 sid,
@@ -367,7 +422,8 @@ const api = {
                 product.expiryDate || '',
                 product.description || '',
                 product.img || '',
-                product.barcode || ''
+                product.barcode || '',
+                JSON.stringify(product.flavorBarcodes || {})
             ]
         );
     },
@@ -381,7 +437,7 @@ const api = {
             const validChunk = chunk.filter(p => p && p.id);
             if (validChunk.length === 0) continue;
             
-            const placeholders = validChunk.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(',');
+            const placeholders = validChunk.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(',');
             const values = [];
             validChunk.forEach(p => {
                 values.push(
@@ -400,11 +456,12 @@ const api = {
                     p.expiryDate || '',
                     p.description || '',
                     p.img || '',
-                    p.barcode || ''
+                    p.barcode || '',
+                    JSON.stringify(p.flavorBarcodes || {})
                 );
             });
             await runQuery(
-                `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode) VALUES ${placeholders}`,
+                `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes) VALUES ${placeholders}`,
                 values
             );
         }
@@ -414,7 +471,7 @@ const api = {
     deleteProduct: (storeId, id) => runQuery(`DELETE FROM products WHERE id = ? AND store_id = ?`, [id, storeId || '']),
 
     // --- INGREDIENTES ---
-    getIngredients: (storeId) => getQuery(`SELECT * FROM ingredients WHERE store_id = ? OR store_id IS NULL`, [storeId || '']),
+    getIngredients: (storeId) => getQuery(`SELECT * FROM ingredients WHERE store_id = ?`, [storeId || '']),
     
     saveIngredient: (storeId, ingredient) => {
         const sid = storeId || '';
@@ -427,7 +484,7 @@ const api = {
     deleteIngredient: (storeId, id) => runQuery(`DELETE FROM ingredients WHERE id = ? AND store_id = ?`, [id, storeId || '']),
 
     // --- RECETAS ---
-    getRecipes: (storeId) => getQuery(`SELECT * FROM recipes WHERE store_id = ? OR store_id IS NULL`, [storeId || '']),
+    getRecipes: (storeId) => getQuery(`SELECT * FROM recipes WHERE store_id = ?`, [storeId || '']),
     
     saveRecipe: (storeId, recipe) => {
         const sid = storeId || '';
@@ -442,7 +499,7 @@ const api = {
     deleteRecipesByProduct: (storeId, productId) => runQuery(`DELETE FROM recipes WHERE product_id = ? AND store_id = ?`, [productId, storeId || '']),
 
     // --- CLIENTES ---
-    getClients: (storeId) => getQuery(`SELECT * FROM clients WHERE store_id = ? OR store_id IS NULL`, [storeId || '']),
+    getClients: (storeId) => getQuery(`SELECT * FROM clients WHERE store_id = ?`, [storeId || '']),
     
     saveClient: (storeId, client) => {
         const sid = storeId || '';
@@ -456,8 +513,8 @@ const api = {
     getSales: (storeId, limit = 100) => getQuery(`
         SELECT s.*, cl.name as client_name, cl.document as client_document, cl.phone as client_phone 
         FROM sales s
-        LEFT JOIN clients cl ON s.client_id = cl.id AND (s.store_id = cl.store_id OR cl.store_id IS NULL OR cl.store_id = '')
-        WHERE s.store_id = ? OR s.store_id IS NULL OR s.store_id = '' 
+        LEFT JOIN clients cl ON s.client_id = cl.id AND s.store_id = cl.store_id
+        WHERE s.store_id = ?
         ORDER BY s.timestamp DESC 
         LIMIT ?
     `, [storeId || '', limit]),
@@ -465,8 +522,8 @@ const api = {
     getSalesByDate: (storeId, startDate, endDate) => getQuery(`
         SELECT s.*, cl.name as client_name, cl.document as client_document, cl.phone as client_phone 
         FROM sales s
-        LEFT JOIN clients cl ON s.client_id = cl.id AND (s.store_id = cl.store_id OR cl.store_id IS NULL OR cl.store_id = '')
-        WHERE (s.store_id = ? OR s.store_id IS NULL OR s.store_id = '') AND s.timestamp >= ? AND s.timestamp <= ? 
+        LEFT JOIN clients cl ON s.client_id = cl.id AND s.store_id = cl.store_id
+        WHERE s.store_id = ? AND s.timestamp >= ? AND s.timestamp <= ? 
         ORDER BY s.timestamp DESC
     `, [storeId || '', startDate, endDate]),
     
@@ -505,8 +562,8 @@ const api = {
 
     voidSale: async (storeId, saleId) => {
         const sid = storeId || '';
-        await runQuery(`UPDATE sales SET status = 'void' WHERE id = ? AND (store_id = ? OR store_id IS NULL OR store_id = '')`, [saleId, sid]);
-        await runQuery(`UPDATE credits SET status = 'VOID' WHERE sale_id = ? AND (store_id = ? OR store_id IS NULL OR store_id = '')`, [saleId, sid]);
+        await runQuery(`UPDATE sales SET status = 'void' WHERE id = ? AND store_id = ?`, [saleId, sid]);
+        await runQuery(`UPDATE credits SET status = 'VOID' WHERE sale_id = ? AND store_id = ?`, [saleId, sid]);
         return { success: true };
     },
 
@@ -517,7 +574,7 @@ const api = {
             FROM credits c
             LEFT JOIN clients cl ON c.client_id = cl.id AND c.store_id = cl.store_id
             LEFT JOIN sales s ON c.sale_id = s.id AND c.store_id = s.store_id
-            WHERE (c.store_id = ? OR c.store_id IS NULL) AND c.status = 'PENDING'
+            WHERE c.store_id = ? AND c.status = 'PENDING'
             ORDER BY c.date DESC
         `, [storeId || '']);
     },
@@ -561,15 +618,35 @@ const api = {
         return true;
     },
 
-    // --- CASHUPS (ARQUEOS) ---
+    // --- CASHUPS (ARQUEOS / CORTE Z) ---
     getCashups: (storeId) => getQuery(`SELECT * FROM cashups WHERE store_id = ? ORDER BY date DESC`, [storeId || '']),
+
+    getCashupByDate: (storeId, date) => getQuery(`SELECT * FROM cashups WHERE store_id = ? AND date = ?`, [storeId || '', date]).then(r => r[0] || null),
 
     saveCashup: (storeId, cashup) => {
         const sid = storeId || '';
         return runQuery(
-            `INSERT OR REPLACE INTO cashups (id, store_id, date, cash_usd, cash_ves, sales_usd, sales_ves, diff_usd, cashier_name, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [cashup.id, sid, cashup.date, cashup.cash_usd, cashup.cash_ves, cashup.sales_usd, cashup.sales_ves, cashup.diff_usd, cashup.cashier_name, cashup.notes || '']
+            `INSERT OR REPLACE INTO cashups (id, store_id, date, opening_usd, opening_ves, cash_usd, cash_ves, sales_usd, sales_ves, sales_pago_movil, sales_transfer, sales_card, sales_eur, expenses_total, transaction_count, counted_usd, counted_ves, diff_usd, diff_ves, cashier_name, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [cashup.id, sid, cashup.date, cashup.opening_usd || 0, cashup.opening_ves || 0, cashup.cash_usd || 0, cashup.cash_ves || 0, cashup.sales_usd || 0, cashup.sales_ves || 0, cashup.sales_pago_movil || 0, cashup.sales_transfer || 0, cashup.sales_card || 0, cashup.sales_eur || 0, cashup.expenses_total || 0, cashup.transaction_count || 0, cashup.counted_usd || 0, cashup.counted_ves || 0, cashup.diff_usd || 0, cashup.diff_ves || 0, cashup.cashier_name || '', cashup.status || 'closed', cashup.notes || '']
         );
+    },
+
+    getTodaySalesSummary: (storeId) => {
+        const sid = storeId || '';
+        const today = new Date().toISOString().split('T')[0];
+        return getQuery(`
+            SELECT
+                COUNT(*) as transaction_count,
+                COALESCE(SUM(CASE WHEN method = 'cash-usd' THEN totalUSD ELSE 0 END), 0) as sales_usd,
+                COALESCE(SUM(CASE WHEN method = 'cash-ves' THEN totalVES ELSE 0 END), 0) as sales_ves,
+                COALESCE(SUM(CASE WHEN method = 'pago-movil' THEN totalVES ELSE 0 END), 0) as sales_pago_movil,
+                COALESCE(SUM(CASE WHEN method = 'transfer' THEN totalVES ELSE 0 END), 0) as sales_transfer,
+                COALESCE(SUM(CASE WHEN method LIKE 'card%' THEN totalVES ELSE 0 END), 0) as sales_card,
+                COALESCE(SUM(CASE WHEN method = 'cash-eur' OR method = 'eur' THEN totalEUR ELSE 0 END), 0) as sales_eur,
+                COALESCE(SUM(totalUSD), 0) as total_usd,
+                COALESCE(SUM(totalVES), 0) as total_ves
+            FROM sales WHERE store_id = ? AND date LIKE ? AND (status IS NULL OR status != 'pending')
+        `, [sid, today + '%']);
     },
 
     // --- MOVEMENTS ---
@@ -592,20 +669,79 @@ const api = {
     },
 
     // --- STOCK TRANSFERS ---
-    getTransfers: (storeId) => getQuery(`SELECT * FROM stock_transfers WHERE store_id = ? OR from_store = ? OR to_store = ? ORDER BY timestamp DESC LIMIT 200`, [storeId || '', storeId || '', storeId || '']),
+    getTransfers: (storeId, status) => {
+        let sql = `SELECT * FROM stock_transfers WHERE (store_id = ? OR from_store = ? OR to_store = ?)`;
+        let params = [storeId || '', storeId || '', storeId || ''];
+        if (status && status !== 'all') { sql += ` AND status = ?`; params.push(status); }
+        sql += ` ORDER BY timestamp DESC LIMIT 200`;
+        return getQuery(sql, params);
+    },
 
     saveTransfer: (storeId, transfer) => {
         const sid = storeId || '';
         return runQuery(
-            `INSERT INTO stock_transfers (id, store_id, from_store, to_store, product_id, product_name, quantity, date, timestamp, status, cashier_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [transfer.id, sid, transfer.from_store, transfer.to_store, transfer.product_id, transfer.product_name, transfer.quantity, transfer.date, transfer.timestamp, transfer.status || 'PENDING', transfer.cashier_name]
+            `INSERT INTO stock_transfers (id, store_id, from_store, to_store, product_id, product_name, quantity, date, timestamp, status, cashier_name, notes, po_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [transfer.id, sid, transfer.from_store, transfer.to_store, transfer.product_id, transfer.product_name, transfer.quantity, transfer.date, transfer.timestamp, transfer.status || 'PENDING', transfer.cashier_name, transfer.notes || '', transfer.po_id || '']
         );
     },
 
-    completeTransfer: (storeId, transferId) => runQuery(`UPDATE stock_transfers SET status = 'COMPLETED' WHERE id = ? AND store_id = ?`, [transferId, storeId || '']),
+    updateTransferStatus: (storeId, transferId, status) => runQuery(`UPDATE stock_transfers SET status = ? WHERE id = ? AND store_id = ?`, [status, transferId, storeId || '']),
+
+    deleteTransfer: (storeId, transferId) => runQuery(`DELETE FROM stock_transfers WHERE id = ? AND store_id = ?`, [transferId, storeId || '']),
+
+    // --- PURCHASE ORDERS ---
+    getPurchaseOrders: (storeId, status) => {
+        let sql = `SELECT * FROM purchase_orders WHERE (store_id = ? OR from_store = ? OR to_store = ?)`;
+        let params = [storeId || '', storeId || '', storeId || ''];
+        if (status && status !== 'all') { sql += ` AND status = ?`; params.push(status); }
+        sql += ` ORDER BY timestamp DESC LIMIT 200`;
+        return getQuery(sql, params);
+    },
+
+    savePurchaseOrder: async (storeId, po) => {
+        const sid = storeId || '';
+        await runQuery(
+            `INSERT INTO purchase_orders (id, store_id, order_type, from_store, to_store, status, items, notes, total_cost, date, timestamp, created_by, approved_by, received_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [po.id, sid, po.order_type || 'purchase', po.from_store, po.to_store, po.status || 'PENDING', JSON.stringify(po.items || []), po.notes || '', po.total_cost || 0, po.date, po.timestamp, po.created_by || '', po.approved_by || '', po.received_date || '']
+        );
+        // Save individual items
+        if (po.items && po.items.length) {
+            for (const item of po.items) {
+                const itemId = 'poi_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+                await runQuery(
+                    `INSERT INTO po_items (id, store_id, po_id, product_id, product_name, quantity, received_qty, cost_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [itemId, sid, po.id, item.product_id, item.product_name, item.quantity || 0, item.received_qty || 0, item.cost_price || 0]
+                );
+            }
+        }
+        return po;
+    },
+
+    updatePOStatus: (storeId, poId, status) => runQuery(`UPDATE purchase_orders SET status = ? WHERE id = ? AND store_id = ?`, [status, poId, storeId || '']),
+
+    receivePO: async (storeId, poId, items) => {
+        const sid = storeId || '';
+        await runQuery(`UPDATE purchase_orders SET status = 'RECEIVED', received_date = ? WHERE id = ? AND store_id = ?`, [new Date().toISOString(), poId, sid]);
+        for (const item of items) {
+            await runQuery(`UPDATE po_items SET received_qty = ? WHERE po_id = ? AND product_id = ?`, [item.received_qty, poId, item.product_id]);
+            // Update product stock
+            const product = (await getQuery(`SELECT * FROM products WHERE id = ? AND store_id = ?`, [item.product_id, sid]))[0];
+            if (product) {
+                await runQuery(`UPDATE products SET stock = stock + ? WHERE id = ? AND store_id = ?`, [item.received_qty, item.product_id, sid]);
+            }
+        }
+    },
+
+    deletePO: (storeId, poId) => {
+        const sid = storeId || '';
+        return Promise.all([
+            runQuery(`DELETE FROM purchase_orders WHERE id = ? AND store_id = ?`, [poId, sid]),
+            runQuery(`DELETE FROM po_items WHERE po_id = ? AND store_id = ?`, [poId, sid])
+        ]);
+    },
 
     // --- LOYALTY POINTS ---
-    getLoyaltyPoints: (storeId) => getQuery(`SELECT lp.*, cl.name as client_name, cl.document as client_document FROM loyalty_points lp LEFT JOIN clients cl ON lp.client_id = cl.id AND (lp.store_id = cl.store_id OR cl.store_id IS NULL OR cl.store_id = '') WHERE lp.store_id = ? ORDER BY lp.points DESC`, [storeId || '']),
+    getLoyaltyPoints: (storeId) => getQuery(`SELECT lp.*, cl.name as client_name, cl.document as client_document FROM loyalty_points lp LEFT JOIN clients cl ON lp.client_id = cl.id AND lp.store_id = cl.store_id WHERE lp.store_id = ? ORDER BY lp.points DESC`, [storeId || '']),
 
     getClientLoyalty: (storeId, clientId) => {
         const sid = storeId || '';
@@ -634,7 +770,7 @@ const api = {
     },
 
     // --- INVOICES ---
-    getInvoices: (storeId) => getQuery(`SELECT i.*, s.total, s.date as sale_date, cl.name as client_name FROM invoices i LEFT JOIN sales s ON i.sale_id = s.id AND (i.store_id = s.store_id OR s.store_id IS NULL OR s.store_id = '') LEFT JOIN clients cl ON s.client_id = cl.id AND (s.store_id = cl.store_id OR cl.store_id IS NULL OR cl.store_id = '') WHERE i.store_id = ? ORDER BY i.sent_date DESC`, [storeId || '']),
+    getInvoices: (storeId) => getQuery(`SELECT i.*, s.total, s.date as sale_date, cl.name as client_name FROM invoices i LEFT JOIN sales s ON i.sale_id = s.id AND i.store_id = s.store_id LEFT JOIN clients cl ON s.client_id = cl.id AND s.store_id = cl.store_id WHERE i.store_id = ? ORDER BY i.sent_date DESC`, [storeId || '']),
 
     saveInvoice: (storeId, invoice) => {
         const sid = storeId || '';
@@ -645,4 +781,54 @@ const api = {
     },
 };
 
-module.exports = { initDatabase, api };
+// ==========================================
+// MIGRACIÓN: Asignar store_id a datos huérfanos
+// Productos, clientes, ventas sin store_id se asignan
+// al storeId proporcionado para evitar que aparezcan
+// en todos los stores (cruce de inventario).
+// ==========================================
+async function migrateOrphanData(storeId) {
+    if (!storeId) return;
+    const sid = String(storeId).trim();
+    if (!sid) return;
+
+    const tables = [
+        { name: 'products', idCol: 'id' },
+        { name: 'clients', idCol: 'id' },
+        { name: 'sales', idCol: 'id' },
+        { name: 'credits', idCol: 'id' },
+        { name: 'credit_payments', idCol: 'id' },
+        { name: 'ingredients', idCol: 'id' },
+        { name: 'recipes', idCol: 'id' },
+        { name: 'settings', idCol: 'key' },
+        { name: 'cashups', idCol: 'id' },
+        { name: 'movements', idCol: 'id' },
+        { name: 'stock_transfers', idCol: 'id' },
+        { name: 'purchase_orders', idCol: 'id' },
+        { name: 'po_items', idCol: 'id' },
+        { name: 'loyalty_points', idCol: 'client_id' },
+        { name: 'invoices', idCol: 'id' }
+    ];
+
+    let totalMigrated = 0;
+    for (const table of tables) {
+        try {
+            const orphans = await getQuery(
+                `SELECT ${table.idCol} FROM ${table.name} WHERE store_id IS NULL OR store_id = ''`
+            );
+            if (orphans && orphans.length > 0) {
+                await runQuery(
+                    `UPDATE ${table.name} SET store_id = ? WHERE store_id IS NULL OR store_id = ''`,
+                    [sid]
+                );
+                totalMigrated += orphans.length;
+            }
+        } catch(e) { /* tabla no existe aún */ }
+    }
+    if (totalMigrated > 0) {
+        console.log(`[DATABASE] Migración: ${totalMigrated} registros huérfanos asignados al store ${sid}`);
+    }
+    return totalMigrated;
+}
+
+module.exports = { initDatabase, api, migrateOrphanData };

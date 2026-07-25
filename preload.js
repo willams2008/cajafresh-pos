@@ -44,12 +44,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Fiscal Printer
     writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
     // Auto-Updater
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     checkForUpdates: () => ipcRenderer.send('check-for-updates'),
     downloadUpdate: () => ipcRenderer.send('download-update'),
     installUpdate: () => ipcRenderer.send('install-update'),
     onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
     // Dashboard Remoto
     syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
+    // Sunmi P3 Integration
+    sunmiGetStatus: () => ipcRenderer.invoke('sunmi-get-status'),
+    sunmiStartMonitoring: () => ipcRenderer.invoke('sunmi-start-monitoring'),
+    sunmiStopMonitoring: () => ipcRenderer.invoke('sunmi-stop-monitoring'),
+    onSunmiStatus: (callback) => ipcRenderer.on('sunmi-status', (event, data) => callback(data)),
+    testPrint: () => ipcRenderer.invoke('test-print'),
     send: (channel, data) => {
         const validChannels = ['dashboard-data', 'sync-products', 'generate-remote-qr', 'generate-download-qr', 'request-discovery-update', 'request-tunnel-info', 'license-activated'];
         if (validChannels.includes(channel)) ipcRenderer.send(channel, data);
@@ -72,6 +79,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 contextBridge.exposeInMainWorld('db', {
+    getSettings: () => ipcRenderer.invoke('db-get-settings'),
     getProducts: () => ipcRenderer.invoke('db-get-products'),
     saveProduct: (product) => ipcRenderer.invoke('db-save-product', product),
     saveProductsBulk: (products) => ipcRenderer.invoke('db-save-products-bulk', products),
@@ -89,7 +97,26 @@ contextBridge.exposeInMainWorld('db', {
     addCreditPayment: (id, amount, method) => ipcRenderer.invoke('db-add-credit-payment', id, amount, method),
     
     migrateData: (data) => ipcRenderer.invoke('db-migrate', data),
-    cloudSyncLog: (msg) => ipcRenderer.invoke('cloud-sync-log', msg)
+    cloudSyncLog: (msg) => ipcRenderer.invoke('cloud-sync-log', msg),
+    
+    // Stock Transfers
+    getTransfers: (status) => ipcRenderer.invoke('db-get-transfers', null, status),
+    saveTransfer: (t) => ipcRenderer.invoke('db-save-transfer', t),
+    updateTransferStatus: (id, status) => ipcRenderer.invoke('db-update-transfer-status', id, status),
+    deleteTransfer: (id) => ipcRenderer.invoke('db-delete-transfer', id),
+    
+    // Purchase Orders
+    getPurchaseOrders: (status) => ipcRenderer.invoke('db-get-purchase-orders', null, status),
+    savePurchaseOrder: (po) => ipcRenderer.invoke('db-save-purchase-order', po),
+    updatePOStatus: (id, status) => ipcRenderer.invoke('db-update-po-status', id, status),
+    receivePO: (poId, items) => ipcRenderer.invoke('db-receive-po', poId, items),
+    deletePO: (id) => ipcRenderer.invoke('db-delete-po', id),
+    
+    // Cashups / Corte Z
+    getCashups: () => ipcRenderer.invoke('db-get-cashups'),
+    getCashupByDate: (date) => ipcRenderer.invoke('db-get-cashup-by-date', date),
+    saveCashup: (cashup) => ipcRenderer.invoke('db-save-cashup', cashup),
+    getTodaySalesSummary: () => ipcRenderer.invoke('db-get-today-sales-summary')
 });
 
 // --- CLOUD SYNC (Multi-Sucursal) ---
@@ -101,6 +128,12 @@ contextBridge.exposeInMainWorld('cloudSync', {
     pushAlerts: (products) => ipcRenderer.invoke('cloud-sync-push-alerts', products),
     pushLiveState: (cart, totals, view) => ipcRenderer.invoke('cloud-sync-push-live', cart, totals, view),
     pushCatalog: (products) => ipcRenderer.invoke('cloud-sync-push-catalog', products),
+    pushTransfer: (t) => ipcRenderer.invoke('cloud-sync-push-transfer', t),
+    pushPurchaseOrder: (po) => ipcRenderer.invoke('cloud-sync-push-purchase-order', po),
+    approvePurchaseOrder: (poId, items, fromStoreId) => ipcRenderer.invoke('cloud-sync-approve-po', poId, items, fromStoreId),
+    receivePurchaseOrder: (poId, items, toStoreId) => ipcRenderer.invoke('cloud-sync-receive-po', poId, items, toStoreId),
+    getWarehouseStoreId: () => ipcRenderer.invoke('cloud-sync-get-warehouse-store-id'),
+    getWarehouseProducts: () => ipcRenderer.invoke('cloud-sync-get-warehouse-products'),
     onStatusChange: (callback) => ipcRenderer.on('cloud-sync-status', (_, data) => callback(data)),
     onProductUpdatedRemote: (callback) => ipcRenderer.on('product-updated-remote', (_, data) => callback(data)),
     onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (_, data) => callback(data)),

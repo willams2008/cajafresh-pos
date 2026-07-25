@@ -502,7 +502,7 @@ window.switchMainTab = function (tabId, el) {
     // Cambiar Título del Header
     const titles = {
         'panel': 'Panel de Control',
-        'inventory': 'Inventario Global',
+        'inventory': 'Inventario',
         'financial': 'Balance General',
         'pos': 'Cajas en Vivo'
     };
@@ -550,7 +550,10 @@ async function setTab(tab) {
     ` : '';
 
     if (tab === 'sales') {
-        const sales = await sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}&order=timestamp.desc`);
+        const nextDate = new Date(currentDetailDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDateStr = nextDate.toISOString().split('T')[0];
+        const sales = await sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=gte.${currentDetailDate}&date=lt.${nextDateStr}&order=timestamp.desc`);
         let htmlStr = '';
         if (!Array.isArray(sales) || sales.length === 0) {
             htmlStr = '<div class="empty">No hay ventas registradas en esta fecha.</div>';
@@ -565,7 +568,7 @@ async function setTab(tab) {
 
                 return `
                 <div class="card" style="padding:16px; margin-bottom:12px;">
-                    <!-- Cabecera del ticket -->
+                     <!-- Cabecera del ticket -->
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
                         <div>
                             <div style="font-size:14px;font-weight:900;color:var(--primary);">Ticket #${s.ticket}</div>
@@ -598,11 +601,14 @@ async function setTab(tab) {
         }
         content.innerHTML = datePickerHtml + htmlStr;
     } else if (tab === 'performance') {
+        const nextDate = new Date(currentDetailDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDateStr = nextDate.toISOString().split('T')[0];
 
         const [snaps, sales, expenses] = await Promise.all([
-            sbGet('store_snapshots', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}&order=timestamp.desc&limit=1`),
-            sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`),
-            sbGet('store_expenses', `?store_id=eq.${currentStoreId}&date=eq.${currentDetailDate}`)
+            sbGet('store_snapshots', `?store_id=eq.${currentStoreId}&date=gte.${currentDetailDate}&date=lt.${nextDateStr}&order=timestamp.desc&limit=1`),
+            sbGet('store_sales', `?store_id=eq.${currentStoreId}&date=gte.${currentDetailDate}&date=lt.${nextDateStr}`),
+            sbGet('store_expenses', `?store_id=eq.${currentStoreId}&date=gte.${currentDetailDate}&date=lt.${nextDateStr}`)
         ]);
 
         const snap = snaps[0] || {};
@@ -1332,21 +1338,45 @@ async function loadGlobalInventory() {
     const list = document.getElementById('global-inventory-list');
     if (!list) return;
 
-    // Si ya tenemos productos cargados en loadDashboard (opcional, pero store_products es grande)
-    // Vamos a buscar todos los productos de todas las tiendas
     list.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
 
     try {
         const products = await sbGet('store_products', '?order=name.asc');
         window.allGlobalProducts = Array.isArray(products) ? products : [];
+        
+        const sel = document.getElementById('inv-store-filter');
+        if (sel) {
+            const currentValue = sel.value;
+            sel.innerHTML = '<option value="">Todas las tiendas</option>' +
+                allStores.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            if (currentValue) sel.value = currentValue;
+        }
+        
         renderGlobalInventory(window.allGlobalProducts);
     } catch (e) {
-        list.innerHTML = '<div class="empty">Error cargando inventario global.</div>';
+        list.innerHTML = '<div class="empty">Error cargando inventario.</div>';
     }
+}
+
+function getFilteredProducts() {
+    if (!window.allGlobalProducts) return [];
+    const sel = document.getElementById('inv-store-filter');
+    const storeId = sel ? sel.value : '';
+    const searchEl = document.getElementById('global-inv-search');
+    const query = searchEl ? searchEl.value.toLowerCase().trim() : '';
+    
+    return window.allGlobalProducts.filter(p => {
+        if (storeId && p.store_id !== storeId) return false;
+        if (query && !p.name.toLowerCase().includes(query) &&
+            !(allStores.find(s => s.id === p.store_id)?.name || '').toLowerCase().includes(query)) return false;
+        return true;
+    });
 }
 
 function renderGlobalInventory(products) {
     const list = document.getElementById('global-inventory-list');
+    if (!products) products = getFilteredProducts();
+    
     if (products.length === 0) {
         list.innerHTML = '<div class="empty">No hay productos sincronizados.</div>';
         return;
@@ -1372,7 +1402,7 @@ function renderGlobalInventory(products) {
                 <div style="font-size:14px; font-weight:900; color:var(--text);">${fmtUSD(p.price)}</div>
                 <div style="font-size:10px; font-weight:800; color:${stockColor}; margin-top:2px;">${p.stock} uds</div>
             </div>
-            <div style="padding-left: 8px;">
+            <div style="padding-left:8px;">
                 <i class="fas fa-pen" style="color:var(--text-muted); font-size:12px;"></i>
             </div>
         </div>
@@ -1381,13 +1411,11 @@ function renderGlobalInventory(products) {
 }
 
 window.filterGlobalInventory = function (query) {
-    if (!window.allGlobalProducts) return;
-    const q = query.toLowerCase().trim();
-    const filtered = window.allGlobalProducts.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        (allStores.find(s => s.id === p.store_id)?.name || '').toLowerCase().includes(q)
-    );
-    renderGlobalInventory(filtered);
+    renderGlobalInventory(getFilteredProducts());
+};
+
+window.filterGlobalInventoryByStore = function (storeId) {
+    renderGlobalInventory(getFilteredProducts());
 };
 
 // ==========================================

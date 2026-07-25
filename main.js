@@ -13,7 +13,7 @@ const cors = require('cors');
 const QRCode = require('qrcode');
 const { spawn, execSync } = require('child_process');
 const https = require('https');
-const { initDatabase, api: dbApi } = require('./database');
+const { initDatabase, api: dbApi, migrateOrphanData } = require('./database');
 const CloudSync = require('./cloud-sync');
 
 // --- STARTUP DIAGNOSTIC LOG ---
@@ -76,8 +76,16 @@ try {
             logStartup('✅ Usando binario cloudflared desempaquetado: ' + bin);
         } else {
             logStartup('⚠️ Binario desempaquetado NO encontrado en: ' + unpackedBin);
-            // Intentar usar el del ASAR (podría fallar por permisos, pero es mejor que nada)
             logStartup('🔍 Reintentando con binario dentro de ASAR: ' + bin);
+        }
+    }
+    if (!fs.existsSync(bin)) {
+        const npmBin = path.join(__dirname, 'node_modules', 'cloudflared', 'bin', 'cloudflared.exe');
+        if (fs.existsSync(npmBin)) {
+            bin = npmBin;
+            logStartup('✅ Usando binario cloudflared desde node_modules: ' + bin);
+        } else {
+            logStartup('❌ Binario cloudflared no encontrado en: ' + npmBin);
         }
     }
 } catch (err) {
@@ -187,6 +195,9 @@ function getStoreIdHelper(passedStoreId) {
     }
 }
 
+ipcMain.handle('db-get-settings', async () => {
+    return getPersistentSettings();
+});
 ipcMain.handle('db-get-products', async (e, storeId) => {
     const sid = getStoreIdHelper(storeId);
     return dbApi.getProducts(sid);
@@ -309,6 +320,66 @@ ipcMain.handle('db-add-credit-payment', async (e, storeId, id, amount, method) =
     return dbApi.addCreditPayment(sid, creditId, amt, meth);
 });
 
+ipcMain.handle('db-get-transfers', async (e, storeId, status) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getTransfers(sid, status);
+});
+ipcMain.handle('db-save-transfer', async (e, storeId, t) => {
+    let sid = storeId, trans = t;
+    if (typeof storeId !== 'string') { trans = storeId; sid = getStoreIdHelper(); }
+    return dbApi.saveTransfer(sid, trans);
+});
+ipcMain.handle('db-update-transfer-status', async (e, storeId, id, status) => {
+    let sid = storeId, tid = id, st = status;
+    if (typeof storeId !== 'string') { tid = storeId; st = id; sid = getStoreIdHelper(); }
+    return dbApi.updateTransferStatus(sid, tid, st);
+});
+ipcMain.handle('db-delete-transfer', async (e, storeId, id) => {
+    let sid = storeId, tid = id;
+    if (typeof storeId !== 'string') { tid = storeId; sid = getStoreIdHelper(); }
+    return dbApi.deleteTransfer(sid, tid);
+});
+ipcMain.handle('db-get-purchase-orders', async (e, storeId, status) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getPurchaseOrders(sid, status);
+});
+ipcMain.handle('db-save-purchase-order', async (e, storeId, po) => {
+    let sid = storeId, order = po;
+    if (typeof storeId !== 'string') { order = storeId; sid = getStoreIdHelper(); }
+    return dbApi.savePurchaseOrder(sid, order);
+});
+ipcMain.handle('db-update-po-status', async (e, storeId, id, status) => {
+    let sid = storeId, pid = id, st = status;
+    if (typeof storeId !== 'string') { pid = storeId; st = id; sid = getStoreIdHelper(); }
+    return dbApi.updatePOStatus(sid, pid, st);
+});
+ipcMain.handle('db-receive-po', async (e, storeId, poId, items) => {
+    let sid = storeId, pid = poId, its = items;
+    if (typeof storeId !== 'string') { pid = storeId; its = poId; sid = getStoreIdHelper(); }
+    return dbApi.receivePO(sid, pid, its);
+});
+ipcMain.handle('db-delete-po', async (e, storeId, id) => {
+    let sid = storeId, pid = id;
+    if (typeof storeId !== 'string') { pid = storeId; sid = getStoreIdHelper(); }
+    return dbApi.deletePO(sid, pid);
+});
+ipcMain.handle('db-get-cashups', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getCashups(sid);
+});
+ipcMain.handle('db-get-cashup-by-date', async (e, storeId, date) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getCashupByDate(sid, date);
+});
+ipcMain.handle('db-save-cashup', async (e, storeId, cashup) => {
+    let sid = storeId, c = cashup;
+    if (typeof storeId !== 'string') { c = storeId; sid = getStoreIdHelper(); }
+    return dbApi.saveCashup(sid, c);
+});
+ipcMain.handle('db-get-today-sales-summary', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getTodaySalesSummary(sid);
+});
 ipcMain.handle('db-migrate', async (e, storeId, data) => {
     let sid = storeId;
     let migrateData = data;
@@ -380,6 +451,24 @@ function getChromePath() {
 // ==========================================
 async function initWhatsApp() {
     logPath = path.join(app.getPath('userData'), 'whatsapp_debug.log');
+
+    // Limpiar archivos de lock de sesiones previas (evita "browser already running")
+    try {
+        const sessionDir = path.join(app.getPath('userData'), 'wwebjs_session');
+        const lockFile = path.join(sessionDir, 'session', 'SingletonLock');
+        if (require('fs').existsSync(lockFile)) {
+            require('fs').unlinkSync(lockFile);
+            logWA('🧹 Lock de sesión WhatsApp eliminado');
+        }
+        // También limpiar archivos de caché del navegador que causan conflictos
+        const singletonFiles = ['SingletonCookie', 'SingletonSocket'];
+        singletonFiles.forEach(f => {
+            const fp = path.join(sessionDir, 'session', f);
+            try { if (require('fs').existsSync(fp)) require('fs').unlinkSync(fp); } catch(e) {}
+        });
+    } catch(e) {
+        logWA('⚠️ No se pudo limpiar lock de sesión: ' + e.message);
+    }
 
     // Destruir cliente anterior si existe para evitar zombies
     if (whatsappClient) {
@@ -1010,6 +1099,9 @@ function startServer() {
         res.sendFile(path.join(__dirname, 'download.html'));
     });
 
+    // Serve Windows installer files from dist_FINAL
+    serverApp.use('/dist', express.static(path.join(__dirname, 'dist_FINAL')));
+
     // DASHBOARD REMOTO: Página web para el dueño del negocio
     serverApp.get('/dashboard', (req, res) => {
         res.sendFile(path.join(__dirname, 'dashboard.html'));
@@ -1131,6 +1223,34 @@ function startServer() {
             }).catch(e => console.error('[CLOUD-SYNC] Snapshot error:', e.message));
         }
     });
+
+    // ==========================================
+    // Endpoints para prueba de pago tarjeta + impresora
+    // ==========================================
+    serverApp.get('/api/usb-devices', (req, res) => {
+        const { execSync } = require('child_process');
+        try {
+            const raw = execSync('powershell "Get-PnpDevice | Where-Object {$_.InstanceId -like \'*0E8D*\'} | Select-Object FriendlyName, InstanceId | ConvertTo-Json -Compress"', { timeout: 5000, encoding: 'utf8', shell: 'powershell.exe' });
+            const parsed = JSON.parse(raw.trim());
+            const arr = Array.isArray(parsed) ? parsed : [parsed];
+            res.json(arr.map(function(d) { return { name: d.FriendlyName || 'Sunmi P3', vid: '0E8D', pid: '201C', driver: 'WinUSB' }; }));
+        } catch(e) {
+            res.json([{ name: 'Sunmi P3', vid: '0E8D', pid: '201C', driver: 'WinUSB', note: 'deteccion estatica' }]);
+        }
+    });
+
+    serverApp.get('/api/default-printer', (req, res) => {
+        const { execSync } = require('child_process');
+        try {
+            const raw = execSync('powershell "(Get-CimInstance Win32_Printer -Filter \'Default=$true\').Name"', { timeout: 5000, encoding: 'utf8', shell: 'powershell.exe' });
+            res.json({ name: raw.trim() || 'Impresora termica (por defecto)' });
+        } catch(e) {
+            res.json({ name: 'Impresora termica (por defecto del sistema)' });
+        }
+    });
+
+    // Servir pagina de prueba de pago con tarjeta
+    serverApp.use('/prueba', express.static(path.join(__dirname)));
 
     const server = http.createServer(serverApp);
     io = new Server(server, {
@@ -1284,9 +1404,11 @@ async function tryCloudflare() {
             });
         } else {
             console.log('☁️  Intentando Cloudflare Quick Tunnel (URL Aleatoria)...');
+            console.log('🔍 Bin path:', bin, '| exists:', fs.existsSync(bin));
             const cf = spawn(bin, ['tunnel', '--url', `http://127.0.0.1:${serverPort}`], {
                 env: cleanEnv(),
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                windowsHide: false
             });
             tunnelProcess = cf;
 
@@ -1715,6 +1837,10 @@ ipcMain.on('install-update', () => {
     autoUpdater.quitAndInstall();
 });
 
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
 app.whenReady().then(async () => {
     // Inicializar Base de Datos
     try {
@@ -1723,6 +1849,16 @@ app.whenReady().then(async () => {
         dialog.showErrorBox('Error Fatal', 'No se pudo inicializar la base de datos: ' + err.message);
         app.quit();
         return;
+    }
+
+    // ── Migrar datos huérfanos (NULL/empty store_id) al store actual ──
+    try {
+        const storeSettings = getPersistentSettings();
+        if (storeSettings && storeSettings.storeId) {
+            await migrateOrphanData(storeSettings.storeId);
+        }
+    } catch (e) {
+        console.error('[MIGRATE] Error migrando datos huérfanos:', e.message);
     }
 
     // ── Verificar licencia antes de abrir el POS ────────────
@@ -2152,6 +2288,124 @@ ipcMain.handle('cloud-sync-push-catalog', async (event, products) => {
     if (cloudSync && cloudSync.enabled) {
         await cloudSync.pushCatalog(products);
     }
+});
+ipcMain.handle('cloud-sync-push-transfer', async (event, t) => {
+    if (cloudSync && cloudSync.enabled) await cloudSync.pushTransfer(t);
+});
+ipcMain.handle('cloud-sync-push-purchase-order', async (event, po) => {
+    if (cloudSync && cloudSync.enabled) await cloudSync.pushPurchaseOrder(po);
+});
+ipcMain.handle('cloud-sync-get-warehouse-store-id', async () => {
+    if (cloudSync && cloudSync.enabled) {
+        return await cloudSync.getWarehouseStoreId();
+    }
+    return null;
+});
+ipcMain.handle('cloud-sync-approve-po', async (event, poId, items, fromStoreId) => {
+    if (cloudSync && cloudSync.enabled) {
+        const dbApi = require('./database.js');
+        await cloudSync.approvePurchaseOrder(poId, items, fromStoreId, dbApi);
+    }
+});
+ipcMain.handle('cloud-sync-receive-po', async (event, poId, items, toStoreId) => {
+    if (cloudSync && cloudSync.enabled) {
+        const dbApi = require('./database.js');
+        await cloudSync.receivePurchaseOrder(poId, items, toStoreId, dbApi);
+    }
+});
+ipcMain.handle('cloud-sync-get-warehouse-products', async () => {
+    try {
+        const settings = getPersistentSettings();
+        if (!cloudSync || !cloudSync.enabled || !cloudSync.supabaseUrl || !cloudSync.supabaseKey) {
+            return [];
+        }
+        const supabaseUrl = cloudSync.supabaseUrl;
+        const supabaseKey = cloudSync.supabaseKey;
+        const https = require('https');
+
+        const fetchJson = (urlStr) => new Promise((resolve) => {
+            const url = new URL(urlStr);
+            const opts = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: 'GET',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': 'Bearer ' + supabaseKey,
+                    'Accept': 'application/json'
+                }
+            };
+            const req = https.request(opts, (res) => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve([]); } });
+            });
+            req.on('error', () => resolve([]));
+            req.end();
+        });
+
+        const stores = await fetchJson(`${supabaseUrl}/rest/v1/stores?select=id&store_type=eq.warehouse`);
+        if (!stores || stores.length === 0) return [];
+
+        const allProducts = [];
+        for (const s of stores) {
+            const prods = await fetchJson(`${supabaseUrl}/rest/v1/store_products?store_id=eq.${s.id}&select=product_id,name,price,stock,category&order=name.asc`);
+            if (prods && prods.length > 0) allProducts.push(...prods);
+        }
+        return allProducts;
+    } catch(e) {
+        return [];
+    }
+});
+
+// ==========================================
+// Sunmi P3 Integration
+// ==========================================
+const sunmiP3 = require('./integracion-sunmi.js');
+
+ipcMain.handle('sunmi-get-status', async () => {
+    const encontrado = await sunmiP3.detectar();
+    return {
+        conectado: encontrado,
+        producto: encontrado ? sunmiP3.device.productName : null,
+        fabricante: encontrado ? sunmiP3.device.manufacturerName : null,
+        serial: encontrado ? sunmiP3.device.serialNumber : null
+    };
+});
+
+ipcMain.handle('sunmi-start-monitoring', async () => {
+    sunmiP3.iniciarMonitoreo(3000);
+    sunmiP3.removeAllListeners('conectado');
+    sunmiP3.removeAllListeners('desconectado');
+    sunmiP3.on('conectado', (data) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('sunmi-status', { conectado: true, ...data });
+        }
+    });
+    sunmiP3.on('desconectado', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('sunmi-status', { conectado: false });
+        }
+    });
+    const status = await sunmiP3.detectar();
+    return { ok: true, conectado: status };
+});
+
+ipcMain.handle('sunmi-stop-monitoring', () => {
+    sunmiP3.detenerMonitoreo();
+    return { ok: true };
+});
+
+ipcMain.handle('test-print', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            mainWindow.webContents.print({ silent: true, printBackground: false, color: false, margins: { marginType: 'none' } });
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+    return { ok: false, error: 'No window' };
 });
 
 // ── Auto-configurar Supabase del proveedor para un cliente nuevo ──

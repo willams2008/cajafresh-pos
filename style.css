@@ -207,8 +207,6 @@ body {
     }
     body.exporting-analytics #view-analytics { display: flex !important; position: static !important; overflow: visible !important; height: auto !important; opacity: 1 !important; visibility: visible !important; }
     body.exporting-analytics #view-analytics .custom-scrollbar { overflow: visible !important; }
-}
-
 .modal-fade-in {
     opacity: 1 !important;
 }

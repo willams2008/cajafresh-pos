@@ -1,6 +1,6 @@
 {
   "name": "puntopila-pos",
-  "version": "1.3.0",
+  "version": "1.3.3",
   "description": "Sistema POS Punto Pila - Gestión Inteligente",
   "main": "main.js",
   "scripts": {
@@ -16,7 +16,9 @@
       "output": "dist_FINAL"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "icon.ico"
     },
     "nsis": {
@@ -56,6 +58,7 @@
     "electron-builder": "^26.8.1"
   },
   "dependencies": {
+    "adbkit": "^2.11.1",
     "cloudflared": "^0.7.1",
     "cors": "^2.8.6",
     "electron-updater": "^6.8.9",
@@ -67,6 +70,7 @@
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
     "sqlite3": "^6.0.1",
+    "usb": "^3.0.1",
     "whatsapp-web.js": "^1.34.6"
   }
 }

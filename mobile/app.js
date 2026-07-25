@@ -1,3 +1,12 @@
+// Compatibility polyfill for older mobile browsers
+if (typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
+    AbortSignal.timeout = function(ms) {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), ms);
+        return controller.signal;
+    };
+}
+
 // Smart server URL management
 const businessId = 'eb60443d3b66474b7c6c';
 const permanentUrl = 'https://puntopila.emprende.ve';
@@ -387,9 +396,6 @@ function closeQrModal() {
 }
 
 if (closeQr) closeQr.onclick = stopScanner;
-
-window.addEventListener('online', () => { socket.connect(); });
-window.addEventListener('offline', () => { isOffline = true; });
 
 
 // UI Elements

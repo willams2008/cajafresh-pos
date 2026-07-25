@@ -153,17 +153,23 @@
             <!-- INVENTORY TAB -->
             <div id="view-inventory" class="tab-view hidden">
                 <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px;">
-                    <div class="title" style="font-size: 20px;">Inventario Global</div>
-                    <div class="subtitle">Stock consolidado de todas tus sedes.</div>
+                    <div class="title" style="font-size: 20px;">Inventario</div>
+                    <div class="subtitle">Stock de tus tiendas.</div>
                 </div>
                 
+                <div class="card" style="padding: 12px; margin-bottom: 10px;">
+                    <select id="inv-store-filter" onchange="filterGlobalInventoryByStore(this.value)" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:13px;font-weight:700;">
+                        <option value="">Todas las tiendas</option>
+                    </select>
+                </div>
+
                 <div class="card" style="padding: 12px; margin-bottom: 16px;">
                     <div style="position:relative">
                         <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px"></i>
                         <input 
                             type="text" 
                             id="global-inv-search" 
-                            placeholder="Buscar en todas las tiendas..." 
+                            placeholder="Buscar producto..." 
                             oninput="filterGlobalInventory(this.value)"
                             style="width:100%;padding:10px 10px 10px 36px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:14px;"
                         >

@@ -259,7 +259,7 @@ window.Notifications = window.Notifications || {};
         if (!panelEl) return;
         if (panelEl.classList.contains('hidden')) return;
         if (!panelEl.contains(e.target) && !e.target.closest('#notif-badge') && !e.target.closest('#notif-quick-btn')) {
-            panelEl.classList.add('hidden');
+            panelEl.style.display = 'none';
         }
     });
 

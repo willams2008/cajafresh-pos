@@ -22,6 +22,7 @@ class CloudSync {
         this.storeName = options.storeName || 'Mi Tienda';
         this.brandName = options.brandName || 'Caja Fresh';
         this.licenseExpiry = options.licenseExpiry || null;
+        this.storeType = options.storeType || 'kiosko'; // 'kiosko' | 'warehouse'
         this.enabled = false;
         this.lastSyncTime = 0;
         this.syncInterval = null;
@@ -30,7 +31,7 @@ class CloudSync {
         this.onStatusChange = options.onStatusChange || (() => {});
         this.lastStatus = { synced: false, lastSync: null, error: null };
 
-        console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}`);
+        console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}, Tipo: ${this.storeType}`);
 
         // Auto-inicializar si ya vienen datos
         if (this.supabaseUrl && this.supabaseKey && this.storeId) {
@@ -46,6 +47,7 @@ class CloudSync {
         if (config.brandName) this.brandName = config.brandName;
         if (config.licenseExpiry !== undefined) this.licenseExpiry = config.licenseExpiry;
         if (config.queuePath) this.queuePath = config.queuePath;
+        if (config.storeType) this.storeType = config.storeType;
 
         this.enabled = !!(this.supabaseUrl && this.supabaseKey && this.storeId);
 
@@ -76,6 +78,7 @@ class CloudSync {
             this.syncInterval = setTimeout(async () => {
                 try {
                     await this._flushQueue();
+                    await this._fetchRemotePOs(getDbApi());
                     await this._fetchCommands();
                     
                     // Si llegó aquí sin error, resetear el contador
@@ -206,6 +209,7 @@ class CloudSync {
                 id: this.storeId,
                 name: this.storeName,
                 brand_name: this.brandName,
+                store_type: this.storeType,
                 last_seen: new Date().toISOString(),
                 status: 'online'
             };
@@ -241,9 +245,24 @@ class CloudSync {
         if (!this.enabled) return;
         try {
             console.log('[CLOUD-SYNC] ⬇️ Importando catálogo desde Supabase...');
-            const remoteProducts = await this._supabaseGet('store_products', `?store_id=eq.${this.storeId}`);
+            let remoteProducts = await this._supabaseGet('store_products', `?store_id=eq.${this.storeId}`);
+            // Si es kiosko y no tiene productos propios, intentar traer de almacenes
+            if ((!remoteProducts || remoteProducts.length === 0) && this.storeType === 'kiosko') {
+                console.log('[CLOUD-SYNC] 🔄 Kiosko sin productos propios — buscando de almacenes...');
+                const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&select=id`);
+                if (stores && stores.length > 0) {
+                    for (const s of stores) {
+                        const whProducts = await this._supabaseGet('store_products', `?store_id=eq.${s.id}`);
+                        if (whProducts && whProducts.length > 0) {
+                            remoteProducts = whProducts;
+                            console.log(`[CLOUD-SYNC] ✅ ${whProducts.length} productos del almacén ${s.id}`);
+                            break;
+                        }
+                    }
+                }
+            }
             if (!remoteProducts || remoteProducts.length === 0) {
-                console.log('[CLOUD-SYNC] ⚠️ No hay productos en store_products para esta tienda.');
+                console.log('[CLOUD-SYNC] ⚠️ No hay productos disponibles en la nube.');
                 return;
             }
 
@@ -572,9 +591,195 @@ class CloudSync {
         }
     }
 
+    async pushTransfer(transferData) {
+        if (!this.enabled) return;
+        const transfer = {
+            id: transferData.id,
+            store_id: this.storeId,
+            from_store: transferData.from_store,
+            to_store: transferData.to_store,
+            product_id: transferData.product_id,
+            product_name: transferData.product_name,
+            quantity: transferData.quantity || 0,
+            status: transferData.status || 'PENDING',
+            date: transferData.date || new Date().toISOString(),
+            timestamp: transferData.timestamp || Date.now(),
+            cashier_name: transferData.cashier_name || '',
+            notes: transferData.notes || ''
+        };
+        try {
+            await this._supabaseRequest('store_transfers', 'POST', transfer);
+        } catch (e) {
+            this.pendingQueue.push({ type: 'transfer', data: transfer, timestamp: Date.now() });
+            this._savePendingQueue();
+        }
+    }
+
+    async getWarehouseStoreId() {
+        if (!this.enabled) return null;
+        try {
+            const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&select=id&limit=1`);
+            if (stores && stores.length > 0) return stores[0].id;
+        } catch (e) {}
+        return null;
+    }
+
+    async pushPurchaseOrder(poData) {
+        if (!this.enabled) return;
+        const po = {
+            id: poData.id,
+            store_id: this.storeId,
+            from_store: poData.from_store || this.storeId,
+            to_store: poData.to_store || '',
+            status: poData.status || 'PENDING',
+            items_json: JSON.stringify(poData.items || []),
+            total_cost: poData.total_cost || 0,
+            notes: poData.notes || '',
+            date: poData.date || new Date().toISOString(),
+            timestamp: poData.timestamp || Date.now(),
+            created_by: poData.created_by || ''
+        };
+        try {
+            await this._supabaseRequest('store_purchase_orders', 'POST', po);
+        } catch (e) {
+            this.pendingQueue.push({ type: 'purchase_order', data: po, timestamp: Date.now() });
+            this._savePendingQueue();
+        }
+    }
+
     // ==========================================
     // LECTURA DE COMANDOS REMOTOS (App del Jefe)
     // ==========================================
+    async patchPurchaseOrder(poId, updates) {
+        if (!this.enabled) return;
+        try {
+            await this._supabaseRequest('store_purchase_orders', 'PATCH', updates, `?id=eq.${poId}`);
+        } catch (e) {
+            console.warn('[CLOUD-SYNC] Error patching PO:', e.message);
+            this.pendingQueue.push({ type: 'purchase_order_patch', data: { id: poId, updates }, timestamp: Date.now() });
+            this._savePendingQueue();
+        }
+    }
+
+    async approvePurchaseOrder(poId, items, fromStoreId, localDbApi) {
+        if (!this.enabled) return;
+        try {
+            for (const item of items) {
+                const spId = `${fromStoreId}_${item.product_id}`;
+                try {
+                    const existing = await this._supabaseGet('store_products', `?id=eq.${spId}&select=stock`);
+                    const currentStock = (existing && existing.length > 0) ? (existing[0].stock || 0) : 0;
+                    const needed = item.quantity || 0;
+                    if (currentStock < needed) {
+                        throw new Error(`Stock insuficiente para "${item.product_name || item.product_id}": hay ${currentStock}, necesita ${needed}`);
+                    }
+                } catch (e2) {
+                    if (e2.message && e2.message.includes('Stock insuficiente')) throw e2;
+                    console.warn('[CLOUD-SYNC] Error checking stock:', e2.message);
+                }
+            }
+            await this.patchPurchaseOrder(poId, { status: 'APPROVED', approved_by: this.storeId });
+            for (const item of items) {
+                const spId = `${fromStoreId}_${item.product_id}`;
+                try {
+                    const existing = await this._supabaseGet('store_products', `?id=eq.${spId}&select=stock`);
+                    if (existing && existing.length > 0) {
+                        const newStock = Math.max(0, (existing[0].stock || 0) - (item.quantity || 0));
+                        await this._supabaseRequest('store_products', 'PATCH', { stock: newStock }, `?id=eq.${spId}`);
+                    }
+                } catch (e2) {
+                    console.warn('[CLOUD-SYNC] Error updating warehouse stock:', e2.message);
+                }
+            }
+            if (localDbApi) {
+                try {
+                    await localDbApi.updatePOStatus(this.storeId, poId, 'APPROVED');
+                } catch (e3) {
+                    console.warn('[CLOUD-SYNC] Error updating local PO status:', e3.message);
+                }
+            }
+        } catch (e) {
+            console.error('[CLOUD-SYNC] Error in approvePurchaseOrder:', e.message);
+            throw e;
+        }
+    }
+
+    async receivePurchaseOrder(poId, items, toStoreId, localDbApi) {
+        if (!this.enabled) return;
+        try {
+            await this.patchPurchaseOrder(poId, { status: 'RECEIVED', received_date: new Date().toISOString() });
+            for (const item of items) {
+                const spId = `${toStoreId}_${item.product_id}`;
+                try {
+                    const existing = await this._supabaseGet('store_products', `?id=eq.${spId}&select=stock`);
+                    const qty = item.received_qty || item.quantity || 0;
+                    if (existing && existing.length > 0) {
+                        const newStock = (existing[0].stock || 0) + qty;
+                        await this._supabaseRequest('store_products', 'PATCH', { stock: newStock }, `?id=eq.${spId}`);
+                    } else {
+                        await this._supabaseRequest('store_products', 'POST', {
+                            id: spId,
+                            store_id: toStoreId,
+                            product_id: item.product_id,
+                            name: item.product_name || 'Producto',
+                            stock: qty,
+                            price: item.cost_price || 0
+                        });
+                    }
+                } catch (e2) {
+                    console.warn('[CLOUD-SYNC] Error updating kiosko stock:', e2.message);
+                }
+            }
+            if (localDbApi) {
+                try {
+                    await localDbApi.receivePO(toStoreId, poId, items);
+                } catch (e3) {
+                    console.warn('[CLOUD-SYNC] Error updating local receive:', e3.message);
+                }
+            }
+        } catch (e) {
+            console.error('[CLOUD-SYNC] Error in receivePurchaseOrder:', e.message);
+            throw e;
+        }
+    }
+
+    async fetchRemotePOs(localDbApi) {
+        if (!this.enabled || !localDbApi) return;
+        try {
+            const remotePOs = await this._supabaseGet('store_purchase_orders', `?or=(from_store.eq.${this.storeId},to_store.eq.${this.storeId})&order=timestamp.desc&limit=100`);
+            if (!remotePOs || remotePOs.length === 0) return;
+            const localPOs = await localDbApi.getPurchaseOrders(this.storeId, 'all') || [];
+            const localMap = {};
+            localPOs.forEach(p => localMap[p.id] = p);
+            for (const rpo of remotePOs) {
+                const local = localMap[rpo.id];
+                const items = (() => { try { return JSON.parse(rpo.items_json || '[]'); } catch(e) { return []; } })();
+                if (!local) {
+                    await localDbApi.savePurchaseOrder(this.storeId, {
+                        id: rpo.id,
+                        store_id: rpo.store_id || this.storeId,
+                        order_type: 'purchase',
+                        from_store: rpo.from_store || '',
+                        to_store: rpo.to_store || '',
+                        status: rpo.status || 'PENDING',
+                        items: items,
+                        notes: rpo.notes || '',
+                        total_cost: rpo.total_cost || 0,
+                        date: rpo.date || new Date().toISOString(),
+                        timestamp: rpo.timestamp || Date.now(),
+                        created_by: rpo.created_by || '',
+                        approved_by: rpo.approved_by || '',
+                        received_date: rpo.received_date || ''
+                    });
+                } else if (local.status !== rpo.status) {
+                    await localDbApi.updatePOStatus(this.storeId, rpo.id, rpo.status);
+                }
+            }
+        } catch (e) {
+            console.warn('[CLOUD-SYNC] Error fetching remote POs:', e.message);
+        }
+    }
+
     async _fetchCommands() {
         if (!this.enabled) {
             console.log('[CLOUD-SYNC] ⏸️ Sincronización desactivada. Saltando fetchCommands.');
@@ -778,6 +983,14 @@ class CloudSync {
                     await this._supabaseRequest('store_snapshots', 'POST', item.data);
                 } else if (item.type === 'sale') {
                     await this._supabaseRequest('store_sales', 'POST', item.data);
+                } else if (item.type === 'transfer') {
+                    await this._supabaseRequest('store_transfers', 'POST', item.data);
+                } else if (item.type === 'purchase_order') {
+                    await this._supabaseRequest('store_purchase_orders', 'POST', item.data);
+                } else if (item.type === 'purchase_order_patch') {
+                    await this._supabaseRequest('store_purchase_orders', 'PATCH', item.data.updates, `?id=eq.${item.data.id}`);
+                } else if (item.type === 'stock_update') {
+                    await this._supabaseRequest('store_products', 'PATCH', item.data.updates, `?id=eq.${item.data.productId}`);
                 }
             } catch (e) {
                 // Si lleva más de 24 horas, descartarlo

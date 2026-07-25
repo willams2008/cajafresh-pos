@@ -8,6 +8,13 @@ window.UpdateManager = window.UpdateManager || {};
     var progressText = null;
     var actionBtn = null;
     var currentInfo = null;
+    var lastStatus = null;
+    var statusChangeCallbacks = [];
+
+    NS.getLastStatus = function() { return lastStatus; };
+    NS.getCurrentInfo = function() { return currentInfo; };
+    NS.onStatusChange = function(cb) { statusChangeCallbacks.push(cb); };
+    NS.removeStatusChange = function(cb) { statusChangeCallbacks = statusChangeCallbacks.filter(function(f) { return f !== cb; }); };
 
     NS.init = function() {
         _createUI();
@@ -17,9 +24,17 @@ window.UpdateManager = window.UpdateManager || {};
 
     NS.check = function() {
         if (window.electronAPI && window.electronAPI.checkForUpdates) {
+            lastStatus = { status: 'checking' };
+            _notify();
             window.electronAPI.checkForUpdates();
         }
     };
+
+    function _notify() {
+        for (var i = 0; i < statusChangeCallbacks.length; i++) {
+            try { statusChangeCallbacks[i](lastStatus); } catch(e) {}
+        }
+    }
 
     function _createUI() {
         if (document.getElementById('updater-container')) return;
@@ -52,6 +67,8 @@ window.UpdateManager = window.UpdateManager || {};
     function _listen() {
         if (window.electronAPI && window.electronAPI.onUpdateStatus) {
             window.electronAPI.onUpdateStatus(function(data) {
+                lastStatus = data;
+                _notify();
                 switch (data.status) {
                     case 'available':
                         currentInfo = data.info;
@@ -67,13 +84,23 @@ window.UpdateManager = window.UpdateManager || {};
                         _showError(data.error);
                         break;
                     case 'not-available':
-                        _hide();
+                        _showNotAvailable();
                         break;
                     default:
                         break;
                 }
             });
         }
+    }
+
+    function _showNotAvailable() {
+        container.style.display = 'block';
+        statusEl.innerHTML = 'Tienes la \u00faltima versi\u00f3n';
+        statusEl.className = 'updater-not-available';
+        progressBar.style.display = 'none';
+        actionBtn.innerHTML = '<button id="updater-btn-close" class="updater-btn">Cerrar</button>';
+        document.getElementById('updater-btn-close').onclick = function() { _hide(); };
+        setTimeout(_hide, 6000);
     }
 
     function _showAvailable(info) {
@@ -116,14 +143,13 @@ window.UpdateManager = window.UpdateManager || {};
 
     function _showError(err) {
         container.style.display = 'block';
-        statusEl.innerHTML = 'Error al buscar actualizaci\u00f3n';
+        statusEl.innerHTML = 'Error: ' + (err || 'No se pudo conectar con GitHub');
         statusEl.className = 'updater-error';
         progressBar.style.display = 'none';
-        actionBtn.innerHTML = '<button id="updater-btn-retry" class="updater-btn">Reintentar</button>';
-        document.getElementById('updater-btn-retry').onclick = function() {
-            NS.check();
-        };
-        setTimeout(_hide, 8000);
+        actionBtn.innerHTML = '<button id="updater-btn-retry" class="updater-btn">Reintentar</button><button id="updater-btn-close" class="updater-btn" style="margin-left:8px">Cerrar</button>';
+        document.getElementById('updater-btn-retry').onclick = function() { NS.check(); };
+        document.getElementById('updater-btn-close').onclick = function() { _hide(); };
+        console.error('[AutoUpdater] Error:', err);
     }
 
     function _hide() {
@@ -144,7 +170,7 @@ window.UpdateManager = window.UpdateManager || {};
             '    right: 20px;\n' +
             '    z-index: 9999;\n' +
             '    display: none;\n' +
-            '    max-width: 360px;\n' +
+            '    max-width: 380px;\n' +
             '}\n' +
             '#updater-panel {\n' +
             '    background: #1a1a2e;\n' +
@@ -161,6 +187,7 @@ window.UpdateManager = window.UpdateManager || {};
             '#updater-status.updater-downloading { color: #ffb74d; }\n' +
             '#updater-status.updater-downloaded { color: #81c784; }\n' +
             '#updater-status.updater-error { color: #e57373; }\n' +
+            '#updater-status.updater-not-available { color: #81c784; }\n' +
             '#updater-progress-bar {\n' +
             '    height: 6px;\n' +
             '    background: #333;\n' +
