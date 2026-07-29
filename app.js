@@ -1470,6 +1470,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             initClientSearch();
         } catch(e) { console.error("Fallo en Servicios:", e); }
 
+        // Auto-updater
+        try { if (window.UpdateManager && window.UpdateManager.init) window.UpdateManager.init(); }
+        catch(e) { console.error("Fallo en auto-updater:", e); }
+
         // 4. EJECUTAR REVELACIÓN
         setTimeout(() => {
             clearTimeout(forceExitTimeout);
