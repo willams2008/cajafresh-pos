@@ -338,24 +338,38 @@ async function ensureJoseUsers() {
             }
         }
         localStorage.setItem(credsKey, JSON.stringify(savedCreds));
-        if (created.length > 0 && typeof Swal !== 'undefined') {
-            var msg = created.map(function(u) {
-                return '👤 ' + u.name + ' (' + u.role + ')\n   Usuario: ' + u.username + ' | Clave: ' + u.password;
-            }).join('\n\n');
-            Swal.fire({ title: '✅ Usuarios creados', html: '<pre style="text-align:left;font-size:14px">' + msg + '</pre>', icon: 'success', confirmButtonText: 'OK' });
+        if (created.length > 0) {
+            _showCredsModal(savedCreds);
         }
     } catch (e) {
         console.error('[Auth] Error creando usuarios Jose:', e);
     }
 }
 
+function _showCredsModal(creds) {
+    var entries = Object.keys(creds);
+    if (entries.length === 0) return;
+    var lines = entries.map(function(k) {
+        return '<b>' + k + '</b>: ' + creds[k];
+    });
+    var html = '<div id="jose-creds-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:monospace">' +
+        '<div style="background:#1a1a2e;color:#fff;border-radius:12px;padding:30px 40px;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center">' +
+        '<h2 style="margin:0 0 15px;color:#00d4aa;font-size:22px">🔑 Credenciales Jose</h2>' +
+        '<div style="text-align:left;background:#0d0d1a;padding:15px;border-radius:8px;font-size:15px;line-height:1.8">' +
+        lines.join('<br>') +
+        '</div>' +
+        '<p style="color:#888;font-size:12px;margin:12px 0 0">Guarda esto en un lugar seguro</p>' +
+        '<button onclick="document.getElementById(\'jose-creds-overlay\').remove()" style="margin-top:15px;padding:8px 24px;border:none;border-radius:6px;background:#00d4aa;color:#000;font-weight:bold;cursor:pointer;font-size:14px">OK ✓</button>' +
+        '</div></div>';
+    var div = document.createElement('div');
+    div.innerHTML = html;
+    document.body.appendChild(div);
+}
+
 window.showJoseCreds = function() {
     try {
         var creds = JSON.parse(localStorage.getItem('freshpos_jose_creds') || '{}');
-        var entries = Object.keys(creds);
-        if (entries.length === 0) { Swal.fire({ title: 'Sin credenciales', text: 'No hay usuarios de Jose creados aun.', icon: 'info' }); return; }
-        var msg = entries.map(function(k) { return '👤 ' + k + '\n   Clave: ' + creds[k]; }).join('\n\n');
-        Swal.fire({ title: '🔑 Credenciales Jose', html: '<pre style="text-align:left;font-size:14px">' + msg + '</pre>', icon: 'info', confirmButtonText: 'OK' });
+        _showCredsModal(creds);
     } catch (e) { console.error(e); }
 }
 
