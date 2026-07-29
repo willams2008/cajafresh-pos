@@ -1507,7 +1507,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 3000);
         }, 800);
 
-
+        // Persistir estado del cierre al cerrar/recargar
+        window.addEventListener('beforeunload', () => {
+            try {
+                const pm = document.getElementById('cierre-count-pm')?.value;
+                const card = document.getElementById('cierre-count-card')?.value;
+                if (pm || card) {
+                    localStorage.setItem('freshpos_last_cierre_state', JSON.stringify({
+                        date: new Date().toISOString().split('T')[0],
+                        'cierre-count-pm': pm || '0',
+                        'cierre-count-card': card || '0'
+                    }));
+                }
+            } catch(e) {}
+        });
 
         // 5. ONBOARDING (Opcional — desactivado)
         onboardingState.welcome = true;
@@ -2129,24 +2142,28 @@ function initNavigation() {
 // --- UPDATE PRICES WITH NEW EXCHANGE RATE ---
 function updatePricesWithNewRate(val, property) {
     if (property === 'exchangeRate' && val > 0) {
-        // 1. Actualizar precios de productos en el catálogo
         products = products.map(p => {
-            const baseUSD = parseFloat(p.priceUSD || p.price || 0);
-            if (baseUSD > 0) {
-                p.priceVES = Math.round((baseUSD * val) / 10) * 10;
+            let usd = parseFloat(p.priceUSD || p.price || 0);
+            if (usd === 0 && parseFloat(p.priceVES) > 0) {
+                p.priceUSD = parseFloat(p.priceVES) / val;
+                usd = parseFloat(p.priceUSD);
+            }
+            if (usd > 0) {
+                p.priceVES = Math.round((usd * val) / 10) * 10;
                 if (p.promoPrice) {
                     p.promoPriceVES = Math.round((parseFloat(p.promoPrice) * val) / 10) * 10;
                 }
-            } else if (parseFloat(p.priceVES) > 0) {
-                p.priceUSD = parseFloat(p.priceVES) / val;
             }
             return p;
         });
 
-        // 2. Actualizar items en el carrito activo
         if (typeof cart !== 'undefined' && Array.isArray(cart)) {
             cart = cart.map(item => {
-                const itemUSD = parseFloat(item.priceUSD || item.price || 0);
+                let itemUSD = parseFloat(item.priceUSD || item.price || 0);
+                if (itemUSD === 0 && parseFloat(item.priceVES) > 0) {
+                    item.priceUSD = parseFloat(item.priceVES) / val;
+                    itemUSD = parseFloat(item.priceUSD);
+                }
                 if (itemUSD > 0) {
                     item.priceVES = Math.round((itemUSD * val) / 10) * 10;
                     if (item.originalPriceUSD > 0) {
@@ -2157,7 +2174,6 @@ function updatePricesWithNewRate(val, property) {
             });
         }
 
-        // 3. Persistir localmente y sincronizar
         if (typeof saveProducts === 'function') {
             saveProducts();
         }
@@ -2423,23 +2439,23 @@ function initPOS() {
             salesListHtml = '<p class="text-center text-slate-400 py-6 italic font-medium">No hay ventas registradas hoy.</p>';
         } else {
             salesListHtml = [...dailySales].reverse().map(s => `
-                <div class="flex items-center justify-between p-3 mb-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-brand-200 transition-all group">
+                <div class="flex items-center justify-between p-3 mb-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-brand-200 transition-all group cursor-pointer" onclick="viewSaleDetail('${s.ticket}')">
                     <div class="flex-1">
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-xs font-black bg-brand-100 text-brand-700 px-2 py-0.5 rounded-lg">#${s.ticket}</span>
                             <span class="text-[10px] text-slate-400 font-bold uppercase">${new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
-                        <div class="text-sm font-bold text-slate-700 truncate w-32 md:w-32">${s.client?.name || 'Cliente Final'}</div>
+                        <div class="text-sm font-bold text-slate-700 truncate w-40">${s.client?.name || 'Cliente Final'}</div>
                     </div>
                     <div class="text-right mr-3">
                         <div class="text-sm font-black text-slate-800">${formatVES(s.totalVES)}</div>
                         <div class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Ref: ${formatUSD(s.totalUSD)}</div>
                     </div>
                     <div class="flex gap-1">
-                        <button onclick="printTicketFromReport('${s.ticket}')" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-brand-600 hover:bg-brand-50 transition-all flex items-center justify-center shadow-sm">
+                        <button onclick="event.stopPropagation(); printTicketFromReport('${s.ticket}')" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-brand-600 hover:bg-brand-50 transition-all flex items-center justify-center shadow-sm">
                             <i class="fas fa-print"></i>
                         </button>
-                        <button onclick="continueInvoice('${s.ticket}')" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center shadow-sm" title="Cargar">
+                        <button onclick="event.stopPropagation(); continueInvoice('${s.ticket}')" class="w-9 h-9 rounded-xl bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center shadow-sm" title="Cargar">
                             <i class="fas fa-redo-alt"></i>
                         </button>
                     </div>
@@ -2483,10 +2499,101 @@ function initPOS() {
     renderProducts();
 }
 
+window.viewSaleDetail = (ticket) => {
+    const sale = sales.find(s => s.ticket === ticket);
+    if (!sale) return;
+
+    let itemsHtml = '';
+    if (sale.items && sale.items.length > 0) {
+        sale.items.forEach(item => {
+            itemsHtml += `
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-slate-700">${item.name}</p>
+                        <p class="text-[10px] text-slate-400 font-semibold">${item.category || ''}</p>
+                    </div>
+                    <div class="flex items-center gap-4 text-right">
+                        <span class="text-xs font-bold text-slate-500 w-8">x${item.qty}</span>
+                        <span class="text-xs font-bold text-slate-400 w-16">${formatVES(item.unitPriceVES)}</span>
+                        <span class="text-sm font-black text-slate-800 w-20">${formatVES(item.totalPriceVES)}</span>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        itemsHtml = '<p class="text-center text-slate-400 py-4 italic">Sin detalle de productos</p>';
+    }
+
+    const methodNames = {
+        'cash-usd': 'Efectivo USD', 'cash-ves': 'Efectivo VES', 'cash-eur': 'Efectivo EUR',
+        'card-ves': 'Punto', 'pago-movil': 'Pago Móvil', 'transfer': 'Transferencia'
+    };
+
+    Swal.fire({
+        title: `<div class="text-lg font-black text-slate-800">Venta #${sale.ticket}</div>`,
+        html: `
+            <div class="text-left">
+                <div class="grid grid-cols-2 gap-2 mb-4 text-xs">
+                    <div class="bg-slate-50 rounded-xl p-2.5">
+                        <span class="text-slate-400 font-bold block">Cliente</span>
+                        <span class="font-bold text-slate-700">${sale.client?.name || 'Final'}</span>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-2.5">
+                        <span class="text-slate-400 font-bold block">Método</span>
+                        <span class="font-bold text-slate-700">${methodNames[sale.method] || sale.method}</span>
+                    </div>
+                </div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Productos</p>
+                <div class="bg-white border border-slate-100 rounded-2xl p-3 mb-4">
+                    ${itemsHtml}
+                </div>
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-sm font-bold text-slate-500">Total</span>
+                    <div class="text-right">
+                        <span class="text-lg font-black text-slate-800">${formatVES(sale.totalVES)}</span>
+                        <span class="text-xs text-slate-400 font-bold block">Ref: ${formatUSD(sale.totalUSD)}</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: '480px',
+        customClass: { popup: 'rounded-3xl' }
+    });
+};
+
 function renderProducts() {
     const grid = document.getElementById('products-grid');
     if (!grid) return;
-    
+
+    if (currentCategory === 'Todos' && !searchTerm.trim()) {
+        const catCounts = {};
+        products.forEach(p => {
+            if (p.category) catCounts[p.category] = (catCounts[p.category] || 0) + 1;
+        });
+        const cats = [...new Set(categories.filter(c => catCounts[c] > 0))];
+        if (cats.length === 0) {
+            grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">No hay categorías con productos.</div>`;
+            return;
+        }
+        grid.innerHTML = cats.map(cat => {
+                const img = products.find(p => p.category === cat && p.img)?.img || '';
+                return `
+                <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group" onclick="selectCategory('${cat}')">
+                    <div class="h-32 bg-gradient-to-br from-brand-50 to-brand-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center relative overflow-hidden">
+                        ${img ? `<img src="${img}" class="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity">` : ''}
+                        <i class="fas fa-folder-open text-5xl text-brand-300 dark:text-slate-500 absolute opacity-40"></i>
+                    </div>
+                    <div class="p-4 text-center">
+                        <h4 class="font-black text-slate-800 dark:text-slate-100 text-lg">${cat}</h4>
+                        <p class="text-xs font-bold text-slate-400 mt-1">${catCounts[cat]} producto${catCounts[cat] !== 1 ? 's' : ''}</p>
+                    </div>
+                </div>`;
+            }).join('');
+        return;
+    }
+
     const filtered = products.filter(p => {
         const matchesCat = currentCategory === 'Todos' || p.category === currentCategory;
         const s = searchTerm.toLowerCase();
@@ -2540,6 +2647,18 @@ function renderProducts() {
     grid.innerHTML = '';
     grid.appendChild(fragment);
 }
+
+window.selectCategory = (cat) => {
+    currentCategory = cat;
+    document.querySelectorAll('.category-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.category === cat);
+        b.classList.toggle('bg-blue-600', b.dataset.category === cat);
+        b.classList.toggle('text-white', b.dataset.category === cat);
+        b.classList.toggle('bg-gray-100', b.dataset.category !== cat);
+        b.classList.toggle('text-gray-500', b.dataset.category !== cat);
+    });
+    renderProducts();
+};
 
 
 async function loadProductsFromDB() {
@@ -2732,6 +2851,74 @@ function initInventory() {
     renderInventory();
     window.renderCategoryOptions();
 }
+
+window.showLowStockReport = () => {
+    const lowItems = products.filter(p => p.stock <= (p.minStock || 5));
+    if (lowItems.length === 0) {
+        Swal.fire({ icon: 'success', title: 'Stock Saludable', text: 'Todos los productos tienen inventario suficiente.', confirmButtonText: 'OK', customClass: { popup: 'rounded-3xl' } });
+        return;
+    }
+    let rows = lowItems.map(p => `
+        <tr class="border-b border-slate-100">
+            <td class="py-2.5 px-3 text-sm font-bold text-slate-700">${p.name}</td>
+            <td class="py-2.5 px-3 text-xs text-slate-500">${p.category || '-'}</td>
+            <td class="py-2.5 px-3 text-sm font-black text-rose-600">${p.stock}</td>
+            <td class="py-2.5 px-3 text-sm font-bold text-slate-500">${p.minStock || 5}</td>
+            <td class="py-2.5 px-3 text-right">
+                <button onclick="quickAddStock('${p.id}')" class="text-xs font-bold bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-all"><i class="fas fa-plus mr-1"></i>Stock</button>
+            </td>
+        </tr>
+    `).join('');
+    Swal.fire({
+        title: `<div class="text-lg font-black text-slate-800"><i class="fas fa-exclamation-triangle text-amber-500 mr-2"></i>${lowItems.length} Producto${lowItems.length !== 1 ? 's' : ''} por Comprar</div>`,
+        html: `
+            <div class="max-h-96 overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left">
+                    <thead><tr class="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        <th class="py-2 px-3">Producto</th><th class="py-2 px-3">Cat</th><th class="py-2 px-3">Stock</th><th class="py-2 px-3">Mín</th><th class="py-2 px-3"></th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-100">
+                <button onclick="printLowStockReport()" class="w-full py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all"><i class="fas fa-print mr-2"></i>Imprimir Lista</button>
+            </div>
+        `,
+        showConfirmButton: false, showCloseButton: true, width: '520px', customClass: { popup: 'rounded-3xl' }
+    });
+};
+
+window.quickAddStock = (id) => {
+    const p = products.find(x => x.id === id);
+    if (!p) return;
+    const qty = prompt(`Stock actual de "${p.name}": ${p.stock}\n¿Cuánto deseas agregar?`, '10');
+    if (qty && !isNaN(qty) && parseInt(qty) > 0) {
+        p.stock = (parseInt(p.stock) || 0) + parseInt(qty);
+        saveProducts();
+        renderInventory();
+        Swal.fire({ icon: 'success', title: 'Stock Actualizado', text: `${p.name}: ${p.stock} unidades`, timer: 1500, showConfirmButton: false, customClass: { popup: 'rounded-3xl' } });
+    }
+};
+
+window.printLowStockReport = () => {
+    const lowItems = products.filter(p => p.stock <= (p.minStock || 5));
+    const lines = [
+        '╔══════════════════════════════╗',
+        '║   LISTA DE COMPRAS           ║',
+        `║  ${new Date().toLocaleDateString().padEnd(27)}║`,
+        '╠══════════════════════════════╣',
+        ...lowItems.map(p => {
+            const name = p.name.padEnd(24).slice(0,24);
+            const stock = String(p.stock).padStart(4);
+            return `║ ${name} ${stock} uds ║`;
+        }),
+        '╚══════════════════════════════╝'
+    ].join('\n');
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<pre style="font-family:monospace;font-size:14px">${lines}</pre>`);
+    printWin.document.close();
+    printWin.print();
+};
 
 function renderInventory() {
     const tbody = document.getElementById('inventory-table-body');
@@ -3506,9 +3693,19 @@ function validatePayment() {
     }
 
     // Validación extra para Pago Móvil (Referencia obligatoria)
+    let pmRefMsg = '';
     if (checkoutMethod === 'pago-movil') {
         const ref = document.getElementById('pm-ref')?.value.trim() || '';
-        if (ref.length < 4) isValid = false;
+        const phone = document.getElementById('pm-phone')?.value.trim() || '';
+        const ci = document.getElementById('pm-id')?.value.trim() || '';
+        if (ref.length < 4) { isValid = false; pmRefMsg = 'Falta referencia (4 dígitos)'; }
+        if (!phone) { isValid = false; pmRefMsg = 'Falta teléfono de origen'; }
+        if (!ci) { isValid = false; pmRefMsg = 'Falta cédula de origen'; }
+    }
+    const pmHint = document.getElementById('pm-validation-hint');
+    if (pmHint) {
+        pmHint.textContent = pmRefMsg;
+        pmHint.classList.toggle('hidden', !pmRefMsg);
     }
 
     if (isValid) {
@@ -5882,7 +6079,8 @@ function sendToAppManagement() {
     const methodMap = {
         'cash-usd': 'divisas',
         'cash-ves': 'efectivo_bs',
-        'card-ves': 'pago_movil'
+        'card-ves': 'card',
+        'pago-movil': 'pago_movil'
     };
 
     const orderData = {
@@ -8820,6 +9018,16 @@ window.openCierreModal = async () => {
         set('cierre-opening-ves', 'Bs 0');
     }
 
+    try {
+        const saved = JSON.parse(localStorage.getItem('freshpos_last_cierre_state'));
+        if (saved && saved.date === new Date().toISOString().split('T')[0]) {
+            ['cierre-count-pm', 'cierre-count-card'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && saved[id]) el.value = saved[id];
+            });
+        }
+    } catch(e) {}
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     setTimeout(() => {
@@ -8833,30 +9041,48 @@ window.openCierreModal = async () => {
 
 window.printCierreZ = () => {
     const totals = window._lastCierreTotals || _calcCierreTotals();
-    const lines = [
-        '╔══════════════════════════════╗',
-        '║       CORTE Z — CIERRE       ║',
-        `║  ${new Date().toLocaleString().padEnd(27)}║`,
-        '╠══════════════════════════════╣',
-        `║ Efectivo USD: ${formatUSD(totals.usd).padStart(14)} ║`,
-        `║ Efectivo VES: ${formatVES(totals.ves).padStart(14)} ║`,
-        `║ Efectivo EUR: ${formatEUR(totals.eur).padStart(14)} ║`,
-        `║ Punto Venta:  ${formatVES(totals.card).padStart(14)} ║`,
-        `║ Pago Móvil:   ${formatVES(totals.pm).padStart(14)} ║`,
-        `║ Transferencia:${formatVES(totals.transfer).padStart(14)} ║`,
-        '╠══════════════════════════════╣',
-        `║ TOTAL USD:    ${formatUSD(totals.totalUSD).padStart(14)} ║`,
-        `║ TOTAL VES:    ${formatVES(totals.totalVES).padStart(14)} ║`,
-        `║ Transacciones: ${String(totals.txCount).padStart(13)} ║`,
-        '╚══════════════════════════════╝'
-    ].join('\n');
-    console.log('[CIERRE-Z] Corte Z:\n' + lines);
-    Swal.fire({
-        title: 'Corte Z Generado',
-        text: `Total: ${formatUSD(totals.totalUSD)} — ${totals.txCount} transacciones`,
-        icon: 'success',
-        confirmButtonText: 'OK'
-    });
+    const countUSD = _calcDenomUSD();
+    const countVES = _calcDenomVES();
+    const countPM = parseFloat(document.getElementById('cierre-count-pm')?.value) || 0;
+    const countCard = parseFloat(document.getElementById('cierre-count-card')?.value) || 0;
+    const dateStr = new Date().toLocaleString();
+    const lines = `
+╔══════════════════════════════════╗
+║        CORTE Z — CIERRE          ║
+║  ${dateStr.padEnd(31)}║
+╠══════════════════════════════════╣
+║ VENTAS DEL DÍA                   ║
+╠══════════════════════════════════╣
+║ Efectivo USD: ${formatUSD(totals.usd).padStart(19)} ║
+║ Efectivo VES: ${formatVES(totals.ves).padStart(19)} ║
+║ Efectivo EUR: ${formatEUR(totals.eur).padStart(19)} ║
+║ Punto Venta:  ${formatVES(totals.card).padStart(19)} ║
+║ Pago Móvil:   ${formatVES(totals.pm).padStart(19)} ║
+║ Transferencia:${formatVES(totals.transfer).padStart(19)} ║
+╠══════════════════════════════════╣
+║ TOTAL USD:    ${formatUSD(totals.totalUSD).padStart(19)} ║
+║ TOTAL VES:    ${formatVES(totals.totalVES).padStart(19)} ║
+║ Transacciones: ${String(totals.txCount).padStart(18)} ║
+╠══════════════════════════════════╣
+║ CUADRE DE CAJA                   ║
+╠══════════════════════════════════╣
+║ Efectivo USD: ${formatUSD(countUSD).padStart(19)} ║
+║ Efectivo VES: ${formatVES(countVES).padStart(19)} ║
+║ Pago Móvil:   ${formatVES(countPM).padStart(19)} ║
+║ Punto:        ${formatVES(countCard).padStart(19)} ║
+╠══════════════════════════════════╣
+║ DIFERENCIAS                      ║
+╠══════════════════════════════════╣
+║ Dif USD: ${(countUSD - totals.usd >= 0 ? '+' : '') + formatUSD(countUSD - totals.usd).padStart(21)} ║
+║ Dif VES: ${(countVES - totals.ves >= 0 ? '+' : '') + formatVES(countVES - totals.ves).padStart(21)} ║
+║ Dif PM:  ${(countPM - (totals.pm || 0) >= 0 ? '+' : '') + formatVES(countPM - (totals.pm || 0)).padStart(21)} ║
+║ Dif Card:${(countCard - (totals.card || 0) >= 0 ? '+' : '') + formatVES(countCard - (totals.card || 0)).padStart(21)} ║
+╚══════════════════════════════════╝
+    `;
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<pre style="font-family:monospace;font-size:13px;line-height:1.4">${lines}</pre>`);
+    printWin.document.close();
+    printWin.print();
 };
 
 window.confirmFinalCierre = () => {
@@ -9097,7 +9323,19 @@ function finalizeAndClear() {
     if (dailyHistory.length > 90) dailyHistory.shift();
     saveHistory();
 
-    sales = [];
+    if (window.db) {
+        window.db.getCredits().then(pending => {
+            if (pending && pending.length > 0) {
+                pending.forEach(p => {
+                    if (p.status === 'pending') {
+                        window.db.saveCredit(p).catch(() => {});
+                    }
+                });
+            }
+        }).catch(() => {});
+    }
+    sales = sales.filter(s => s.status === 'pending');
+    if (sales.length === 0) sales = [];
     saveSales();
 
     if (typeof expenses !== 'undefined') {
