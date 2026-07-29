@@ -19,6 +19,7 @@ class CloudSync {
         this.supabaseUrl = options.supabaseUrl || '';
         this.supabaseKey = options.supabaseKey || '';
         this.storeId = options.storeId || '';
+        this.tenantId = options.tenantId || 'tenant_default';
         this.storeName = options.storeName || 'Mi Tienda';
         this.brandName = options.brandName || 'Caja Fresh';
         this.licenseExpiry = options.licenseExpiry || null;
@@ -28,10 +29,12 @@ class CloudSync {
         this.syncInterval = null;
         this.pendingQueue = []; // Cola de datos pendientes si hay fallo de red
         this.queuePath = options.queuePath || '';
+        this.deletedProductIds = new Set();
+        this._loadDeletedIds();
         this.onStatusChange = options.onStatusChange || (() => {});
         this.lastStatus = { synced: false, lastSync: null, error: null };
 
-        console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}, Tipo: ${this.storeType}`);
+        console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}, Tenant: ${this.tenantId}, Tipo: ${this.storeType}`);
 
         // Auto-inicializar si ya vienen datos
         if (this.supabaseUrl && this.supabaseKey && this.storeId) {
@@ -43,6 +46,7 @@ class CloudSync {
         if (config.supabaseUrl) this.supabaseUrl = config.supabaseUrl.replace(/\/$/, '');
         if (config.supabaseKey) this.supabaseKey = config.supabaseKey;
         if (config.storeId) this.storeId = config.storeId;
+        if (config.tenantId) this.tenantId = config.tenantId;
         if (config.storeName) this.storeName = config.storeName;
         if (config.brandName) this.brandName = config.brandName;
         if (config.licenseExpiry !== undefined) this.licenseExpiry = config.licenseExpiry;
@@ -207,6 +211,7 @@ class CloudSync {
         try {
             const payload = {
                 id: this.storeId,
+                tenant_id: this.tenantId,
                 name: this.storeName,
                 brand_name: this.brandName,
                 store_type: this.storeType,
@@ -245,14 +250,14 @@ class CloudSync {
         if (!this.enabled) return;
         try {
             console.log('[CLOUD-SYNC] ⬇️ Importando catálogo desde Supabase...');
-            let remoteProducts = await this._supabaseGet('store_products', `?store_id=eq.${this.storeId}`);
-            // Si es kiosko y no tiene productos propios, intentar traer de almacenes
+            let remoteProducts = await this._supabaseGet('store_products', `?store_id=eq.${this.storeId}&tenant_id=eq.${this.tenantId}`);
+            // Si es kiosko y no tiene productos propios, intentar traer de almacenes del mismo tenant
             if ((!remoteProducts || remoteProducts.length === 0) && this.storeType === 'kiosko') {
                 console.log('[CLOUD-SYNC] 🔄 Kiosko sin productos propios — buscando de almacenes...');
-                const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&select=id`);
+                const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&tenant_id=eq.${this.tenantId}&select=id`);
                 if (stores && stores.length > 0) {
                     for (const s of stores) {
-                        const whProducts = await this._supabaseGet('store_products', `?store_id=eq.${s.id}`);
+                        const whProducts = await this._supabaseGet('store_products', `?store_id=eq.${s.id}&tenant_id=eq.${this.tenantId}`);
                         if (whProducts && whProducts.length > 0) {
                             remoteProducts = whProducts;
                             console.log(`[CLOUD-SYNC] ✅ ${whProducts.length} productos del almacén ${s.id}`);
@@ -271,11 +276,16 @@ class CloudSync {
             const localMap = new Map((currentLocalProducts || []).map(p => [String(p.id), p]));
 
             let imported = 0;
+            let skipped = 0;
             for (const rp of remoteProducts) {
                 const pid = String(rp.product_id);
+                if (this.deletedProductIds.has(pid)) {
+                    skipped++;
+                    continue;
+                }
                 const existing = localMap.get(pid);
                 
-                const localProduct = {
+                const localProduct = existing ? { ...existing } : {
                     id: rp.product_id,
                     name: rp.name || 'Sin nombre',
                     category: rp.category || 'Otros',
@@ -284,13 +294,18 @@ class CloudSync {
                     priceEUR: parseFloat(rp.price_eur) || 0,
                     promoPrice: parseFloat(rp.promo_price) || 0,
                     costPrice: parseFloat(rp.cost) || 0,
-                    stock: existing ? (existing.stock ?? 0) : (parseInt(rp.stock) || 0),
-                    minStock: existing ? (existing.minStock ?? 5) : 5,
-                    img: rp.img_url || (existing ? existing.img : ''),
-                    flavors: existing ? (typeof existing.flavors === 'string' ? JSON.parse(existing.flavors) : existing.flavors) : [],
-                    expiryDate: rp.expiry_date || (existing ? existing.expiryDate : ''),
-                    description: existing ? existing.description : ''
+                    stock: parseInt(rp.stock) || 0,
+                    minStock: parseInt(rp.min_stock) || 5,
+                    img: rp.img_url || '',
+                    flavors: [],
+                    expiryDate: rp.expiry_date || '',
+                    description: ''
                 };
+                // Siempre actualizar campos que vienen de la nube (nombre, categoría, etc.)
+                if (rp.name) localProduct.name = rp.name;
+                if (rp.category) localProduct.category = rp.category;
+                if (rp.img_url) localProduct.img = rp.img_url;
+                if (rp.expiry_date) localProduct.expiryDate = rp.expiry_date;
                 await localDbApi.saveProduct(this.storeId, localProduct);
                 imported++;
             }
@@ -318,6 +333,7 @@ class CloudSync {
 
         const snapshot = {
             store_id: this.storeId,
+            tenant_id: this.tenantId,
             date: new Date().toISOString().split('T')[0],
             timestamp: new Date().toISOString(),
             total_ves: snapshotData.totalVES || 0,
@@ -368,6 +384,7 @@ class CloudSync {
         const sale = {
             id: `${this.storeId}_S${datePart}_${Date.now()}_${saleData.ticket || '0'}`,
             store_id: this.storeId,
+            tenant_id: this.tenantId,
             ticket: saleData.ticket || saleData.id || '---',
             date: saleDate,
             timestamp: saleData.timestamp || Date.now(),
@@ -406,6 +423,7 @@ class CloudSync {
         const expense = {
             id: `${this.storeId}_${expenseData.id || Date.now()}`,
             store_id: this.storeId,
+            tenant_id: this.tenantId,
             date: (expenseData.date || new Date().toISOString()).split('T')[0],
             description: expenseData.description || 'Gasto General',
             amount_usd: expenseData.amountUSD || 0,
@@ -487,6 +505,7 @@ class CloudSync {
                     const item = {
                         id: `${this.storeId}_${p.id}`,
                         store_id: this.storeId,
+                        tenant_id: this.tenantId,
                         product_id: p.id,
                         name: p.name,
                         price: p.priceUSD || p.price || 0,
@@ -548,6 +567,7 @@ class CloudSync {
         
         const state = {
             store_id: this.storeId,
+            tenant_id: this.tenantId,
             cart_data: cart.map(item => ({
                 id: item.id,
                 name: item.name,
@@ -618,7 +638,7 @@ class CloudSync {
     async getWarehouseStoreId() {
         if (!this.enabled) return null;
         try {
-            const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&select=id&limit=1`);
+            const stores = await this._supabaseGet('stores', `?store_type=eq.warehouse&tenant_id=eq.${this.tenantId}&select=id&limit=1`);
             if (stores && stores.length > 0) return stores[0].id;
         } catch (e) {}
         return null;
@@ -629,6 +649,7 @@ class CloudSync {
         const po = {
             id: poData.id,
             store_id: this.storeId,
+            tenant_id: this.tenantId,
             from_store: poData.from_store || this.storeId,
             to_store: poData.to_store || '',
             status: poData.status || 'PENDING',
@@ -746,7 +767,7 @@ class CloudSync {
     async fetchRemotePOs(localDbApi) {
         if (!this.enabled || !localDbApi) return;
         try {
-            const remotePOs = await this._supabaseGet('store_purchase_orders', `?or=(from_store.eq.${this.storeId},to_store.eq.${this.storeId})&order=timestamp.desc&limit=100`);
+            const remotePOs = await this._supabaseGet('store_purchase_orders', `?tenant_id=eq.${this.tenantId}&or=(from_store.eq.${this.storeId},to_store.eq.${this.storeId})&order=timestamp.desc&limit=100`);
             if (!remotePOs || remotePOs.length === 0) return;
             const localPOs = await localDbApi.getPurchaseOrders(this.storeId, 'all') || [];
             const localMap = {};
@@ -791,7 +812,7 @@ class CloudSync {
             console.log(msg1);
             try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${msg1}\n`); } catch(e){}
 
-            const commands = await this._supabaseGet('store_commands', `?store_id=eq.${this.storeId}&status=eq.pending`);
+            const commands = await this._supabaseGet('store_commands', `?store_id=eq.${this.storeId}&tenant_id=eq.${this.tenantId}&status=eq.pending`);
             
             const msg2 = `[CLOUD-SYNC] 🔍 Resultado supabaseGet: ${commands ? commands.length : 'null'}`;
             console.log(msg2, commands);
@@ -1026,6 +1047,35 @@ class CloudSync {
         } catch (e) {}
     }
 
+    _loadDeletedIds() {
+        if (!this.queuePath) return;
+        try {
+            const filePath = path.join(this.queuePath, 'deleted_product_ids.json');
+            if (fs.existsSync(filePath)) {
+                const arr = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                if (Array.isArray(arr)) this.deletedProductIds = new Set(arr);
+            }
+        } catch (e) {}
+    }
+
+    _saveDeletedIds() {
+        if (!this.queuePath) return;
+        try {
+            const filePath = path.join(this.queuePath, 'deleted_product_ids.json');
+            fs.writeFileSync(filePath, JSON.stringify([...this.deletedProductIds]));
+        } catch (e) {}
+    }
+
+    addDeletedProductId(id) {
+        this.deletedProductIds.add(String(id));
+        this._saveDeletedIds();
+    }
+
+    removeDeletedProductId(id) {
+        this.deletedProductIds.delete(String(id));
+        this._saveDeletedIds();
+    }
+
     _updateStatus(synced, error = null) {
         this.lastStatus = {
             synced,
@@ -1073,6 +1123,178 @@ class CloudSync {
             console.log(`[CLOUD-SYNC] ✅ Backup automático guardado en la nube para tienda: ${this.storeId}`);
         } catch (e) {
             console.error('[CLOUD-SYNC] ❌ Error subiendo backup automático:', e.message);
+        }
+    }
+
+    // ==========================================
+    // LICENSE MANAGEMENT (Activación por Máquina)
+    // ==========================================
+    async _licenseRequest(table, method, data, queryParams = '') {
+        const url = new URL(`${this.supabaseUrl}/rest/v1/${table}${queryParams}`);
+        return new Promise((resolve, reject) => {
+            const options = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Prefer': method === 'POST' ? 'resolution=merge-duplicates,return=minimal' : 'return=minimal'
+                }
+            };
+            const req = https.request(options, (res) => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        try { resolve(body ? JSON.parse(body) : { success: true }); }
+                        catch (e) { resolve({ success: true }); }
+                    } else {
+                        reject(new Error(`License ${method} ${table} → HTTP ${res.statusCode}: ${body.substring(0, 200)}`));
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
+            if (data && (method === 'POST' || method === 'PATCH')) req.write(JSON.stringify(data));
+            req.end();
+        });
+    }
+
+    async _licenseGet(table, queryParams = '') {
+        const url = new URL(`${this.supabaseUrl}/rest/v1/${table}${queryParams}`);
+        return new Promise((resolve, reject) => {
+            const options = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: 'GET',
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Accept': 'application/json'
+                }
+            };
+            const req = https.request(options, (res) => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        try { resolve(JSON.parse(body)); } catch (e) { resolve([]); }
+                    } else {
+                        reject(new Error(`License GET ${res.statusCode}: ${body.substring(0, 200)}`));
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+            req.end();
+        });
+    }
+
+    async registerMachine(machineId, appId, deviceName, userType, userInfo) {
+        const data = {
+            machine_id: machineId,
+            app_id: appId,
+            device_name: deviceName || '',
+            user_type: userType || 'negocio',
+            user_info: userInfo || {},
+            status: 'trial',
+            trial_start: new Date().toISOString(),
+            trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            version: '',
+            last_seen: new Date().toISOString()
+        };
+        try {
+            await this._licenseRequest('licenses', 'POST', data);
+            await this._licenseRequest('license_audit', 'POST', {
+                machine_id: machineId,
+                action: 'registered',
+                ip_address: ''
+            });
+            await this._licenseRequest('license_audit', 'POST', {
+                machine_id: machineId,
+                action: 'trial_started',
+                ip_address: ''
+            });
+            return { ok: true, trial_end: data.trial_end };
+        } catch (e) {
+            console.error('[LICENSE] Error registering machine:', e.message);
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async checkMachineStatus(machineId) {
+        if (!this.supabaseUrl) return { status: 'unknown', error: 'No cloud config' };
+        try {
+            const rows = await this._licenseGet('licenses', `?machine_id=eq.${encodeURIComponent(machineId)}&limit=1`);
+            if (!rows || rows.length === 0) return { status: 'not_found' };
+            const lic = rows[0];
+            const now = new Date();
+            // Auto-expire trials
+            if (lic.status === 'trial' && lic.trial_end && new Date(lic.trial_end) < now) {
+                lic.status = 'trial_expired';
+                try {
+                    await this._licenseRequest('licenses', 'PATCH', { status: 'trial_expired' }, `?machine_id=eq.${encodeURIComponent(machineId)}`);
+                } catch (_) {}
+            }
+            return {
+                status: lic.status,
+                device_name: lic.device_name,
+                user_type: lic.user_type,
+                user_info: lic.user_info,
+                trial_end: lic.trial_end,
+                expiration_date: lic.expiration_date,
+                deactivation_reason: lic.deactivation_reason
+            };
+        } catch (e) {
+            console.error('[LICENSE] Error checking machine status:', e.message);
+            return { status: 'error', error: e.message };
+        }
+    }
+
+    async licenseHeartbeat(machineId, version) {
+        try {
+            await this._licenseRequest('licenses', 'PATCH', {
+                last_seen: new Date().toISOString(),
+                version: version || ''
+            }, `?machine_id=eq.${encodeURIComponent(machineId)}`);
+            try {
+                await this._licenseRequest('license_audit', 'POST', {
+                    machine_id: machineId,
+                    action: 'heartbeat',
+                    ip_address: ''
+                });
+            } catch (_) {}
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async getAllLicenses() {
+        try {
+            return await this._licenseGet('licenses', '?order=created_at.desc');
+        } catch (e) {
+            console.error('[LICENSE] Error getting all licenses:', e.message);
+            return [];
+        }
+    }
+
+    async updateLicenseStatus(machineId, newStatus, reason) {
+        if (!['active','deactivated'].includes(newStatus)) return { ok: false, error: 'Invalid status' };
+        try {
+            const patch = { status: newStatus, updated_at: new Date().toISOString() };
+            if (newStatus === 'deactivated' && reason) patch.deactivation_reason = reason;
+            await this._licenseRequest('licenses', 'PATCH', patch, `?machine_id=eq.${encodeURIComponent(machineId)}`);
+            await this._licenseRequest('license_audit', 'POST', {
+                machine_id: machineId,
+                action: newStatus === 'active' ? 'activated' : 'deactivated',
+                reason: reason || ''
+            });
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, error: e.message };
         }
     }
 
