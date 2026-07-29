@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provisionar Sandbox - Caja Fresh</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; background: #f4f4f5; }
+        input, select, button { font-family: inherit; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th { background: #2c3e50; color: white; text-align: left; padding: 8px; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+        .btn-tab { padding: 10px 15px; border: 1px solid #ccc; background: #ecf0f1; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .btn-tab.active { background: #2c3e50; color: white; border-color: #2c3e50; }
+        .btn-tab:hover { opacity: 0.9; }
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .provisionar-container { max-width: 1400px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .btn-danger { background: #e74c3c; color: white; border: none; cursor: pointer; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="provisionar-container">
+        <h2>Modulo de Provisionar - Caja Fresh</h2>
+
+        <nav class="nav-tabs">
+            <button class="btn-tab active" onclick="switchTab('tab-materiales')">Inventario Materiales</button>
+            <button class="btn-tab" onclick="switchTab('tab-cad')">Visualizador CAD y Cortes</button>
+            <button class="btn-tab" onclick="switchTab('tab-costos')">Cotizacion y Costeo</button>
+        </nav>
+
+        <!-- TAB 1: MATERIALES -->
+        <section id="tab-materiales" class="tab-content" style="display: block;">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <form id="form-material" style="flex: 1; min-width: 300px; background: #f4f6f9; padding: 15px; border-radius: 8px;">
+                    <h3>Registrar / Editar Material</h3>
+                    <input type="hidden" id="mat-id" value="">
+
+                    <div style="margin-bottom: 10px;">
+                        <label>Nombre del Material:</label><br>
+                        <input type="text" id="mat-nombre" placeholder="Ej. MDF 15mm" required style="width: 100%; padding: 6px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label>Tipo:</label><br>
+                        <select id="mat-tipo" style="width: 100%; padding: 6px;">
+                            <option value="Madera">Madera / MDF</option>
+                            <option value="Acrilico">Acrilico</option>
+                            <option value="Metal">Metal / Alucobond</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div style="flex:1;">
+                            <label>Ancho (mm):</label>
+                            <input type="number" id="mat-ancho" required style="width: 100%; padding: 6px;">
+                        </div>
+                        <div style="flex:1;">
+                            <label>Largo (mm):</label>
+                            <input type="number" id="mat-largo" required style="width: 100%; padding: 6px;">
+                        </div>
+                        <div style="flex:1;">
+                            <label>Espesor (mm):</label>
+                            <input type="number" id="mat-espesor" step="0.1" required style="width: 100%; padding: 6px;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Precio por Lamina ($):</label>
+                        <input type="number" id="mat-precio" step="0.01" required style="width: 100%; padding: 6px;">
+                    </div>
+                    <button type="submit" style="background: #27ae60; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Guardar Material</button>
+                </form>
+
+                <div style="flex: 2; min-width: 400px;">
+                    <h3>Inventario Disponible</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo</th>
+                                <th>Dimensiones</th>
+                                <th>Espesor</th>
+                                <th>Precio</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-materiales-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: CAD Y OPTIMIZACION -->
+        <section id="tab-cad" class="tab-content" style="display: none;">
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
+                <select id="cad-select-material" style="padding: 8px; min-width: 250px;">
+                    <option value="">-- Seleccionar Material para Corte --</option>
+                </select>
+
+                <div id="cad-drop-zone" style="border: 2px dashed #3498db; padding: 10px 20px; border-radius: 6px; background: #ebf5fb; cursor: pointer;">
+                    Arrastra o haz clic para subir <strong>.DXF</strong> o <strong>.SVG</strong>
+                    <input type="file" id="cad-file-input" accept=".dxf,.svg" style="display: none;">
+                </div>
+
+                <button id="btn-ejecutar-nesting" style="background: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    Optimizar Corte
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 3; position: relative;">
+                    <canvas id="cad-canvas" width="800" height="500" style="border: 1px solid #ccc; background: #fafafa; border-radius: 6px; cursor: default;"></canvas>
+                </div>
+                <div id="nesting-resultados-container" style="flex: 1; min-width: 250px;"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: COSTOS -->
+        <section id="tab-costos" class="tab-content" style="display: none;">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; min-width: 250px;">
+                    <h3>Parametros de Costeo</h3>
+                    <div style="margin-bottom: 10px;">
+                        <label>Costo Hora Maquina ($/hr):</label>
+                        <input type="number" id="costo-hora-input" value="25.00" step="1" style="width: 100%; padding: 6px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Margen de Ganancia (%):</label>
+                        <input type="number" id="costo-margen-input" value="35.00" step="1" style="width: 100%; padding: 6px;">
+                    </div>
+                    <button id="btn-recalcular-costo" style="background: #f39c12; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 10px;">
+                        Recalcular Costo
+                    </button>
+                    <button id="btn-generar-pdf" style="background: #e74c3c; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%;">
+                        Exportar Cotizacion PDF
+                    </button>
+                </div>
+                <div id="costos-resumen-container" style="flex: 2;"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(function(el) { el.style.display = 'none'; });
+            document.querySelectorAll('.btn-tab').forEach(function(el) { el.classList.remove('active'); });
+            document.getElementById(tabId).style.display = 'block';
+        }
+    </script>
+
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <script src="src/modules/provisionar/provisionar-db.js"></script>
+    <script src="src/modules/provisionar/provisionar-materiales.js"></script>
+    <script src="src/modules/provisionar/provisionar-cad.js"></script>
+    <script src="src/modules/provisionar/provisionar-cortes.js"></script>
+    <script src="src/modules/provisionar/provisionar-costos.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('Inicializando Suite Provisionar - Caja Fresh...');
+            await window.ProvisionarDB.init();
+            await window.ProvisionarMateriales.init();
+            window.ProvisionarCAD.init('cad-canvas');
+            window.ProvisionarCortes.init();
+            window.ProvisionarCostos.init();
+            console.log('Todos los modulos inicializados y desacoplados.');
+        });
+    </script>
+</body>
+</html>

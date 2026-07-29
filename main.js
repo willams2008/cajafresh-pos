@@ -21,12 +21,12 @@ const startupLogPath = path.join(app.getPath('userData'), 'startup_debug.log');
 const origLog = console.log;
 const origErr = console.error;
 console.log = function(...args) {
-    origLog.apply(console, args);
+    try { origLog.apply(console, args); } catch (e) {}
     const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
     try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [LOG] ${msg}\n`); } catch(e) {}
 };
 console.error = function(...args) {
-    origErr.apply(console, args);
+    try { origErr.apply(console, args); } catch (e) {}
     const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
     try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [ERROR] ${msg}\n`); } catch(e) {}
 };
@@ -235,13 +235,16 @@ ipcMain.handle('db-save-products-bulk', async (e, storeId, p) => {
     return res;
 });
 ipcMain.handle('db-delete-product', async (e, storeId, id) => {
-    let sid = storeId;
-    let productId = id;
-    if (typeof storeId !== 'string') {
+    let sid, productId;
+    if (id === undefined && storeId !== undefined) {
         productId = storeId;
         sid = getStoreIdHelper();
+    } else {
+        sid = storeId;
+        productId = id;
     }
     const res = await dbApi.deleteProduct(sid, productId);
+    if (cloudSync) cloudSync.addDeletedProductId(productId);
     syncCatalogToCloud(sid);
     return res;
 });
@@ -380,6 +383,15 @@ ipcMain.handle('db-get-today-sales-summary', async (e, storeId) => {
     const sid = getStoreIdHelper(storeId);
     return dbApi.getTodaySalesSummary(sid);
 });
+ipcMain.handle('db-get-movements', async (e, storeId, startDate, endDate, type) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getMovements(sid, startDate, endDate, type);
+});
+ipcMain.handle('db-save-movement', async (e, storeId, movement) => {
+    let sid = storeId, m = movement;
+    if (typeof storeId !== 'string') { m = storeId; sid = getStoreIdHelper(); }
+    return dbApi.saveMovement(sid, m);
+});
 ipcMain.handle('db-migrate', async (e, storeId, data) => {
     let sid = storeId;
     let migrateData = data;
@@ -388,6 +400,62 @@ ipcMain.handle('db-migrate', async (e, storeId, data) => {
         sid = getStoreIdHelper();
     }
     return dbApi.migrateData(sid, migrateData);
+});
+
+// Product change history & soft-delete
+ipcMain.handle('db-get-product-changes', async (e, storeId, productId, limit) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getProductChanges(sid, productId, limit);
+});
+ipcMain.handle('db-restore-product', async (e, storeId, id, cashier) => {
+    let sid = storeId, pid = id, c = cashier;
+    if (typeof storeId !== 'string') { pid = storeId; c = id; sid = getStoreIdHelper(); }
+    const res = await dbApi.restoreProduct(sid, pid, c);
+    if (cloudSync) cloudSync.removeDeletedProductId(pid);
+    syncCatalogToCloud(sid);
+    return res;
+});
+ipcMain.handle('db-get-deleted-products', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getDeletedProducts(sid);
+});
+ipcMain.handle('db-delete-product-permanent', async (e, storeId, id) => {
+    let sid = storeId, pid = id;
+    if (typeof storeId !== 'string') { pid = storeId; sid = getStoreIdHelper(); }
+    return dbApi.deleteProductPermanent(sid, pid);
+});
+ipcMain.handle('db-set-meta', async (e, storeId, key, value) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.setMeta(sid, key, value);
+});
+ipcMain.handle('db-get-meta', async (e, storeId, key) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getMeta(sid, key);
+});
+ipcMain.handle('db-get-product-by-id', async (e, storeId, productId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getProductById(sid, productId);
+});
+
+ipcMain.handle('db-get-users', async () => {
+    const sid = getStoreIdHelper();
+    return dbApi.getUsers(sid);
+});
+ipcMain.handle('db-get-user', async (e, username) => {
+    const sid = getStoreIdHelper();
+    return dbApi.getUser(sid, username);
+});
+ipcMain.handle('db-save-user', async (e, user) => {
+    const sid = getStoreIdHelper();
+    return dbApi.saveUser(sid, user);
+});
+ipcMain.handle('db-delete-user', async (e, userId) => {
+    const sid = getStoreIdHelper();
+    return dbApi.deleteUser(sid, userId);
+});
+ipcMain.handle('db-update-user-last-login', async (e, userId) => {
+    const sid = getStoreIdHelper();
+    return dbApi.updateUserLastLogin(sid, userId);
 });
 
 // ==========================================
@@ -1102,8 +1170,8 @@ function startServer() {
     // Serve Windows installer files from dist_FINAL
     serverApp.use('/dist', express.static(path.join(__dirname, 'dist_FINAL')));
 
-    // DASHBOARD REMOTO: Página web para el dueño del negocio
-    serverApp.get('/dashboard', (req, res) => {
+    // DASHBOARD REMOTO / APP DEL JEFE: Página web para el dueño del negocio
+    serverApp.get(['/dashboard', '/jefe'], (req, res) => {
         res.sendFile(path.join(__dirname, 'dashboard.html'));
     });
 
@@ -1115,9 +1183,23 @@ function startServer() {
 
     serverApp.get('/api/boss/config', (req, res) => {
         const userSettings = getPersistentSettings();
+        let supaUrl = userSettings.supabaseUrl || '';
+        let supaKey = userSettings.supabaseKey || '';
+        if (!supaUrl || supaUrl.includes('TU_SUPABASE')) {
+            try {
+                const sysConfig = require('./src/config');
+                supaUrl = sysConfig.supabase.url;
+                supaKey = sysConfig.supabase.key;
+            } catch(e) {
+                supaUrl = 'https://effgvevvnfzcuvtulyvs.supabase.co';
+                supaKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmZmd2ZXZ2bmZ6Y3V2dHVseXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTg0MzgsImV4cCI6MjA5MjUzNDQzOH0.0WzyJcGCuGYfJAIE9g1Gxcm5G4thooHxDV0a4D5jMVk';
+            }
+        }
         res.json({
-            supabaseUrl: userSettings.supabaseUrl || '',
-            supabaseKey: userSettings.supabaseKey || ''
+            supabaseUrl: supaUrl,
+            supabaseKey: supaKey,
+            tenantId: userSettings.tenantId || process.env.CAJA_FRESH_TENANT_ID || 'tenant_default',
+            storeId: userSettings.storeId || 'mi_tienda'
         });
     });
 
@@ -2358,6 +2440,45 @@ ipcMain.handle('cloud-sync-get-warehouse-products', async () => {
     }
 });
 
+ipcMain.handle('sync-add-deleted-product', async (event, productId) => {
+    if (cloudSync) {
+        cloudSync.addDeletedProductId(productId);
+        return true;
+    }
+    return false;
+});
+ipcMain.handle('sync-remove-deleted-product', async (event, productId) => {
+    if (cloudSync) {
+        cloudSync.removeDeletedProductId(productId);
+        return true;
+    }
+    return false;
+});
+
+// ==========================================
+// LICENSE ACTIVATION SYSTEM
+// ==========================================
+ipcMain.handle('license-register-machine', async (event, { machineId, appId, deviceName, userType, userInfo }) => {
+    if (!cloudSync) return { ok: false, error: 'CloudSync not initialized' };
+    return await cloudSync.registerMachine(machineId, appId, deviceName, userType, userInfo);
+});
+ipcMain.handle('license-check-status', async (event, machineId) => {
+    if (!cloudSync) return { status: 'unknown', error: 'CloudSync not initialized' };
+    return await cloudSync.checkMachineStatus(machineId);
+});
+ipcMain.handle('license-heartbeat', async (event, { machineId, version }) => {
+    if (!cloudSync) return { ok: false };
+    return await cloudSync.licenseHeartbeat(machineId, version);
+});
+ipcMain.handle('license-get-all', async () => {
+    if (!cloudSync) return [];
+    return await cloudSync.getAllLicenses();
+});
+ipcMain.handle('license-update-status', async (event, { machineId, status, reason }) => {
+    if (!cloudSync) return { ok: false, error: 'CloudSync not initialized' };
+    return await cloudSync.updateLicenseStatus(machineId, status, reason);
+});
+
 // ==========================================
 // Sunmi P3 Integration
 // ==========================================
@@ -2469,10 +2590,13 @@ async function initCloudSync() {
         }
     }
 
+    const tenantId = settings.tenantId || process.env.CAJA_FRESH_TENANT_ID || 'tenant_default';
+
     cloudSync = new CloudSync({
         supabaseUrl: supaUrl,
         supabaseKey: supaKey,
         storeId:     storeId,
+        tenantId:    tenantId,
         storeName:   settings.storeName || 'Mi Tienda',
         brandName:   settings.brandName || 'Caja Fresh',
         queuePath:   app.getPath('userData'),

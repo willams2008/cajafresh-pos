@@ -1,0 +1,21 @@
+{
+  "name": "chatbot-cajafresh",
+  "version": "1.0.0",
+  "description": "Chatbot WhatsApp para Caja Fresh POS - Baileys + Gemini API",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "pair": "node pair.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "dotenv": "^17.4.2",
+    "pino": "^9.6.0",
+    "pino-pretty": "^11.3.0",
+    "qrcode-terminal": "^0.12.0",
+    "sqlite3": "^6.0.1",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

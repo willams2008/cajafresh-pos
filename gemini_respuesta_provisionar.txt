@@ -1,0 +1,342 @@
+Gemini
+Flash
+Conversación con Gemini
+Tú dijiste
+
+Hola Gemini. Este es el modulo "Provisionar" de mi POS Caja Fresh:
+
+
+
+
+MODULO PROVISIONAR - RESUMEN:
+
+- Archivo: src/features/provisionar.js
+
+- Total: 1989 lines
+
+- Estado: materiales[], capasCAD[], piezasCAD[], resultadoCortes, cotizaciones[]
+
+- 4 tabs: materiales, cad, cortes, costos
+
+- Todo en localStorage
+
+
+
+
+PRINCIPALES FUNCIONES:
+
+function init() {
+
+cargarEstado();
+
+renderMateriales();
+
+renderSelectMateriales();
+
+initCADDropZone();
+
+if (tabActivo) switchTab(tabActivo);
+
+
+
+
+// ─── Event Listeners para el Canvas CAD ──────────────
+
+
+
+
+
+
+
+// ─── Event Listeners para el Canvas CAD ──────────────
+
+setTimeout(function() {
+
+var cadCanvas = document.getElementById('cad-canvas');
+
+if (cadCanvas) {
+
+// Zoom con rueda del ratón
+
+
+
+
+
+
+
+// Zoom con rueda del ratón
+
+cadCanvas.addEventListener('wheel', function(e) {
+
+e.preventDefault();
+
+var factor = e.deltaY < 0 ? 1.12 : 0.88;
+
+var rect = cadCanvas.getBoundingClientRect();
+
+var mx = e.clientX - rect.left;
+
+var my = e.clientY - rect.top;
+
+// Zoom centrado en el cursor
+
+
+
+
+
+
+
+// Zoom centrado en el cursor
+
+cadCam.panX = mx - (mx - cadCam.panX) * factor;
+
+cadCam.panY = my - (my - cadCam.panY) * factor;
+
+cadCam.zoom *= factor;
+
+redibujarCanvasCAD();
+
+}, { passive: false });
+
+
+
+
+// Drag: mousedown
+
+
+
+
+
+
+
+// Drag: mousedown
+
+cadCanvas.addEventListener('mousedown', function(e) {
+
+e.preventDefault();
+
+var rect = cadCanvas.getBoundingClientRect();
+
+var mx = e.clientX - rect.left;
+
+var my = e.clientY - rect.top;
+
+
+
+
+if (e.button === 0) {
+
+// Click izquierdo: intentar seleccionar pieza para arrastrar
+
+
+
+
+
+
+
+// Click izquierdo: intentar seleccionar pieza para arrastrar
+
+var hit = hitTestPieza(mx, my);
+
+if (hit) {
+
+cadDrag = { active: true, startX: mx, startY: my, mode: 'piece', type: hit.type, pieceIdx: hit.pieceIdx, capaIdx: hit.capaIdx };
+
+cadCanvas.style.cursor = 'grabbing';
+
+} else {
+
+// Si no hay pieza, iniciar paneo
+
+
+
+
+
+
+
+// Si no hay pieza, iniciar paneo
+
+cadDrag = { active: true, startX: mx, startY: my, mode: 'pan', pieceIdx: -1, capaIdx: -1 };
+
+cadCanvas.style.cursor = 'move';
+
+}
+
+} else if (e.button === 1) {
+
+// Click medio: siempre paneo
+
+
+
+
+
+
+
+// Click medio: siempre paneo
+
+cadDrag = { active: true, startX: mx, startY: my, mode: 'pan', pieceIdx: -1, capaIdx: -1 };
+
+cadCanvas.style.cursor = 'move';
+
+}
+
+});
+
+
+
+
+cadCanvas.addEventListener('mousemove', function(e) {
+
+if (!cadDrag.active) {
+
+// Cambiar cursor según si está sobre una pieza
+
+
+
+
+
+
+
+// Cambiar cursor según si está sobre una pieza
+
+var rect = cadCanvas.getBoundingClientRect();
+
+var mx = e.clientX - rect.left;
+
+var my = e.clientY - rect.top;
+
+var hit = hitTestPieza(mx, my);
+
+cadCanvas.style.cursor = hit ? 'grab' : 'default';
+
+return;
+
+}
+
+
+
+
+var rect = cadCanvas.getBoundingClientRect();
+
+var mx = e.clientX - rect.left;
+
+var my = e.clientY - rect.top;
+
+var dx = mx - cadDrag.startX;
+
+var dy = my - cadDrag.startY;
+
+
+
+
+if (cadDrag.mode === 'pan') {
+
+cadCam.panX += dx;
+
+cadCam.panY += dy;
+
+cadDrag.startX = mx;
+
+cadDrag.startY = my;
+
+redibujarCanvasCAD();
+
+} else if (cadDrag.mode === 'piece' && cadDrag.type === 'piece') {
+
+// Mover pieza: convertir delta en coordenadas virtuales
+
+
+
+
+
+
+
+// Mover pieza: convertir delta en coordenadas virtuales
+
+var capa = capasCAD[cadDrag.capaIdx];
+
+if (capa && capa.piezas[cadDrag.pieceIdx]) {
+
+var p = capa.piezas[cadDrag.pieceIdx];
+
+var info = getCADTransformInfo();
+
+if (info) {
+
+var mmDx = dx / (info.scale * cadCam.zoom);
+
+var mmDy = -dy / (info.scale * cadCam.zoom);
+
+if (!p.offsetX) p.offsetX = 0;
+
+if (!p.offsetY) p.offsetY = 0;
+
+p.offsetX += mmDx;
+
+p.offsetY += mmDy;
+
+cadDrag.startX = mx;
+
+cadDrag.startY = my;
+
+redibujarCanvasCAD();
+
+}
+
+}
+
+} else if (cadDrag.mode === 'piece' && cadDrag.type === 'plancha') {
+
+// Mover plancha
+
+
+
+
+
+
+
+...[resto omitido - 97k chars total]...
+
+
+
+
+PREGUNTA: Con esta estructura, ¿QUE MEJORARIAS? Dame recomendaciones de: SQL migration, nesting algorithm, workers, costeo, trazabilidad de retales.
+
+Gemini dijo
+
+¡Hola, Williams! Qué buen proyecto tienes entre manos con este módulo de aprovisionamiento y optimización para tu POS. Casi 2,000 líneas en un solo archivo de JavaScript vanilla manejando estados complejos (geometrías, renders, layouts de corte y costeo) es un logro importante, pero mantenerlo ahí va a ser una pesadilla a mediano plazo.
+
+Considerando que estás escalando la arquitectura de tu software, aquí tienes un desglose directo con las mejores recomendaciones técnicas para cada uno de los puntos que mencionas.
+
+1. Migración a SQL (De localStorage a Base de Datos)
+
+localStorage tiene un límite estricto de ~5MB, no es transaccional y es propenso a corromperse si el usuario limpia la caché. Para un módulo de cortes y cotizaciones, necesitas consistencia relacional.
+
+Estrategia de Transición: Si el POS corre puramente en el navegador/cliente, migra inmediatamente a IndexedDB (usando librerías limpias como Dexie.js). Si ya tienes un backend listo, pasa esto a una base de datos relacional (PostgreSQL/SQLite).
+
+Diseño del Esquema Relacional:
+
+materiales: id, nombre, tipo (madera, acrílico, metal), ancho_mm, alto_mm, espesor_mm, costo_unitario, stock_disponible.
+
+piezas_cad: id, cotizacion_id, nombre, ancho_mm, alto_mm, cantidad, geometria_json (para guardar polígonos complejos de las capas CAD si aplica).
+
+resultado_cortes: id, fecha, eficiencia_porcentaje. Aquí guardas el histórico de optimizaciones.
+
+retales (Mesa de retales): id, material_id, origen_corte_id, ancho_mm, alto_mm, disponible (boolean).
+
+2. Algoritmo de Nesting (Optimización de Espacio)
+
+Actualmente pareces estar manejando transformaciones manuales (offsetX, offsetY) o un algoritmo básico. Para optimizar planchas de manera profesional necesitas un motor de Nesting Bidimensional (2D Bin Packing).
+
+El Enfoque (Guillotina vs. No-Guillotina):
+
+Si los cortes se hacen con sierra manual o dimensionadora de paneles, necesitas un algoritmo de corte de guillotina (los cortes deben ir de lado a lado de la plancha).
+
+Si usas Router CNC o Láser, puedes usar algoritmos de empaquetamiento libre donde las piezas pueden encajar dentro de los huecos de otras.
+
+Librerías Recomendadas:
+
+
+
+
+Detener respuesta

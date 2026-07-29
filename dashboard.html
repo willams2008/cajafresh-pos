@@ -2,230 +2,539 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Remoto — POS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>App del Jefe — Caja Fresh POS</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Inter',sans-serif; background:#0f172a; color:#e2e8f0; min-height:100vh; }
-        
-        .container { max-width:480px; margin:0 auto; padding:16px; }
-        
-        /* Header */
-        .header { text-align:center; padding:24px 0 16px; }
-        .header h1 { font-size:20px; font-weight:900; letter-spacing:-0.5px; }
-        .header h1 span { color:#3b82f6; }
-        .header .badge { display:inline-block; margin-top:6px; padding:3px 10px; background:#1e293b; border:1px solid #334155; border-radius:20px; font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:1.5px; }
-        .header .live-dot { display:inline-block; width:6px; height:6px; background:#22c55e; border-radius:50%; margin-right:4px; animation:pulse 2s infinite; }
-        
-        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
-        
-        /* Cards */
-        .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
-        .kpi { background:#1e293b; border:1px solid #334155; border-radius:16px; padding:16px; position:relative; overflow:hidden; }
-        .kpi.highlight { background:linear-gradient(135deg,#1e3a5f,#1e293b); border-color:#3b82f6; }
-        .kpi.profit { background:linear-gradient(135deg,#064e3b,#1e293b); border-color:#10b981; }
-        .kpi .label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:1.5px; color:#64748b; margin-bottom:4px; }
-        .kpi .value { font-size:22px; font-weight:900; color:#f1f5f9; line-height:1.1; }
-        .kpi .sub { font-size:10px; font-weight:600; color:#475569; margin-top:4px; }
-        .kpi.highlight .value { color:#60a5fa; }
-        .kpi.profit .value { color:#34d399; }
-        
-        /* Section */
-        .section { background:#1e293b; border:1px solid #334155; border-radius:16px; margin-bottom:12px; overflow:hidden; }
-        .section-header { padding:14px 16px; border-bottom:1px solid #334155; display:flex; align-items:center; gap:8px; }
-        .section-header i { color:#3b82f6; font-size:12px; }
-        .section-header h3 { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; }
-        
-        /* Sales list */
-        .sale-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #1e293b; }
-        .sale-row:last-child { border-bottom:none; }
-        .sale-row:nth-child(odd) { background:#1a2536; }
-        .sale-info { flex:1; }
-        .sale-ticket { font-size:12px; font-weight:800; color:#e2e8f0; }
-        .sale-meta { font-size:10px; color:#64748b; font-weight:600; margin-top:2px; }
-        .sale-amount { font-size:14px; font-weight:900; color:#f1f5f9; text-align:right; }
-        .sale-method { font-size:9px; font-weight:700; padding:2px 8px; border-radius:8px; display:inline-block; margin-top:2px; }
-        .method-cash-usd { background:#064e3b; color:#34d399; }
-        .method-cash-ves { background:#1e3a5f; color:#60a5fa; }
-        .method-card-ves { background:#312e81; color:#a78bfa; }
-        
-        /* Alerts */
-        .alert-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid #1e293b; }
-        .alert-item:last-child { border-bottom:none; }
-        .alert-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-        .alert-dot.warning { background:#f59e0b; }
-        .alert-dot.danger { background:#ef4444; animation:pulse 1.5s infinite; }
-        .alert-text { font-size:11px; font-weight:600; color:#cbd5e1; flex:1; }
-        .alert-count { font-size:10px; font-weight:800; color:#64748b; }
-        
-        /* Empty state */
-        .empty { text-align:center; padding:24px; color:#475569; font-size:11px; font-weight:600; font-style:italic; }
-        
-        /* Footer */
-        .footer { text-align:center; padding:20px; color:#334155; font-size:9px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
-        
-        /* Refresh animation */
-        .refreshing { animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        .refresh-btn { position:fixed; bottom:20px; right:20px; width:48px; height:48px; background:#3b82f6; color:white; border:none; border-radius:50%; font-size:18px; cursor:pointer; box-shadow:0 4px 20px rgba(59,130,246,0.4); z-index:10; }
-        
-        /* Last update */
-        .last-update { text-align:center; font-size:9px; color:#475569; font-weight:600; padding:8px 0 4px; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1 id="dash-company">Caja <span>Fresh</span></h1>
-            <div class="badge"><span class="live-dot"></span> Dashboard en Vivo</div>
-        </div>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-24 selection:bg-brand-500 selection:text-white">
 
-        <!-- KPIs -->
-        <div class="kpi-grid">
-            <div class="kpi highlight">
-                <div class="label">Ventas Hoy</div>
-                <div class="value" id="d-total-ves">Bs 0</div>
-                <div class="sub" id="d-total-usd">$0.00 USD</div>
+    <!-- TOP HEADER -->
+    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-md shadow-brand-500/20">
+                <i class="fas fa-crown"></i>
             </div>
-            <div class="kpi profit">
-                <div class="label">Tickets</div>
-                <div class="value" id="d-tickets">0</div>
-                <div class="sub" id="d-items">0 artículos</div>
-            </div>
-            <div class="kpi">
-                <div class="label">Productos</div>
-                <div class="value" id="d-products">0</div>
-                <div class="sub">en inventario</div>
-            </div>
-            <div class="kpi">
-                <div class="label">Tasa</div>
-                <div class="value" id="d-rate">0</div>
-                <div class="sub">Bs/USD</div>
+            <div>
+                <h1 class="font-black text-base text-white tracking-tight leading-none flex items-center gap-2">
+                    App del Jefe
+                    <span id="tenant-badge" class="bg-brand-500/20 text-brand-400 border border-brand-500/30 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Cargando...</span>
+                </h1>
+                <p class="text-[11px] font-medium text-slate-400 mt-0.5" id="store-selector-container">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1"></span>
+                    <span id="current-view-title">Todas las Sucursales</span>
+                </p>
             </div>
         </div>
+        <button onclick="refreshAllData()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 flex items-center justify-center transition-all border border-slate-700">
+            <i class="fas fa-sync-alt text-xs" id="global-sync-icon"></i>
+        </button>
+    </header>
 
-        <!-- Últimas Ventas -->
-        <div class="section">
-            <div class="section-header">
-                <i class="fas fa-receipt"></i>
-                <h3>Últimas Ventas</h3>
-            </div>
-            <div id="d-sales-list">
-                <div class="empty">Esperando datos del POS...</div>
-            </div>
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-xl mx-auto p-4 space-y-4">
+
+        <!-- SUCURSAL SELECTOR STRIP -->
+        <div class="flex gap-2 overflow-x-auto custom-scrollbar pb-1 text-xs font-bold" id="store-pills-container">
+            <button onclick="filterByStore('ALL')" class="store-pill active px-4 py-2 rounded-xl bg-brand-600 text-white shadow-md shadow-brand-600/20 shrink-0 transition-all">
+                🌐 Todas las Sucursales
+            </button>
         </div>
 
-        <!-- Alertas -->
-        <div class="section">
-            <div class="section-header">
-                <i class="fas fa-bell"></i>
-                <h3>Alertas de Inventario</h3>
-            </div>
-            <div id="d-alerts-list">
-                <div class="empty">Sin alertas</div>
-            </div>
-        </div>
+        <!-- ========================================== -->
+        <!-- TAB 1: RESUMEN / MÉTRICAS GENERALES -->
+        <!-- ========================================== -->
+        <section id="tab-dashboard" class="space-y-4">
+            <!-- CARDS DE TOTALES -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 border border-slate-800 shadow-xl relative overflow-hidden group">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Ventas Totales ($)</div>
+                    <div class="text-3xl font-black text-emerald-400 tracking-tight" id="metric-sales-usd">$0.00</div>
+                    <div class="text-xs font-bold text-slate-400 mt-1" id="metric-sales-ves">Bs 0.00</div>
+                </div>
 
-        <div class="last-update">Última actualización: <span id="d-last-update">--</span></div>
-        <div class="footer">Powered by Caja Fresh POS</div>
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 border border-slate-800 shadow-xl">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Tickets / Facturas</div>
+                    <div class="text-3xl font-black text-brand-400 tracking-tight" id="metric-tickets">0</div>
+                    <div class="text-xs font-bold text-slate-400 mt-1" id="metric-avg-ticket">Prom: $0.00</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Gastos Registrados</div>
+                    <div class="text-2xl font-black text-rose-400 tracking-tight" id="metric-expenses">$0.00</div>
+                    <div class="text-[10px] font-bold text-slate-500 mt-0.5">Egreso acumulado</div>
+                </div>
+
+                <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-sm">
+                    <div class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Ganancia Est.</div>
+                    <div class="text-2xl font-black text-teal-400 tracking-tight" id="metric-profit">$0.00</div>
+                    <div class="text-[10px] font-bold text-slate-500 mt-0.5">Utilidad estimada</div>
+                </div>
+            </div>
+
+            <!-- ÚLTIMAS VENTAS EN TIEMPO REAL -->
+            <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+                <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <h3 class="font-black text-xs uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <i class="fas fa-bolt text-amber-400"></i> Últimas Ventas en Vivo
+                    </h3>
+                    <span class="text-[10px] font-bold text-slate-500" id="live-sales-count">0 registradas</span>
+                </div>
+                <div class="divide-y divide-slate-800/60 max-h-60 overflow-y-auto custom-scrollbar" id="recent-sales-list">
+                    <div class="p-6 text-center text-xs text-slate-500 font-medium italic">Esperando ventas de las cajas...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: AUDITORÍA DE CAJAS EN VIVO -->
+        <!-- ========================================== -->
+        <section id="tab-audit" class="space-y-4 hidden">
+            <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800">
+                <h3 class="font-black text-sm text-white mb-1 flex items-center gap-2">
+                    <i class="fas fa-user-shield text-indigo-400"></i> Auditoría de Cajas Activas
+                </h3>
+                <p class="text-xs text-slate-400">Supervisa en tiempo real qué usuario está vendiendo y qué tiene cargado en pantalla.</p>
+            </div>
+            
+            <div id="live-audit-cards" class="space-y-3">
+                <div class="p-6 text-center text-xs text-slate-500 italic">Cargando estado de las cajas...</div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: MÉTRICAS DE EMPLEADOS / CAJEROS -->
+        <!-- ========================================== -->
+        <section id="tab-employees" class="space-y-4 hidden">
+            <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800">
+                <h3 class="font-black text-sm text-white mb-1 flex items-center gap-2">
+                    <i class="fas fa-users-gear text-brand-400"></i> Rendimiento por Empleado
+                </h3>
+                <p class="text-xs text-slate-400">Total acumulado de ventas y tickets generados por cada cajero.</p>
+            </div>
+
+            <div id="employee-metrics-list" class="space-y-3">
+                <div class="p-6 text-center text-xs text-slate-500 italic">Cargando rendimiento de personal...</div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: SUCURSALES (GESTIÓN) -->
+        <!-- ========================================== -->
+        <section id="tab-stores" class="space-y-4 hidden">
+            <div class="flex justify-between items-center">
+                <h3 class="font-black text-sm text-white uppercase tracking-wider">Sucursales Registradas</h3>
+                <button onclick="openAddStoreModal()" class="px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-brand-600/20 transition-all">
+                    <i class="fas fa-plus"></i> Nueva Sucursal
+                </button>
+            </div>
+
+            <div id="stores-management-list" class="space-y-3">
+                <div class="p-6 text-center text-xs text-slate-500 italic">Cargando sucursales...</div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: INVENTARIO & CATÁLOGO -->
+        <!-- ========================================== -->
+        <section id="tab-inventory" class="space-y-4 hidden">
+            <div class="flex gap-2">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="inventory-search" oninput="filterInventory()" placeholder="Buscar producto por nombre..." class="w-full pl-9 pr-3 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-white focus:border-brand-500 outline-none transition-all">
+                </div>
+                <button onclick="openAddProductModal()" class="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shrink-0 transition-all">
+                    <i class="fas fa-plus"></i> Añadir
+                </button>
+            </div>
+
+            <div id="inventory-products-list" class="space-y-2">
+                <div class="p-6 text-center text-xs text-slate-500 italic">Cargando inventario...</div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- BOTTOM NAVIGATION BAR -->
+    <!-- ========================================== -->
+    <nav class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 px-2 py-2">
+        <div class="max-w-xl mx-auto flex justify-around items-center">
+            <button onclick="switchTab('dashboard')" class="nav-btn active flex flex-col items-center gap-1 p-2 rounded-xl text-brand-400 transition-all" data-tab="dashboard">
+                <i class="fas fa-chart-pie text-lg"></i>
+                <span class="text-[10px] font-bold">Resumen</span>
+            </button>
+            <button onclick="switchTab('audit')" class="nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-500 hover:text-slate-300 transition-all" data-tab="audit">
+                <i class="fas fa-user-shield text-lg"></i>
+                <span class="text-[10px] font-bold">Cajas</span>
+            </button>
+            <button onclick="switchTab('employees')" class="nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-500 hover:text-slate-300 transition-all" data-tab="employees">
+                <i class="fas fa-users-gear text-lg"></i>
+                <span class="text-[10px] font-bold">Personal</span>
+            </button>
+            <button onclick="switchTab('stores')" class="nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-500 hover:text-slate-300 transition-all" data-tab="stores">
+                <i class="fas fa-store text-lg"></i>
+                <span class="text-[10px] font-bold">Tiendas</span>
+            </button>
+            <button onclick="switchTab('inventory')" class="nav-btn flex flex-col items-center gap-1 p-2 rounded-xl text-slate-500 hover:text-slate-300 transition-all" data-tab="inventory">
+                <i class="fas fa-boxes-stacked text-lg"></i>
+                <span class="text-[10px] font-bold">Stock</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MODAL NUEVA SUCURSAL -->
+    <div id="add-store-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-black text-lg text-white">Añadir Nueva Sucursal</h3>
+                <button onclick="closeAddStoreModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-400 mb-1">ID de Sucursal (único)</label>
+                    <input type="text" id="new-store-id" placeholder="ej: kiosko_centro_01" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl font-bold text-white focus:border-brand-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-400 mb-1">Nombre Comercial</label>
+                    <input type="text" id="new-store-name" placeholder="ej: Kiosko Centro Plaza" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl font-bold text-white focus:border-brand-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-400 mb-1">Tipo de Sucursal</label>
+                    <select id="new-store-type" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl font-bold text-white focus:border-brand-500 outline-none">
+                        <option value="kiosko">Kiosko / Punto de Venta</option>
+                        <option value="warehouse">Almacén Central / Depósito</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="saveNewStore()" class="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-black text-sm rounded-xl transition-all shadow-lg shadow-brand-600/20">
+                Guardar Sucursal
+            </button>
+        </div>
     </div>
 
-    <button class="refresh-btn" onclick="fetchData()" title="Actualizar"><i class="fas fa-sync-alt" id="refresh-icon"></i></button>
-
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- SCRIPT DE LÓGICA & SUPABASE -->
     <script>
-        const methodLabels = {
-            'cash-usd': ['Efec $', 'method-cash-usd'],
-            'cash-ves': ['Efec Bs', 'method-cash-ves'],
-            'card-ves': ['Punto', 'method-card-ves']
-        };
+        let config = { supabaseUrl: '', supabaseKey: '', tenantId: 'tenant_default', storeId: 'ALL' };
+        let storesData = [];
+        let productsData = [];
+        let salesData = [];
+        let currentSelectedStore = 'ALL';
 
-        function formatVES(n) { return 'Bs ' + Math.round(n).toLocaleString('es-VE'); }
-        function formatUSD(n) { return '$' + Number(n).toFixed(2); }
+        function formatUSD(n) { return '$' + (Number(n) || 0).toFixed(2); }
+        function formatVES(n) { return 'Bs ' + (Number(n) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }); }
 
-        function renderDashboard(data) {
-            if (!data) return;
-            
-            // Company name
-            const compEl = document.getElementById('dash-company');
-            if (data.companyName && compEl) {
-                const words = data.companyName.split(' ');
-                compEl.innerHTML = words.length > 1 
-                    ? `${words[0]} <span>${words.slice(1).join(' ')}</span>` 
-                    : `<span>${data.companyName}</span>`;
-            }
-            
-            // KPIs
-            document.getElementById('d-total-ves').textContent = formatVES(data.today?.totalVES || 0);
-            document.getElementById('d-total-usd').textContent = formatUSD(data.today?.totalUSD || 0) + ' USD';
-            document.getElementById('d-tickets').textContent = data.today?.tickets || 0;
-            document.getElementById('d-items').textContent = (data.today?.items || 0) + ' artículos';
-            document.getElementById('d-products').textContent = data.inventory?.total || 0;
-            document.getElementById('d-rate').textContent = (data.exchangeRate || 0).toFixed(2);
-            
-            // Sales
-            const salesEl = document.getElementById('d-sales-list');
-            if (data.recentSales?.length > 0) {
-                salesEl.innerHTML = data.recentSales.map(s => {
-                    const [label, cls] = methodLabels[s.method] || ['Otro', ''];
-                    return `<div class="sale-row">
-                        <div class="sale-info">
-                            <div class="sale-ticket">#${s.ticket} — ${s.client}</div>
-                            <div class="sale-meta">${s.time} · <span class="sale-method ${cls}">${label}</span></div>
-                        </div>
-                        <div class="sale-amount">${formatVES(s.totalVES)}</div>
-                    </div>`;
-                }).join('');
-            } else {
-                salesEl.innerHTML = '<div class="empty">No hay ventas registradas hoy</div>';
-            }
-            
-            // Alerts
-            const alertsEl = document.getElementById('d-alerts-list');
-            let alertsHTML = '';
-            
-            if (data.alerts?.outOfStock?.length > 0) {
-                data.alerts.outOfStock.forEach(p => {
-                    alertsHTML += `<div class="alert-item"><div class="alert-dot danger"></div><div class="alert-text">${p.name}</div><div class="alert-count">AGOTADO</div></div>`;
-                });
-            }
-            if (data.alerts?.lowStock?.length > 0) {
-                data.alerts.lowStock.forEach(p => {
-                    alertsHTML += `<div class="alert-item"><div class="alert-dot warning"></div><div class="alert-text">${p.name}</div><div class="alert-count">${p.stock} uds</div></div>`;
-                });
-            }
-            
-            alertsEl.innerHTML = alertsHTML || '<div class="empty">Sin alertas de inventario</div>';
-            
-            // Timestamp
-            document.getElementById('d-last-update').textContent = new Date().toLocaleTimeString('es-VE');
-        }
-
-        // Fetch via HTTP fallback
-        async function fetchData() {
-            const icon = document.getElementById('refresh-icon');
-            icon.classList.add('refreshing');
+        async function initBossApp() {
             try {
-                const res = await fetch('/api/dashboard-data');
-                const data = await res.json();
-                renderDashboard(data);
-            } catch(e) { console.log('Fetch failed, waiting for socket...'); }
-            setTimeout(() => icon.classList.remove('refreshing'), 800);
+                // 1. Cargar configuración desde el servidor local o URL
+                const res = await fetch('/api/boss/config');
+                const cfg = await res.json();
+                if (cfg.supabaseUrl && cfg.supabaseKey) {
+                    config.supabaseUrl = cfg.supabaseUrl.replace(/\/$/, '');
+                    config.supabaseKey = cfg.supabaseKey;
+                    config.tenantId = cfg.tenantId || 'tenant_default';
+                }
+            } catch(e) {
+                console.warn('Fallback a modo directo Supabase');
+            }
+            document.getElementById('tenant-badge').textContent = config.tenantId;
+            refreshAllData();
         }
 
-        // Socket.io real-time
-        try {
-            const socket = io();
-            socket.on('dashboard-update', (data) => renderDashboard(data));
-            socket.on('connect', () => console.log('Dashboard conectado en vivo'));
-        } catch(e) { console.log('Socket.io no disponible'); }
+        async function supabaseFetch(table, query = '') {
+            if (!config.supabaseUrl || !config.supabaseKey) return [];
+            try {
+                const url = `${config.supabaseUrl}/rest/v1/${table}${query}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'apikey': config.supabaseKey,
+                        'Authorization': `Bearer ${config.supabaseKey}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                if (res.ok) return await res.json();
+            } catch(e) {
+                console.error('Error fetching Supabase:', e);
+            }
+            return [];
+        }
 
-        // Initial load + auto-refresh
-        fetchData();
-        setInterval(fetchData, 30000);
+        async function refreshAllData() {
+            const icon = document.getElementById('global-sync-icon');
+            if (icon) icon.classList.add('animate-spin');
+
+            await Promise.all([
+                loadStores(),
+                loadMetrics(),
+                loadAudit(),
+                loadEmployees(),
+                loadInventory()
+            ]);
+
+            if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        }
+
+        async function loadStores() {
+            storesData = await supabaseFetch('stores', `?tenant_id=eq.${config.tenantId}`);
+            renderStorePills();
+            renderStoresManagement();
+        }
+
+        function renderStorePills() {
+            const container = document.getElementById('store-pills-container');
+            let html = `<button onclick="filterByStore('ALL')" class="store-pill ${currentSelectedStore === 'ALL' ? 'bg-brand-600 text-white shadow-md shadow-brand-600/20' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'} px-4 py-2 rounded-xl shrink-0 transition-all">🌐 Todas las Sucursales</button>`;
+            
+            storesData.forEach(s => {
+                const isActive = currentSelectedStore === s.id;
+                const icon = s.store_type === 'warehouse' ? '🏬' : '🏪';
+                html += `<button onclick="filterByStore('${s.id}')" class="store-pill ${isActive ? 'bg-brand-600 text-white shadow-md shadow-brand-600/20' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'} px-4 py-2 rounded-xl shrink-0 transition-all">${icon} ${s.name}</button>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function filterByStore(storeId) {
+            currentSelectedStore = storeId;
+            document.getElementById('current-view-title').textContent = storeId === 'ALL' ? 'Todas las Sucursales' : (storesData.find(s => s.id === storeId)?.name || storeId);
+            renderStorePills();
+            loadMetrics();
+        }
+
+        async function loadMetrics() {
+            let filter = `?tenant_id=eq.${config.tenantId}`;
+            if (currentSelectedStore !== 'ALL') filter += `&store_id=eq.${currentSelectedStore}`;
+            
+            salesData = await supabaseFetch('store_sales', filter + '&order=timestamp.desc&limit=100');
+            const expenses = await supabaseFetch('store_expenses', filter);
+
+            const totalUSD = salesData.reduce((acc, s) => acc + (parseFloat(s.total_usd) || 0), 0);
+            const totalVES = salesData.reduce((acc, s) => acc + (parseFloat(s.total_ves) || 0), 0);
+            const totalExpenses = expenses.reduce((acc, e) => acc + (parseFloat(e.amount_usd) || 0), 0);
+            const tickets = salesData.length;
+            const avgTicket = tickets > 0 ? totalUSD / tickets : 0;
+            const profit = totalUSD - totalExpenses;
+
+            document.getElementById('metric-sales-usd').textContent = formatUSD(totalUSD);
+            document.getElementById('metric-sales-ves').textContent = formatVES(totalVES);
+            document.getElementById('metric-tickets').textContent = tickets;
+            document.getElementById('metric-avg-ticket').textContent = 'Prom: ' + formatUSD(avgTicket);
+            document.getElementById('metric-expenses').textContent = formatUSD(totalExpenses);
+            document.getElementById('metric-profit').textContent = formatUSD(profit);
+
+            // Render sales
+            const salesList = document.getElementById('recent-sales-list');
+            document.getElementById('live-sales-count').textContent = `${salesData.length} registradas`;
+
+            if (salesData.length > 0) {
+                salesList.innerHTML = salesData.slice(0, 15).map(s => `
+                    <div class="px-4 py-3 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-xs">
+                        <div>
+                            <div class="font-black text-white">#${s.ticket || '000'} — ${s.client_name || 'Venta'}</div>
+                            <div class="text-[10px] text-slate-400 font-medium mt-0.5">${new Date(s.date || s.timestamp).toLocaleTimeString('es-VE')} · <span class="uppercase text-brand-400 font-bold">${s.method || 'efectivo'}</span></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-black text-emerald-400 text-sm">${formatUSD(s.total_usd)}</div>
+                            <div class="text-[10px] text-slate-500 font-bold">${formatVES(s.total_ves)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                salesList.innerHTML = '<div class="p-6 text-center text-xs text-slate-500 italic">No hay ventas registradas</div>';
+            }
+        }
+
+        async function loadAudit() {
+            const auditData = await supabaseFetch('view_live_box_audit', `?tenant_id=eq.${config.tenantId}`);
+            const container = document.getElementById('live-audit-cards');
+
+            if (auditData.length > 0) {
+                container.innerHTML = auditData.map(a => `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-black text-white text-sm flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full ${a.connection_status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}"></span>
+                                ${a.store_name || a.store_id}
+                            </h4>
+                            <span class="px-2 py-0.5 rounded-full ${a.connection_status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'} text-[9px] font-black uppercase">${a.connection_status || 'offline'}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase block">Cajero Activo</span>
+                                <span class="font-black text-brand-400">${a.active_cashier || 'Sin asignar'}</span>
+                            </div>
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase block">Carrito en Vivo</span>
+                                <span class="font-black text-white">${a.items_in_cart} ítems (${formatUSD(a.cart_total_usd)})</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-500 italic">No hay cajas activas reportando en vivo</div>';
+            }
+        }
+
+        async function loadEmployees() {
+            const empData = await supabaseFetch('view_employee_metrics', `?tenant_id=eq.${config.tenantId}`);
+            const container = document.getElementById('employee-metrics-list');
+
+            if (empData.length > 0) {
+                container.innerHTML = empData.map(e => `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-brand-500/10 text-brand-400 flex items-center justify-center font-black text-lg border border-brand-500/20">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-white text-sm">${e.cashier_name}</h4>
+                                <span class="text-[10px] text-slate-400 font-bold">${e.total_sales_count} ventas realizadas</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-black text-emerald-400 text-base">${formatUSD(e.total_sales_usd)}</div>
+                            <div class="text-[10px] text-slate-500 font-bold">Prom: ${formatUSD(e.avg_ticket_usd)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-500 italic">Sin datos de empleados</div>';
+            }
+        }
+
+        function renderStoresManagement() {
+            const container = document.getElementById('stores-management-list');
+            if (storesData.length > 0) {
+                container.innerHTML = storesData.map(s => `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                        <div>
+                            <h4 class="font-black text-white text-sm flex items-center gap-2">
+                                ${s.store_type === 'warehouse' ? '🏬' : '🏪'} ${s.name}
+                                <span class="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold uppercase">${s.store_type}</span>
+                            </h4>
+                            <span class="text-[10px] text-slate-500 font-mono">ID: ${s.id}</span>
+                        </div>
+                        <button onclick="deleteStore('${s.id}')" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-colors flex items-center justify-center text-xs">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-500 italic">No hay sucursales registradas</div>';
+            }
+        }
+
+        async function loadInventory() {
+            productsData = await supabaseFetch('store_products', `?tenant_id=eq.${config.tenantId}&order=name.asc`);
+            renderInventoryList(productsData);
+        }
+
+        function renderInventoryList(list) {
+            const container = document.getElementById('inventory-products-list');
+            if (list.length > 0) {
+                container.innerHTML = list.map(p => `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-slate-400 overflow-hidden">
+                                ${p.img_url ? `<img src="${p.img_url}" class="w-full h-full object-cover">` : '<i class="fas fa-box"></i>'}
+                            </div>
+                            <div>
+                                <div class="font-black text-white">${p.name}</div>
+                                <div class="text-[10px] text-slate-400 font-bold">${p.category} · <span class="${p.stock <= 5 ? 'text-rose-400 font-black' : 'text-emerald-400'}">${p.stock} dispon.</span></div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-black text-white">${formatUSD(p.price)}</div>
+                            <div class="text-[10px] text-slate-500 font-bold">${formatVES(p.price_ves)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div class="p-6 text-center text-xs text-slate-500 italic">No hay productos en inventario</div>';
+            }
+        }
+
+        function filterInventory() {
+            const query = document.getElementById('inventory-search').value.toLowerCase();
+            const filtered = productsData.filter(p => p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
+            renderInventoryList(filtered);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active', 'text-brand-400');
+                btn.classList.add('text-slate-500');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active', 'text-brand-400');
+                activeBtn.classList.remove('text-slate-500');
+            }
+        }
+
+        function openAddStoreModal() { document.getElementById('add-store-modal').classList.remove('hidden'); }
+        function closeAddStoreModal() { document.getElementById('add-store-modal').classList.add('hidden'); }
+
+        async function saveNewStore() {
+            const id = document.getElementById('new-store-id').value.trim();
+            const name = document.getElementById('new-store-name').value.trim();
+            const type = document.getElementById('new-store-type').value;
+
+            if (!id || !name) return alert('Por favor ingresa ID y Nombre');
+
+            const payload = { id, tenant_id: config.tenantId, name, store_type: type, status: 'online' };
+            
+            await fetch(`${config.supabaseUrl}/rest/v1/stores`, {
+                method: 'POST',
+                headers: {
+                    'apikey': config.supabaseKey,
+                    'Authorization': `Bearer ${config.supabaseKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            closeAddStoreModal();
+            loadStores();
+        }
+
+        async function deleteStore(storeId) {
+            if (!confirm(`¿Eliminar la sucursal "${storeId}" definitivamente?`)) return;
+            await fetch(`${config.supabaseUrl}/rest/v1/stores?id=eq.${storeId}&tenant_id=eq.${config.tenantId}`, {
+                method: 'DELETE',
+                headers: {
+                    'apikey': config.supabaseKey,
+                    'Authorization': `Bearer ${config.supabaseKey}`
+                }
+            });
+            loadStores();
+        }
+
+        // Iniciar al cargar
+        document.addEventListener('DOMContentLoaded', initBossApp);
     </script>
 </body>
 </html>

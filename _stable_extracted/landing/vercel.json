@@ -1,0 +1,10 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/conectar", "destination": "/conectar.html" },
+    { "source": "/descargar", "destination": "/descargar.html" },
+    { "source": "/jefe/(.*)", "destination": "/jefe/$1" },
+    { "source": "/boss/(.*)", "destination": "/boss/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

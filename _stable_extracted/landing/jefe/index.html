@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Panel Jefe - Caja Fresh</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+    <!-- Pantalla de Carga -->
+    <div class="loading-screen" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Pantalla de Login -->
+    <div id="login-screen">
+        <div class="app-header" style="background:none; color:var(--text); padding-bottom: 20px;">
+            <div class="brand">Caja <span>Fresh</span></div>
+            <div class="subtitle">Executive Dashboard</div>
+        </div>
+        
+        <!-- Setup Primer Ingreso -->
+        <div id="setup-container" style="display:none; width: 100%; max-width: 320px; padding: 0 20px;">
+            <div style="font-size: 16px; font-weight: 800; margin-bottom: 20px; text-align: center;">¡Bienvenido Jefe!</div>
+            <div class="field">
+                <label>Tu Nombre</label>
+                <input type="text" id="setup-boss-name" placeholder="Ej. Carlos">
+            </div>
+            <div class="field">
+                <label>Nombre del Negocio</label>
+                <input type="text" id="setup-business-name" placeholder="Ej. Bodegón Express">
+            </div>
+            <button class="btn-save" style="width:100%; margin-top:10px;" onclick="saveBossSetup()">Comenzar</button>
+        </div>
+
+        <!-- Teclado PIN -->
+        <div id="pin-container" style="display:none; flex-direction:column; align-items:center;">
+            <div style="font-size: 15px; font-weight: 800; margin-bottom: 10px;" id="login-greeting">Ingresa tu PIN</div>
+            <div class="pin-dots">
+                <div class="pin-dot"></div><div class="pin-dot"></div>
+                <div class="pin-dot"></div><div class="pin-dot"></div>
+            </div>
+            <div class="keypad" id="keypad">
+                <div class="key" data-val="1">1</div><div class="key" data-val="2">2</div><div class="key" data-val="3">3</div>
+                <div class="key" data-val="4">4</div><div class="key" data-val="5">5</div><div class="key" data-val="6">6</div>
+                <div class="key" data-val="7">7</div><div class="key" data-val="8">8</div><div class="key" data-val="9">9</div>
+                <div style="visibility:hidden"></div><div class="key" data-val="0">0</div>
+                <div class="key del" data-val="del"><i class="fas fa-backspace"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Currency Bar -->
+    <div class="currency-bar" id="currency-bar" style="display:none">
+        <div style="display:flex; gap:15px; align-items:center;">
+            <span>BCV: <b id="rate-bcv">Bs 0.00</b></span>
+            <span>Euro: <b id="rate-eur">Bs 0.00</b></span>
+            <span>Mercado: <b id="rate-mkt">Bs 0.00</b></span>
+        </div>
+        <button onclick="openRateModal()" style="background:rgba(255,255,255,0.1); border:none; color:white; width:30px; height:30px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <i class="fas fa-pen" style="font-size:12px;"></i>
+        </button>
+    </div>
+
+    <!-- App Principal -->
+    <div id="app" style="display:none; padding:0; margin:0; max-width:100%">
+        <header class="app-header">
+            <div class="brand" id="header-title">Panel de Control</div>
+            <button class="header-btn" onclick="toggleConfig()"><i class="fas fa-cog"></i></button>
+        </header>
+
+        <div id="tab-container" style="padding: 20px 16px;">
+            <!-- PANEL TAB -->
+            <div id="view-panel" class="tab-view">
+                
+                <div class="pulso-banner">
+                    <div class="title" id="banner-title">Bienvenido</div>
+                    <div class="subtitle" id="banner-subtitle">Tu resumen del día — todo lo importante de un vistazo.</div>
+                </div>
+
+                <!-- Caja Abierta Card -->
+                <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="background:var(--primary); color:white; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                            <i class="fas fa-cash-register"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:900; font-size:16px;">Caja abierta</div>
+                            <div style="font-size:11px; color:var(--text-muted); line-height:1.2;">Abierta hoy a las 7:00 AM &bull; Monto inicial: $0</div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:900; font-size:18px; color:var(--primary);" id="g-total">$0.00</div>
+                        <div style="font-size:10px; color:var(--text-muted);">en caja ahora</div>
+                    </div>
+                </div>
+
+                <!-- Resumen Rápido -->
+                <div style="font-size:12px; font-weight:700; color:var(--text); text-align:center; padding-bottom:16px; border-bottom:1px solid var(--outline); margin-bottom:16px;">
+                    <span id="g-tickets">0</span> ventas &nbsp;&nbsp; Efectivo: <b id="g-cash">$0</b> &nbsp;&nbsp; Zelle: <b id="g-zelle">$0</b> &nbsp;&nbsp; PM: <b id="g-pm">Bs 0</b>
+                </div>
+
+                <!-- Global Summary Cards 2x2 Grid -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+                    <div class="card" style="margin-bottom:0;">
+                        <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Ingresos del mes</div>
+                        <div id="g-monthly" style="font-size:22px; font-weight:900; color:var(--primary); margin:4px 0;">$0.00</div>
+                        <div style="font-size:11px; color:var(--text-muted);">Ventas acumuladas</div>
+                    </div>
+                    <div class="card" style="margin-bottom:0;">
+                        <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Ganancia Est.</div>
+                        <div id="g-profit" style="font-size:22px; font-weight:900; color:var(--error); margin:4px 0;">$0.00</div>
+                        <div style="font-size:11px; color:var(--text-muted);">Margen del día</div>
+                    </div>
+                    <div class="card" style="margin-bottom:0;">
+                        <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Ticket Prom.</div>
+                        <div id="g-avg-ticket" style="font-size:22px; font-weight:900; color:var(--warning); margin:4px 0;">$0.00</div>
+                        <div style="font-size:11px; color:var(--text-muted);">Por venta hoy</div>
+                    </div>
+                    <div class="card" style="margin-bottom:0;">
+                        <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Stock Bajo</div>
+                        <div id="g-low-stock" style="font-size:22px; font-weight:900; color:var(--primary); margin:4px 0;">0</div>
+                        <div style="font-size:11px; color:var(--text-muted);">Productos para reponer</div>
+                    </div>
+                </div>
+
+
+                <div id="global-stats-container"></div>
+
+                <div class="card">
+                    <div class="card-title">Sucursales <span class="badge-count" id="stores-count">0</span></div>
+                    <div id="stores-list"></div>
+                </div>
+            </div>
+
+            <!-- INVENTORY TAB -->
+            <div id="view-inventory" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px;">
+                    <div class="title" style="font-size: 20px;">Inventario Global</div>
+                    <div class="subtitle">Stock consolidado de todas tus sedes.</div>
+                </div>
+                
+                <div class="card" style="padding: 12px; margin-bottom: 16px;">
+                    <div style="position:relative">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px"></i>
+                        <input 
+                            type="text" 
+                            id="global-inv-search" 
+                            placeholder="Buscar en todas las tiendas..." 
+                            oninput="filterGlobalInventory(this.value)"
+                            style="width:100%;padding:10px 10px 10px 36px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:14px;"
+                        >
+                    </div>
+                </div>
+
+                <div id="global-inventory-list">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+
+            <!-- FINANCIAL TAB -->
+            <div id="view-financial" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.3);">
+                    <div class="title" style="font-size: 20px;">Resumen Financiero</div>
+                    <div class="subtitle">Ganancias y rendimiento acumulado.</div>
+                </div>
+                
+                <div id="financial-summary-content">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+
+            <!-- POS TAB (Placeholder) -->
+            <div id="view-pos" class="tab-view hidden">
+                <div class="empty">
+                    <i class="fas fa-tv" style="font-size: 40px; color: var(--outline); margin-bottom: 16px; display: block;"></i>
+                    Próximamente: Vista en tiempo real de las cajas activas.
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="nav-item active" onclick="switchMainTab('panel', this)">
+                <i class="fas fa-th-large"></i>
+                <span>Panel</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('inventory', this)">
+                <i class="fas fa-boxes"></i>
+                <span>Stock</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('financial', this)">
+                <i class="fas fa-chart-line"></i>
+                <span>Balance</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('pos', this)">
+                <i class="fas fa-desktop"></i>
+                <span>En Vivo</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Vista Detalle (Inventario/Ventas) -->
+    <div id="detail-view">
+        <div class="detail-header">
+            <div class="back-btn" onclick="closeDetail()"><i class="fas fa-arrow-left"></i></div>
+            <div id="detail-title" class="brand-title">Sucursal</div>
+        </div>
+        <div class="detail-tabs">
+            <div class="tab-btn active" id="tab-sales" onclick="setTab('sales')">Ventas (v6)</div>
+            <div id="tab-performance" class="tab-btn" onclick="setTab('performance')">Rendimiento</div>
+            <div id="tab-expenses" class="tab-btn" onclick="setTab('expenses')">Gastos</div>
+            <div class="tab-btn" id="tab-inventory" onclick="setTab('inventory')">Inventario</div>
+        </div>
+        <div id="detail-content" class="detail-content"></div>
+    </div>
+
+    <!-- Modal Configuración -->
+    <div class="modal" id="config-modal">
+        <div class="modal-content">
+            <div class="modal-title">Configuración Cloud</div>
+            <div class="field">
+                <label>Supabase URL</label>
+                <input type="text" id="cfg-url" placeholder="https://...">
+            </div>
+            <div class="field">
+                <label>Supabase Key</label>
+                <input type="password" id="cfg-key" placeholder="eyJhbGciOiJIUzI1Ni...">
+            </div>
+            <div class="field">
+                <label>PIN de Acceso</label>
+                <input type="number" id="cfg-pin" placeholder="0000">
+            </div>
+            <button class="btn-action" onclick="saveConfig()">Guardar Cambios</button>
+        </div>
+    </div>
+
+    <!-- Modal Editar Producto -->
+    <div class="modal" id="edit-product-modal">
+        <div class="modal-content edit-modal">
+            <input type="hidden" id="edit-product-id">
+
+            <div class="edit-modal-header">
+                <h2 id="edit-product-title">Editar Producto</h2>
+                <button class="close-x" onclick="closeEditModal()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Stock + ID actuales -->
+            <div class="stock-badge-row">
+                <div class="stock-badge">
+                    <div class="sb-val" id="edit-current-stock">—</div>
+                    <div class="sb-lbl">Stock actual</div>
+                </div>
+                <div class="stock-badge" style="flex:2">
+                    <div class="sb-val" style="font-size:13px;word-break:break-all" id="edit-current-id">—</div>
+                    <div class="sb-lbl">ID Producto</div>
+                </div>
+            </div>
+
+            <!-- Configuración de Precios -->
+            <div class="price-config-box">
+                <div class="price-config-title">
+                    <i class="fas fa-coins"></i>
+                    Configuración de Precios Independientes
+                </div>
+                <div class="price-trio">
+                    <!-- VES -->
+                    <div class="price-field-wrap">
+                        <label>Bolívares (VES)</label>
+                        <div class="price-input-row">
+                            <span class="price-prefix">Bs</span>
+                            <input type="number" step="0.01" id="edit-product-ves" placeholder="0" oninput="updateConversionHint()">
+                            <button class="auto-calc-btn" onclick="autoCalcVES()" title="Calcular desde USD"><i class="fas fa-bolt"></i></button>
+                        </div>
+                    </div>
+                    <!-- USD -->
+                    <div class="price-field-wrap">
+                        <label>Dólares (USD)</label>
+                        <div class="price-input-row">
+                            <span class="price-prefix">$</span>
+                            <input type="number" step="0.01" id="edit-product-usd" placeholder="0" oninput="updateConversionHint()">
+                            <button class="auto-calc-btn" onclick="autoCalcUSD()" title="Calcular desde VES"><i class="fas fa-bolt"></i></button>
+                        </div>
+                    </div>
+                    <!-- EUR -->
+                    <div class="price-field-wrap">
+                        <label>Euros (EUR)</label>
+                        <div class="price-input-row">
+                            <span class="price-prefix">€</span>
+                            <input type="number" step="0.01" id="edit-product-eur" placeholder="0" oninput="updateConversionHint()">
+                            <button class="auto-calc-btn" onclick="autoCalcEUR()" title="Calcular desde USD"><i class="fas fa-bolt"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="conversion-hint" id="edit-conversion-hint">Bs — | — €</div>
+
+                <!-- Precio Promoción -->
+                <div class="promo-row">
+                    <label>Precio Promoción (BS) — Opcional</label>
+                    <div class="price-input-row">
+                        <span class="price-prefix">Bs</span>
+                        <input type="number" step="0.01" id="edit-product-promo" placeholder="Ej. 950">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila: Stock + Vencimiento -->
+            <div class="edit-field-row">
+                <div class="edit-field">
+                    <label><i class="fas fa-boxes"></i> Stock / Inventario</label>
+                    <input type="number" step="1" id="edit-product-stock" placeholder="0">
+                </div>
+                <div class="edit-field">
+                    <label><i class="fas fa-calendar"></i> Fecha Vencimiento</label>
+                    <input type="date" id="edit-product-expiry">
+                </div>
+            </div>
+
+            <!-- Fila: Variantes + Imagen -->
+            <div class="edit-field-row">
+                <div class="edit-field edit-full">
+                    <label><i class="fas fa-tags"></i> Sabores / Variantes (opcional)</label>
+                    <input type="text" id="edit-product-variants" placeholder="Cola, Naranja, Limón...">
+                </div>
+                <div class="edit-field edit-full">
+                    <label><i class="fas fa-image"></i> URL de Imagen</label>
+                    <input type="text" id="edit-product-img" placeholder="https://...">
+                </div>
+            </div>
+
+            <div class="edit-actions">
+                <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
+                <button class="btn-save" id="btn-save-product" onclick="saveProductEdits()">
+                    <i class="fas fa-save"></i> Guardar Producto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Tasa -->
+    <div class="modal" id="rate-modal">
+        <div class="modal-content">
+            <div class="modal-title">Actualizar Tasa de Cambio</div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px; text-align:center;">Este cambio se enviará a todas las sucursales activas inmediatamente.</p>
+            <div class="field">
+                <label>Tasa Mercado (Bs/$)</label>
+                <input type="number" step="0.01" id="new-exchange-rate" placeholder="Ej. 42.50">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-cancel" style="flex:1;" onclick="closeRateModal()">Cancelar</button>
+                <button class="btn-action" style="flex:1; margin-top:0;" id="btn-save-rate" onclick="saveRemoteRate()">Actualizar Todo</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=7"></script>
+</body>
+</html>

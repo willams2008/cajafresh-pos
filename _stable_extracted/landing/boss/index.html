@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mi Negocio — Panel de Control</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#060b18">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="../mobile/icon-192.png">
+    <link rel="apple-touch-icon" href="../mobile/icon-192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+        body{font-family:'Inter',sans-serif;background:#060b18;color:#e2e8f0;min-height:100vh;overflow-x:hidden;}
+        ::-webkit-scrollbar{width:0;}
+
+        /* ===== LOGIN ===== */
+        #login-screen{position:fixed;inset:0;background:#060b18;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+        #login-screen.hidden{display:none;}
+        .login-logo{width:64px;height:64px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;margin-bottom:16px;box-shadow:0 8px 32px rgba(59,130,246,0.3);}
+        .login-title{font-size:22px;font-weight:900;margin-bottom:4px;letter-spacing:-0.5px;}
+        .login-sub{font-size:12px;color:#64748b;font-weight:600;margin-bottom:32px;}
+        .pin-dots{display:flex;gap:16px;margin-bottom:40px;height:20px;}
+        .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid #334155;transition:all 0.2s;}
+        .pin-dot.filled{background:#3b82f6;border-color:#3b82f6;box-shadow:0 0 12px rgba(59,130,246,0.5);}
+        .pin-dot.error{border-color:#ef4444;background:#ef4444;animation:shake 0.4s;}
+        @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+        .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:260px;}
+        .key{width:76px;height:60px;border-radius:16px;border:1px solid #1e293b;background:#0f1729;color:#e2e8f0;font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;user-select:none;}
+        .key:active{background:#1e293b;transform:scale(0.95);}
+        .key.empty{border:none;background:transparent;}
+        .key.delete{font-size:16px;color:#64748b;}
+
+        /* ===== APP SHELL ===== */
+        #app{display:none;padding-bottom:72px;}
+        #app.active{display:block;}
+        .app-header{position:sticky;top:0;z-index:50;background:#060b18ee;backdrop-filter:blur(20px);padding:16px 20px 12px;border-bottom:1px solid #1e293b20;}
+        .app-header h1{font-size:18px;font-weight:900;letter-spacing:-0.5px;}
+        .app-header h1 span{color:#3b82f6;}
+        .live-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#0f1729;border:1px solid #1e293b;border-radius:20px;font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-top:4px;}
+        .live-dot{width:6px;height:6px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;}
+        @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+        /* ===== VIEWS ===== */
+        .view{display:none;padding:16px 20px;}
+        .view.active{display:block;animation:fadeIn 0.25s ease-out;}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+        /* ===== KPI CARDS ===== */
+        .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+        .kpi{background:#0f1729;border:1px solid #1e293b;border-radius:16px;padding:14px;position:relative;overflow:hidden;}
+        .kpi.blue{background:linear-gradient(135deg,#0c1e3d,#0f1729);border-color:#1e3a5f;}
+        .kpi.green{background:linear-gradient(135deg,#052e21,#0f1729);border-color:#064e3b;}
+        .kpi.amber{background:linear-gradient(135deg,#2d1f04,#0f1729);border-color:#78350f;}
+        .kpi .label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;margin-bottom:2px;}
+        .kpi .value{font-size:20px;font-weight:900;color:#f1f5f9;line-height:1.2;}
+        .kpi .sub{font-size:10px;font-weight:600;color:#475569;margin-top:2px;}
+        .kpi.blue .value{color:#60a5fa;}
+        .kpi.green .value{color:#34d399;}
+        .kpi.amber .value{color:#fbbf24;}
+
+        /* ===== SECTION CARDS ===== */
+        .section{background:#0f1729;border:1px solid #1e293b;border-radius:16px;margin-bottom:12px;overflow:hidden;}
+        .section-hdr{padding:14px 16px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:8px;}
+        .section-hdr i{color:#3b82f6;font-size:12px;}
+        .section-hdr h3{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;flex:1;}
+        .section-hdr .badge-count{background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;}
+
+        /* ===== SALE ROW ===== */
+        .sale-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #0f172a;}
+        .sale-row:last-child{border-bottom:none;}
+        .sale-row:nth-child(odd){background:#0a1020;}
+        .sale-info{flex:1;min-width:0;}
+        .sale-ticket{font-size:12px;font-weight:800;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .sale-meta{font-size:10px;color:#64748b;font-weight:600;margin-top:2px;}
+        .sale-amount{font-size:14px;font-weight:900;color:#f1f5f9;text-align:right;flex-shrink:0;margin-left:8px;}
+        .method-tag{font-size:8px;font-weight:800;padding:2px 6px;border-radius:6px;display:inline-block;text-transform:uppercase;letter-spacing:0.5px;}
+        .m-cash-usd{background:#064e3b;color:#34d399;}
+        .m-cash-ves{background:#1e3a5f;color:#60a5fa;}
+        .m-card{background:#312e81;color:#a78bfa;}
+        .m-pm{background:#4c1d95;color:#c4b5fd;}
+        .m-eur{background:#1e3a5f;color:#93c5fd;}
+        .m-credit{background:#78350f;color:#fbbf24;}
+
+        /* ===== PRODUCT ROW ===== */
+        .prod-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #0f172a;gap:12px;}
+        .prod-row:nth-child(odd){background:#0a1020;}
+        .prod-info{flex:1;min-width:0;}
+        .prod-name{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .prod-cat{font-size:9px;color:#64748b;font-weight:600;margin-top:1px;}
+        .prod-price{font-size:13px;font-weight:900;color:#60a5fa;text-align:right;margin-right:8px;}
+        .stock-pill{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;flex-shrink:0;min-width:40px;text-align:center;}
+        .stock-ok{background:#064e3b;color:#34d399;}
+        .stock-low{background:#78350f;color:#fbbf24;}
+        .stock-out{background:#7f1d1d;color:#fca5a5;animation:pulse 1.5s infinite;}
+        .prod-edit{width:32px;height:32px;border-radius:10px;border:1px solid #1e293b;background:#0f1729;color:#64748b;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;flex-shrink:0;}
+        .prod-edit:active{background:#1e293b;color:#3b82f6;}
+
+        /* ===== CREDIT ROW ===== */
+        .credit-row{padding:14px 16px;border-bottom:1px solid #0f172a;}
+        .credit-row:nth-child(odd){background:#0a1020;}
+        .credit-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+        .credit-client{font-size:13px;font-weight:800;color:#e2e8f0;}
+        .credit-amount{font-size:15px;font-weight:900;color:#fbbf24;}
+        .credit-meta{font-size:10px;color:#64748b;font-weight:600;margin-bottom:6px;}
+        .progress-bar{height:6px;background:#1e293b;border-radius:3px;overflow:hidden;}
+        .progress-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#10b981);border-radius:3px;transition:width 0.5s;}
+
+        /* ===== SEARCH ===== */
+        .search-box{position:relative;margin-bottom:12px;}
+        .search-box input{width:100%;padding:12px 16px 12px 40px;background:#0f1729;border:1px solid #1e293b;border-radius:12px;color:#e2e8f0;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;outline:none;}
+        .search-box input::placeholder{color:#475569;}
+        .search-box input:focus{border-color:#3b82f6;}
+        .search-box i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#475569;font-size:13px;}
+
+        /* ===== PERIOD TABS ===== */
+        .period-tabs{display:flex;gap:6px;margin-bottom:14px;}
+        .period-tab{flex:1;padding:8px;text-align:center;border-radius:10px;background:#0f1729;border:1px solid #1e293b;font-size:11px;font-weight:700;color:#64748b;cursor:pointer;transition:all 0.2s;}
+        .period-tab.active{background:#1e293b;color:#3b82f6;border-color:#3b82f6;}
+
+        /* ===== REPORT STAT ===== */
+        .stat-big{text-align:center;padding:20px;margin-bottom:12px;}
+        .stat-big .label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#64748b;margin-bottom:4px;}
+        .stat-big .value{font-size:36px;font-weight:900;color:#60a5fa;}
+        .stat-big .sub{font-size:14px;font-weight:700;color:#34d399;margin-top:2px;}
+        .top-item{display:flex;align-items:center;padding:10px 16px;gap:10px;border-bottom:1px solid #0f172a;}
+        .top-rank{width:24px;height:24px;border-radius:8px;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#64748b;flex-shrink:0;}
+        .top-name{flex:1;font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .top-qty{font-size:11px;font-weight:800;color:#94a3b8;}
+        .method-bar{padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #0f172a;}
+        .method-bar .name{flex:1;font-size:12px;font-weight:700;color:#cbd5e1;}
+        .method-bar .pct{font-size:12px;font-weight:900;color:#60a5fa;}
+        .bar-track{flex:2;height:6px;background:#1e293b;border-radius:3px;overflow:hidden;}
+        .bar-fill{height:100%;background:#3b82f6;border-radius:3px;}
+
+        /* ===== BOTTOM NAV ===== */
+        .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#0a0e1aee;backdrop-filter:blur(20px);border-top:1px solid #1e293b;display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
+        .nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 0 8px;gap:3px;cursor:pointer;transition:all 0.2s;position:relative;}
+        .nav-tab i{font-size:16px;color:#475569;transition:color 0.2s;}
+        .nav-tab span{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.5px;transition:color 0.2s;}
+        .nav-tab.active i{color:#3b82f6;}
+        .nav-tab.active span{color:#3b82f6;}
+        .nav-tab .alert-badge{position:absolute;top:6px;right:50%;margin-right:-16px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #0a0e1a;}
+
+        /* ===== EMPTY STATE ===== */
+        .empty{text-align:center;padding:32px 16px;color:#475569;font-size:12px;font-weight:600;font-style:italic;}
+        .empty i{font-size:24px;display:block;margin-bottom:8px;opacity:0.5;}
+
+        /* ===== MODAL ===== */
+        .modal-overlay{position:fixed;inset:0;background:#000a;z-index:200;display:none;align-items:flex-end;justify-content:center;}
+        .modal-overlay.active{display:flex;}
+        .modal-sheet{background:#0f1729;border-top-left-radius:24px;border-top-right-radius:24px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;padding:24px 20px;border:1px solid #1e293b;}
+        .modal-handle{width:40px;height:4px;background:#334155;border-radius:2px;margin:0 auto 16px;}
+        .modal-title{font-size:16px;font-weight:900;margin-bottom:16px;color:#f1f5f9;}
+        .form-group{margin-bottom:14px;}
+        .form-group label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px;}
+        .form-group input{width:100%;padding:12px;background:#060b18;border:1px solid #1e293b;border-radius:10px;color:#e2e8f0;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;outline:none;}
+        .form-group input:focus{border-color:#3b82f6;}
+        .btn-save{width:100%;padding:14px;background:#3b82f6;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:800;font-family:'Inter',sans-serif;cursor:pointer;margin-top:8px;}
+        .btn-save:active{background:#2563eb;}
+        .btn-cancel{width:100%;padding:12px;background:transparent;color:#64748b;border:1px solid #1e293b;border-radius:12px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;margin-top:8px;}
+    </style>
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="login-screen">
+    <div class="login-logo"><i class="fas fa-store"></i></div>
+    <div class="login-title">Panel de Control</div>
+    <div class="login-sub">Ingresa tu PIN de acceso</div>
+    <div class="pin-dots" id="pin-dots">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="keypad">
+        <div class="key" data-val="1">1</div><div class="key" data-val="2">2</div><div class="key" data-val="3">3</div>
+        <div class="key" data-val="4">4</div><div class="key" data-val="5">5</div><div class="key" data-val="6">6</div>
+        <div class="key" data-val="7">7</div><div class="key" data-val="8">8</div><div class="key" data-val="9">9</div>
+        <div class="key empty"></div><div class="key" data-val="0">0</div><div class="key delete" data-val="del"><i class="fas fa-delete-left"></i></div>
+    </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app">
+    <div class="app-header">
+        <h1 id="hdr-company">Mi <span>Negocio</span></h1>
+        <div class="live-badge"><span class="live-dot"></span> En vivo</div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="view-dashboard" class="view active">
+        <div class="kpi-grid">
+            <div class="kpi blue"><div class="label">Ventas Hoy</div><div class="value" id="k-ves">Bs 0</div><div class="sub" id="k-usd">$0.00</div></div>
+            <div class="kpi green"><div class="label">Tickets</div><div class="value" id="k-tickets">0</div><div class="sub" id="k-items">0 artículos</div></div>
+            <div class="kpi amber"><div class="label">Ganancia Est.</div><div class="value" id="k-profit">$0.00</div><div class="sub">hoy</div></div>
+            <div class="kpi"><div class="label">Tasa BCV</div><div class="value" id="k-rate">0.00</div><div class="sub">Bs/USD</div></div>
+        </div>
+        <div class="section">
+            <div class="section-hdr"><i class="fas fa-receipt"></i><h3>Últimas Ventas</h3></div>
+            <div id="dash-sales"><div class="empty"><i class="fas fa-clock"></i>Esperando datos...</div></div>
+        </div>
+        <div class="section">
+            <div class="section-hdr"><i class="fas fa-bell"></i><h3>Alertas</h3><span class="badge-count" id="alert-count">0</span></div>
+            <div id="dash-alerts"><div class="empty">Sin alertas</div></div>
+        </div>
+    </div>
+
+    <!-- SALES VIEW -->
+    <div id="view-sales" class="view">
+        <div class="period-tabs">
+            <div class="period-tab active" data-period="today">Hoy</div>
+            <div class="period-tab" data-period="week">Semana</div>
+            <div class="period-tab" data-period="month">Mes</div>
+        </div>
+        <div class="section"><div id="sales-list"><div class="empty"><i class="fas fa-receipt"></i>Cargando ventas...</div></div></div>
+    </div>
+
+    <!-- INVENTORY VIEW -->
+    <div id="view-inventory" class="view">
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="inv-search" placeholder="Buscar producto..."></div>
+        <div class="section"><div id="inv-list"><div class="empty"><i class="fas fa-box"></i>Cargando inventario...</div></div></div>
+    </div>
+
+    <!-- CREDITS VIEW -->
+    <div id="view-credits" class="view">
+        <div class="kpi-grid" style="grid-template-columns:1fr;">
+            <div class="kpi amber"><div class="label">Total Deuda Pendiente</div><div class="value" id="k-total-debt">$0.00</div></div>
+        </div>
+        <div class="section">
+            <div class="section-hdr"><i class="fas fa-hand-holding-dollar"></i><h3>Fiaos Pendientes</h3><span class="badge-count" id="credit-count">0</span></div>
+            <div id="credits-list"><div class="empty"><i class="fas fa-check-circle"></i>No hay deudas pendientes</div></div>
+        </div>
+    </div>
+
+    <!-- REPORTS VIEW -->
+    <div id="view-reports" class="view">
+        <div class="period-tabs" id="report-period-tabs">
+            <div class="period-tab active" data-period="today">Hoy</div>
+            <div class="period-tab" data-period="week">Semana</div>
+            <div class="period-tab" data-period="month">Mes</div>
+        </div>
+        <div class="stat-big"><div class="label">Total Vendido</div><div class="value" id="r-total">$0.00</div><div class="sub" id="r-total-ves">Bs 0</div></div>
+        <div class="section">
+            <div class="section-hdr"><i class="fas fa-trophy"></i><h3>Top Productos</h3></div>
+            <div id="r-top-products"><div class="empty">Sin datos</div></div>
+        </div>
+        <div class="section">
+            <div class="section-hdr"><i class="fas fa-credit-card"></i><h3>Métodos de Pago</h3></div>
+            <div id="r-methods"><div class="empty">Sin datos</div></div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="bottom-nav">
+        <div class="nav-tab active" data-view="dashboard"><i class="fas fa-chart-pie"></i><span>Inicio</span></div>
+        <div class="nav-tab" data-view="sales"><i class="fas fa-receipt"></i><span>Ventas</span></div>
+        <div class="nav-tab" data-view="inventory"><i class="fas fa-box"></i><span>Stock</span></div>
+        <div class="nav-tab" data-view="credits"><i class="fas fa-hand-holding-dollar"></i><span>Fiaos</span></div>
+        <div class="nav-tab" data-view="reports"><i class="fas fa-chart-bar"></i><span>Reportes</span></div>
+    </div>
+</div>
+
+<!-- ===== EDIT MODAL ===== -->
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Editar Producto</div>
+        <input type="hidden" id="edit-id">
+        <div class="form-group"><label>Nombre</label><input type="text" id="edit-name" readonly></div>
+        <div class="form-group"><label>Precio USD</label><input type="number" id="edit-price" step="0.01"></div>
+        <div class="form-group"><label>Precio Bs</label><input type="number" id="edit-priceVES" step="1"></div>
+        <div class="form-group"><label>Stock</label><input type="number" id="edit-stock" step="1"></div>
+        <div class="form-group"><label>Costo USD</label><input type="number" id="edit-cost" step="0.01"></div>
+        <button class="btn-save" onclick="saveProduct()">Guardar Cambios</button>
+        <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

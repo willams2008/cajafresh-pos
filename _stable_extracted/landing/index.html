@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto Pila POS - La Evolución de tu Negocio</title>
+    
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="Punto Pila POS - Sistema Inteligente de Punto de Venta">
+    <meta name="description" content="Optimiza tu negocio con Punto Pila. Punto de Venta (POS) con sincronización en la nube, detección automática de pagos móviles y control total de inventario.">
+    <meta name="keywords" content="POS, Punto de Venta, Venezuela, Pagos Móviles, Inventario, Negocios, Automatización">
+    <meta name="author" content="Punto Pila Team">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://puntopila.emprende.ve/">
+    <meta property="og:title" content="Punto Pila POS - Sistema Inteligente">
+    <meta property="og:description" content="El POS que detecta tus pagos móviles automáticamente y sincroniza con la nube. Diseñado para el comercio moderno.">
+    <meta property="og:image" content="https://puntopila.emprende.ve/assets/logo_moderno.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://puntopila.emprende.ve/">
+    <meta property="twitter:title" content="Punto Pila POS - Sistema Inteligente">
+    <meta property="twitter:description" content="El POS que detecta tus pagos móviles automáticamente y sincroniza con la nube.">
+    <meta property="twitter:image" content="https://puntopila.emprende.ve/assets/logo_moderno.png">
+
+    <!-- JSON-LD Structured Data (AI Agent Friendly) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Punto Pila POS",
+      "operatingSystem": "Windows 10, Windows 11, Android",
+      "applicationCategory": "BusinessApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Detección automática de Pagos Móviles",
+        "Sincronización en la nube (Boss App)",
+        "Control de Inventario y Existencias",
+        "Cierre de caja inteligente",
+        "Generación de reportes PDF y Excel"
+      ],
+      "description": "Sistema de Punto de Venta inteligente diseñado para optimizar la gestión de comercios medianos y pequeños con automatización de conciliación bancaria.",
+      "softwareVersion": "1.1.5",
+      "author": {
+        "@type": "Organization",
+        "name": "Punto Pila"
+      }
+    }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap');
+        
+        body { 
+            font-family: 'Outfit', sans-serif;
+            background-color: #fafbfc;
+            color: #111827;
+            overflow-x: hidden;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 50%, #45B7D1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 200% auto;
+            animation: moveGradient 5s linear infinite;
+        }
+
+        @keyframes moveGradient {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        .bento-card {
+            border-radius: 32px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+            background: white;
+            border: 1px solid rgba(0,0,0,0.03);
+            z-index: 1;
+        }
+
+        .bento-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 30px 60px -15px rgba(0,0,0,0.1);
+        }
+
+        .bg-mesh-1 { background: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%); color: white; border: none; }
+        .bg-mesh-2 { background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 99%, #FECFEF 100%); }
+        .bg-mesh-3 { background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); }
+        
+        .blob-bg {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            z-index: 0;
+            top: -200px;
+            right: -100px;
+            animation: pulse-blob 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse-blob {
+            0% { transform: scale(1) translate(0, 0); }
+            100% { transform: scale(1.1) translate(-20px, 40px); }
+        }
+
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .btn-modern {
+            padding: 18px 36px;
+            border-radius: 100px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background-color: #111827;
+            color: white;
+            box-shadow: 0 10px 20px rgba(17, 24, 39, 0.2);
+        }
+        
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(17, 24, 39, 0.3);
+        }
+
+        .mockup-container {
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 8px solid white;
+        }
+    </style>
+</head>
+<body class="relative">
+
+    <header>
+    <!-- Floating Navbar -->
+    <nav class="fixed top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-5xl z-50 transition-all duration-300 bg-white/80 backdrop-blur-2xl border border-gray-200/50 shadow-xl shadow-gray-200/40 rounded-full">
+        <div class="px-6 h-16 flex items-center justify-between">
+            <!-- Logo -->
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-br from-[#FF6B6B] to-[#4ECDC4] rounded-xl flex items-center justify-center text-white shadow-md transform -rotate-6 group-hover:rotate-0 transition-transform">
+                    <i class="fas fa-layer-group text-sm"></i>
+                </div>
+                <span class="text-xl font-black tracking-tight text-gray-900">Punto Pila</span>
+            </div>
+
+            <!-- Navegación Central (Desktop) -->
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#features" class="text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors">El Sistema</a>
+                <a href="#plans" class="text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors">Licencia VIP</a>
+                <a href="/descargar" class="text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-2">
+                    <i class="fab fa-android"></i> Descargar App
+                </a>
+                <a href="/conectar" class="text-sm font-bold text-indigo-500 hover:text-indigo-600 transition-colors flex items-center gap-2">
+                    <i class="fas fa-mobile-screen"></i> Conectar Caja
+                </a>
+            </div>
+
+            <!-- Botón CTA -->
+            <a href="https://wa.me/584123633283?text=Hola,%20estoy%20interesado%20en%20Punto%20Pila%20POS" class="bg-gray-900 hover:bg-black text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wide transition-all hover:scale-105 shadow-md flex items-center gap-2 group">
+                Consultar <i class="fab fa-whatsapp text-emerald-400 group-hover:scale-125 transition-transform"></i>
+            </a>
+        </div>
+    </nav>
+    </header>
+
+    <main>
+    <!-- Hero Section -->
+    <section class="relative pt-40 pb-20 px-6 min-h-[90vh] flex items-center">
+        <div class="blob-bg"></div>
+        <div class="blob-bg" style="background: #a18cd1; left: -200px; top: 100px; animation-delay: 2s;"></div>
+
+        <div class="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            
+            <div data-aos="fade-right" data-aos-duration="1000" class="text-left">
+                <span class="inline-block py-1.5 px-4 rounded-full bg-blue-50 text-blue-600 font-bold text-xs tracking-widest mb-6 border border-blue-100 shadow-sm uppercase">Nuevo Sistema 2026</span>
+                <h1 class="text-5xl lg:text-7xl font-black mb-6 leading-[1.1] tracking-tight text-gray-900">
+                    Vender nunca fue <br>
+                    <span class="gradient-text">tan fácil y hermoso.</span>
+                </h1>
+                <p class="text-lg lg:text-xl text-gray-500 mb-10 max-w-md font-medium leading-relaxed">
+                    Olvídate de los sistemas aburridos. Punto Pila POS está diseñado para sorprender, organizar tus ventas en tu PC y llevar el control a tu teléfono celular.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="#plans" class="btn-modern btn-primary text-center">
+                        Ver Licencia <i class="fas fa-arrow-right"></i>
+                    </a>
+                    <a href="/conectar" class="btn-modern bg-white text-gray-900 shadow-md border border-gray-100 hover:border-gray-200 hover:-translate-y-1 text-center justify-center">
+                        <i class="fas fa-link text-indigo-500 text-xl"></i> Conectar App
+                    </a>
+                </div>
+            </div>
+
+            <div data-aos="fade-left" data-aos-duration="1200" class="relative hidden py-10 md:block perspective" style="perspective: 1500px;">
+                <div class="transform -rotate-y-12 rotate-x-6 hover:rotate-0 transition-transform duration-700 ease-out shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] rounded-2xl border-8 border-white bg-white overflow-hidden">
+                    <div class="w-full h-8 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-400"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                    </div>
+                    <video src="pos-demo.mp4" autoplay loop muted playsinline class="w-full object-cover min-h-[300px] bg-gray-50 text-center"></video>
+                </div>
+                
+                <div class="absolute -bottom-4 -left-8 bg-white p-4 rounded-2xl shadow-xl border border-gray-100 flex items-center gap-3 animate-bounce" style="animation-duration: 3s;">
+                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Caja y Ventas</p>
+                        <p class="font-black text-gray-900">Súper rápida ⚡</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="py-20 px-6 bg-white relative z-10 border-t border-gray-100 mt-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-4xl md:text-5xl font-black mb-4 text-gray-900">Todo tu negocio en sintonía.</h2>
+                <p class="text-lg text-gray-500 font-medium">Funciones diseñadas para que ganes velocidad y te veas profesional.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 md:grid-rows-2 gap-6">
+                <div class="bento-card md:col-span-2 flex flex-col md:flex-row items-center gap-8 bg-mesh-2" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex-1 text-left relative z-10">
+                        <div class="w-14 h-14 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl flex items-center justify-center text-pink-600 text-2xl mb-6">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-gray-900 mb-4">App Móvil PWA</h3>
+                        <p class="text-gray-800 font-medium text-lg leading-relaxed mb-6">Tus clientes interactúan con tu menú en tiempo real. La app se actualiza automáticamente y no requiere descargas pesadas desde tiendas.</p>
+                    </div>
+                    <div class="flex-1 w-full flex justify-center float-animation relative">
+                        <div class="absolute inset-0 bg-pink-400 blur-2xl opacity-20 rounded-full scale-150"></div>
+                        <div class="w-56 bg-gray-900 rounded-[2.5rem] p-2 shadow-2xl relative z-10 border-[6px] border-gray-800">
+                             <div class="w-1/2 h-4 bg-gray-800 rounded-b-xl mx-auto absolute top-0 left-1/4 z-20"></div>
+                             <video src="movil-demo.mp4" autoplay loop muted playsinline class="w-full rounded-[2rem] min-h-[300px] object-cover bg-white"></video>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-card flex flex-col justify-between" style="background-color: #E8F5E9;" data-aos="fade-left" data-aos-delay="200">
+                    <div>
+                        <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center text-white text-xl mb-6 shadow-lg shadow-green-500/30">
+                            <i class="fab fa-whatsapp"></i>
+                        </div>
+                        <h3 class="text-2xl font-black text-green-900 mb-3">Tu Bot de Reportes</h3>
+                        <p class="text-green-800/80 font-medium leading-relaxed">
+                            Apenas cierres caja, te llega un mensaje de WhatsApp con el total vendido, cantidad de facturas y cuadre Z. 
+                        </p>
+                    </div>
+                    <div class="mt-8 bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-green-500/20 text-sm font-semibold text-green-900 flex items-center gap-3">
+                        <i class="fas fa-check-double text-green-500"></i> "Corte diario recibido $450"
+                    </div>
+                </div>
+
+                <div class="bento-card" style="background-color: #F3F4F6;" data-aos="fade-right" data-aos-delay="300">
+                    <div class="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white text-xl mb-6">
+                        <i class="fas fa-box-open"></i>
+                    </div>
+                    <h3 class="text-2xl font-black text-gray-900 mb-3">Stock Inteligente</h3>
+                    <p class="text-gray-600 font-medium leading-relaxed mb-4">
+                        Descuenta productos de inmediato. Sincronización instantánea entre la caja principal y las tablets o celulares de tus meseros/vendedores.
+                    </p>
+                </div>
+
+                <div class="bento-card md:col-span-2 bg-mesh-1 overflow-hidden" data-aos="fade-up" data-aos-delay="400">
+                    <div class="relative z-10 w-full md:w-1/2">
+                        <div class="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white text-xl mb-6 border border-white/20">
+                            <i class="fas fa-paint-roller text-[#4ECDC4]"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-white mb-4">Marca Blanca Local</h3>
+                        <p class="text-gray-300 font-medium text-lg leading-relaxed">
+                            Personaliza el sistema para que lleve el nombre y los colores de TU empresa. No te conformes con plantillas aburridas, dales un toque "glass" a tus fondos.
+                        </p>
+                    </div>
+                    <i class="fas fa-layer-group absolute -right-10 -bottom-10 text-[15rem] text-white/5 transform -rotate-12 group-hover:rotate-0 transition-transform duration-1000"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="plans" class="py-32 px-6 background-color: #fafbfc relative z-10 overflow-hidden">
+        <div class="max-w-4xl mx-auto text-center" data-aos="zoom-in" data-aos-duration="800">
+            <h2 class="text-4xl md:text-5xl font-black mb-6">Un Plan. Todo Incluido.</h2>
+            <p class="text-xl text-gray-500 font-medium mb-12">Olvida los pagos mensuales escondidos. Lleva tu negocio al éxito hoy.</p>
+            
+            <div class="bg-white rounded-[40px] p-10 md:p-16 shadow-[0_0_80px_rgba(0,0,0,0.08)] border border-gray-100 relative transform transition-transform hover:scale-[1.02] duration-500">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-400 rounded-bl-[100px] flex items-center justify-center -mr-2 -mt-2 shadow-lg z-20">
+                    <span class="text-yellow-900 font-black text-lg transform rotate-12">¡ESTRELLA!</span>
+                </div>
+
+                <h3 class="text-3xl font-black mb-2 text-gray-900">Licencia Anual</h3>
+                <p class="text-gray-500 font-semibold mb-8 uppercase tracking-widest text-sm">Pago único por 12 meses</p>
+                
+                <div class="text-7xl font-black text-gray-900 mb-10">
+                    <span class="text-4xl align-top text-gray-400">$</span>CONSULTA
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left mb-12 max-w-2xl mx-auto">
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl font-semibold text-gray-700">
+                        <i class="fas fa-check-circle text-blue-500 text-xl"></i> PWA Integrada (Móvil)
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl font-semibold text-gray-700">
+                        <i class="fas fa-check-circle text-blue-500 text-xl"></i> Bot de Reportes WhatsApp
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl font-semibold text-gray-700">
+                        <i class="fas fa-check-circle text-blue-500 text-xl"></i> Licencia de escritorio
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl font-semibold text-gray-700">
+                        <i class="fas fa-check-circle text-blue-500 text-xl"></i> Actualizaciones VIP
+                    </div>
+                </div>
+
+                <a href="https://wa.me/584123633283?text=Hola,%20quiero%20adquirir%20la%20Licencia%20Anual%20de%20Punto%20Pila%20POS" target="_blank" class="btn-modern w-full md:w-auto bg-gray-900 text-white hover:bg-black text-xl px-16 py-6 shadow-2xl hover:-translate-y-2">
+                    Comprar Licencia Ahora <i class="fab fa-whatsapp ml-2 text-emerald-400"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-16 px-6 rounded-t-[3rem] mt-20 max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="text-center md:text-left">
+                <span class="text-3xl font-black tracking-tight text-white mb-2 block">Punto Pila POS</span>
+                <span class="text-gray-400 font-medium">Llevando negocios al siguiente nivel.</span>
+            </div>
+            
+            <div class="flex gap-6">
+                <a href="#" class="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center hover:bg-white hover:text-gray-900 transition-colors text-xl">
+                    <i class="fab fa-instagram"></i>
+                </a>
+                <a href="#" class="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center hover:bg-white hover:text-gray-900 transition-colors text-xl">
+                    <i class="fab fa-facebook-f"></i>
+                </a>
+                <a href="#" class="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center hover:bg-white hover:text-gray-900 transition-colors text-xl">
+                    <i class="fab fa-whatsapp"></i>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 800,
+            once: true,
+            offset: 50,
+            easing: 'ease-out-cubic'
+        });
+    </script>
+</body>
+</html>

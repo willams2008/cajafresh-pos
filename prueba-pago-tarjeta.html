@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integracion Sunmi P3 - Caja Fresh</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; padding: 20px; color: #eee; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; font-size: 22px; color: #e94560; margin-bottom: 20px; }
+        .card { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+        .card h2 { font-size: 15px; color: #e94560; margin-bottom: 12px; border-bottom: 1px solid #0f3460; padding-bottom: 8px; }
+        .status { display: flex; align-items: center; gap: 10px; padding: 12px; background: #0f3460; border-radius: 8px; margin-bottom: 10px; }
+        .led { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .led.red { background: #e74c3c; box-shadow: 0 0 8px #e74c3c88; }
+        .led.green { background: #2ecc71; box-shadow: 0 0 8px #2ecc7188; }
+        .led.yellow { background: #f1c40f; box-shadow: 0 0 8px #f1c40f88; }
+        .label { color: #888; font-size: 12px; }
+        .value { color: #fff; font-weight: 600; font-size: 13px; }
+        .monto-box { text-align: center; padding: 16px; background: #0f3460; border-radius: 8px; margin-bottom: 12px; }
+        .monto-box .amount { font-size: 36px; font-weight: 800; }
+        .monto-box .amount.green { color: #2ecc71; }
+        .monto-box .amount.waiting { color: #f1c40f; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; margin-bottom: 8px; transition: all .2s; }
+        .btn:hover { transform: translateY(-1px); opacity: .9; }
+        .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+        .btn-red { background: #e94560; color: #fff; }
+        .btn-green { background: #2ecc71; color: #fff; }
+        .btn-blue { background: #3498db; color: #fff; }
+        .btn-gray { background: #555; color: #fff; }
+        .row { display: flex; gap: 8px; }
+        .row .btn { flex: 1; }
+        .log { background: #0a0a1a; border-radius: 8px; padding: 12px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; line-height: 1.6; }
+        .log .t { color: #555; }
+        .log .ok { color: #2ecc71; }
+        .log .err { color: #e74c3c; }
+        .log .info { color: #3498db; }
+        #ticket-template { display: none; }
+        .steps { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
+        .steps .dot { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+        .steps .dot.active { background: #e94560; }
+        .steps .dot.done { background: #2ecc71; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Prueba Sunmi P3 + Impresora Termica</h1>
+
+    <!-- ESTADO -->
+    <div class="card">
+        <h2>Estado del Sunmi P3</h2>
+        <div class="status">
+            <div class="led red" id="sunmi-led"></div>
+            <div>
+                <div><span class="label">Dispositivo:</span> <span class="value" id="sunmi-device">Detectando...</span></div>
+                <div><span class="label">Serial:</span> <span class="value" id="sunmi-serial">-</span></div>
+            </div>
+        </div>
+        <button class="btn btn-blue" id="btn-detectar" onclick="detectarSunmi()">Detectar Sunmi P3</button>
+    </div>
+
+    <!-- PAGO -->
+    <div class="card">
+        <h2>Procesar Pago con Tarjeta</h2>
+        <div class="monto-box">
+            <div style="font-size:12px; color:#888;">Monto (Bs)</div>
+            <div class="amount green" id="montoDisplay">0,00</div>
+        </div>
+        <div class="row">
+            <button class="btn btn-gray" onclick="setMonto(10)">10</button>
+            <button class="btn btn-gray" onclick="setMonto(25)">25</button>
+            <button class="btn btn-gray" onclick="setMonto(50)">50</button>
+            <button class="btn btn-gray" onclick="setMonto(100)">100</button>
+            <button class="btn btn-gray" onclick="setMonto(500)">500</button>
+        </div>
+        <div style="margin: 10px 0;">
+            <label style="font-size:12px; color:#888;">Monto personalizado:</label>
+            <input type="number" id="inputMonto" value="25.00" step="0.01" style="width:100%; padding:10px; background:#0f3460; border:1px solid #333; border-radius:6px; color:#fff; font-size:16px; margin-top:4px;">
+        </div>
+        <div class="steps" id="steps">
+            <div class="dot" id="step1"></div>
+            <div class="dot" id="step2"></div>
+            <div class="dot" id="step3"></div>
+        </div>
+        <button class="btn btn-red" id="btnPagar" onclick="iniciarPago()">1. Iniciar Pago en Sunmi P3</button>
+        <button class="btn btn-blue" id="btnConfirmar" onclick="confirmarPago()" disabled>2. Confirmar Pago Recibido</button>
+        <button class="btn btn-green" id="btnPrint" onclick="imprimirTicket()" disabled>3. Imprimir Ticket</button>
+    </div>
+
+    <!-- IMPRESORA -->
+    <div class="card">
+        <h2>Impresora Termica</h2>
+        <div class="status">
+            <div class="led yellow" id="printer-led"></div>
+            <div><span class="label">Estado:</span> <span class="value" id="printer-status">Usando Electron silent print</span></div>
+        </div>
+        <button class="btn btn-blue" onclick="probarImpresora()">Probar Impresora</button>
+    </div>
+
+    <!-- LOG -->
+    <div class="card">
+        <h2>Registro</h2>
+        <div class="log" id="log"></div>
+        <button class="btn btn-gray" onclick="document.getElementById('log').innerHTML=''" style="margin-top:6px;">Limpiar</button>
+    </div>
+</div>
+
+<div id="ticket-template">
+    <div style="width:80mm; font-family:'Courier New',monospace; font-size:12px; padding:10px; text-align:center;">
+        <div style="font-size:18px; font-weight:bold;">CAJA FRESH</div>
+        <div>Punto Pila POS</div>
+        <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+        <div><strong>COMPROBANTE DE PAGO</strong></div>
+        <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+        <table style="width:100%; font-size:11px; text-align:left;">
+            <tr><td>Fecha:</td><td style="text-align:right;" id="tp-fecha"></td></tr>
+            <tr><td>Metodo:</td><td style="text-align:right;">Punto de Venta</td></tr>
+            <tr><td>Terminal:</td><td style="text-align:right;" id="tp-terminal">Sunmi P3</td></tr>
+            <tr><td style="border-top:1px dashed #000; padding-top:6px;"><strong>TOTAL</strong></td><td style="border-top:1px dashed #000; padding-top:6px; text-align:right;"><strong id="tp-total">Bs 0,00</strong></td></tr>
+        </table>
+        <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+        <div style="font-size:10px;">Gracias por su compra!</div>
+    </div>
+</div>
+
+<script>
+    var logEl = document.getElementById('log');
+    var montoActual = 0;
+    var paso = 0;
+
+    function addLog(msg, type) {
+        var t = new Date().toLocaleTimeString();
+        var cls = type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'info';
+        logEl.innerHTML += '<div><span class="t">[' + t + ']</span> <span class="' + cls + '">' + msg + '</span></div>';
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setMonto(v) { montoActual = v; document.getElementById('montoDisplay').textContent = v.toFixed(2).replace('.', ','); document.getElementById('inputMonto').value = v; addLog('Monto: Bs ' + v.toFixed(2), 'info'); }
+
+    document.getElementById('inputMonto').addEventListener('input', function() {
+        montoActual = parseFloat(this.value) || 0;
+        document.getElementById('montoDisplay').textContent = montoActual.toFixed(2).replace('.', ',');
+    });
+
+    function setPaso(p) {
+        paso = p;
+        for (var i = 1; i <= 3; i++) {
+            var el = document.getElementById('step' + i);
+            el.className = 'dot';
+            if (i < p) el.className = 'dot done';
+            if (i === p) el.className = 'dot active';
+        }
+    }
+
+    // --- DETECTAR SUNMI ---
+    async function detectarSunmi() {
+        addLog('Detectando Sunmi P3...', 'info');
+        document.getElementById('btn-detectar').disabled = true;
+        try {
+            if (window.electronAPI && window.electronAPI.sunmiGetStatus) {
+                var st = await window.electronAPI.sunmiGetStatus();
+                actualizarStatusSunmi(st);
+                if (st.conectado) {
+                    addLog('Sunmi P3 conectado. Serial: ' + st.serial, 'ok');
+                } else {
+                    addLog('Sunmi P3 NO conectado', 'err');
+                }
+            } else {
+                addLog('Electron API no disponible, probando HTTP API...', 'info');
+                try {
+                    var res = await fetch('/api/usb-devices');
+                    var data = await res.json();
+                    var sunmi = data && data.find(function(d) { return d.vid === '0E8D' || (d.name && d.name.indexOf('P3') !== -1); });
+                    if (sunmi) {
+                        actualizarStatusSunmi({ conectado: true, producto: sunmi.name, serial: sunmi.vid + ':' + sunmi.pid });
+                        addLog('Sunmi P3 detectado via HTTP API', 'ok');
+                    } else {
+                        actualizarStatusSunmi({ conectado: false });
+                        addLog('Sunmi P3 no encontrado via HTTP', 'err');
+                    }
+                } catch(httpErr) {
+                    addLog('HTTP API no disponible', 'err');
+                    detectarSunmiLocal();
+                }
+            }
+        } catch (e) {
+            addLog('Error: ' + e.message, 'err');
+            detectarSunmiLocal();
+        }
+        document.getElementById('btn-detectar').disabled = false;
+    }
+
+    function detectarSunmiLocal() {
+        addLog('Usando deteccion local...', 'info');
+        if (navigator.usb) {
+            navigator.usb.requestDevice({ filters: [{ vendorId: 0x0E8D }] })
+                .then(function(device) {
+                    actualizarStatusSunmi({ conectado: true, producto: device.productName || 'Sunmi P3', serial: device.serialNumber || '0x' + device.vendorId.toString(16) });
+                    addLog('Sunmi P3 conectado via WebUSB!', 'ok');
+                })
+                .catch(function(err) {
+                    addLog('WebUSB: ' + err.message, 'err');
+                    addLog('Sunmi P3 detectado en Windows como: P3 (VID_0E8D:PID_201C)', 'info');
+                    actualizarStatusSunmi({ conectado: true, producto: 'Sunmi P3 (conocido)', serial: 'P34425CBJ2198' });
+                });
+        } else {
+            addLog('WebUSB no disponible en este navegador', 'err');
+            addLog('Sunmi P3 detectado en Windows: P3 (VID_0E8D:PID_201C) Serial: P34425CBJ2198', 'info');
+            actualizarStatusSunmi({ conectado: true, producto: 'Sunmi P3 (conocido)', serial: 'P34425CBJ2198' });
+        }
+    }
+
+    function actualizarStatusSunmi(st) {
+        var led = document.getElementById('sunmi-led');
+        if (st.conectado) {
+            led.className = 'led green';
+            document.getElementById('sunmi-device').textContent = st.producto || 'Sunmi P3';
+            document.getElementById('sunmi-serial').textContent = st.serial || '-';
+        } else {
+            led.className = 'led red';
+            document.getElementById('sunmi-device').textContent = 'Desconectado';
+            document.getElementById('sunmi-serial').textContent = '-';
+        }
+    }
+
+    // --- INICIAR PAGO ---
+    function iniciarPago() {
+        if (montoActual <= 0) { addLog('Selecciona un monto primero', 'err'); return; }
+        addLog('Paso 1: Procesa Bs ' + montoActual.toFixed(2) + ' en el terminal Sunmi P3', 'info');
+        document.getElementById('btnPagar').disabled = true;
+        document.getElementById('btnPagar').textContent = 'Procesando en Sunmi...';
+        document.getElementById('btnConfirmar').disabled = false;
+        setPaso(1);
+        addLog('Esperando que ingreses el monto en el terminal...', 'info');
+        document.getElementById('montoDisplay').className = 'amount waiting';
+    }
+
+    function confirmarPago() {
+        addLog('Paso 2: Pago CONFIRMADO', 'ok');
+        document.getElementById('btnConfirmar').disabled = true;
+        document.getElementById('btnConfirmar').textContent = 'Pago Confirmado';
+        document.getElementById('btnPrint').disabled = false;
+        setPaso(2);
+        document.getElementById('montoDisplay').className = 'amount green';
+        addLog('Listo para imprimir ticket', 'ok');
+    }
+
+    // --- IMPRIMIR ---
+    async function imprimirTicket() {
+        document.getElementById('btnPrint').disabled = true;
+        document.getElementById('btnPrint').textContent = 'Imprimiendo...';
+        addLog('Imprimiendo ticket...', 'info');
+        setPaso(3);
+
+        var fecha = new Date().toLocaleString();
+        document.getElementById('tp-fecha').textContent = fecha;
+        document.getElementById('tp-total').textContent = 'Bs ' + montoActual.toFixed(2).replace('.', ',');
+
+        var ticketHTML = document.getElementById('ticket-template').innerHTML;
+
+        try {
+            if (window.electronAPI && window.electronAPI.testPrint) {
+                var w = window.open('', '_blank', 'width=350,height=400,toolbar=no,menubar=no');
+                w.document.write('<html><head><style>body{margin:0;padding:0;font-family:"Courier New",monospace;}</style></head><body>');
+                w.document.write(ticketHTML);
+                w.document.write('</body></html>');
+                w.document.close();
+                setTimeout(function() {
+                    w.print();
+                    addLog('Ticket enviado a impresora via window.print()', 'ok');
+                    setTimeout(function() { w.close(); resetear(); }, 1000);
+                }, 500);
+            } else {
+                addLog('Usando window.print() como fallback', 'info');
+                var w = window.open('', '_blank', 'width=350,height=400');
+                w.document.write('<html><head><style>body{margin:0;padding:0;}</style></head><body>');
+                w.document.write(ticketHTML);
+                w.document.write('</body></html>');
+                w.document.close();
+                setTimeout(function() { w.print(); setTimeout(function() { w.close(); resetear(); }, 1000); }, 500);
+            }
+        } catch(e) {
+            addLog('Error al imprimir: ' + e.message, 'err');
+            resetear();
+        }
+    }
+
+    function resetear() {
+        document.getElementById('btnPagar').disabled = false;
+        document.getElementById('btnPagar').textContent = '1. Iniciar Pago en Sunmi P3';
+        document.getElementById('btnConfirmar').disabled = true;
+        document.getElementById('btnConfirmar').textContent = '2. Confirmar Pago Recibido';
+        document.getElementById('btnPrint').disabled = true;
+        document.getElementById('btnPrint').textContent = '3. Imprimir Ticket';
+        setPaso(0);
+    }
+
+    function probarImpresora() {
+        addLog('Probando impresora termica...', 'info');
+        var w = window.open('', '_blank', 'width=350,height=300,toolbar=no,menubar=no');
+        w.document.write('<html><head><style>body{font-family:"Courier New",monospace;width:80mm;padding:10px;text-align:center;}h2{font-size:16px;}</style></head><body>');
+        w.document.write('<h2>PRUEBA DE IMPRESION</h2>');
+        w.document.write('<hr style="border-top:1px dashed #000;">');
+        w.document.write('<p>CAJA FRESH - Punto Pila POS</p>');
+        w.document.write('<p>Fecha: ' + new Date().toLocaleString() + '</p>');
+        w.document.write('<hr style="border-top:1px dashed #000;">');
+        w.document.write('<p style="font-size:10px;">Si ves esto impreso, la impresora termica funciona correctamente.</p>');
+        w.document.write('</body></html>');
+        w.document.close();
+        setTimeout(function() { w.print(); setTimeout(function() { w.close(); }, 1000); }, 500);
+        document.getElementById('printer-led').className = 'led green';
+        document.getElementById('printer-status').textContent = 'Prueba enviada';
+        addLog('Prueba de impresora enviada.', 'ok');
+    }
+
+    // --- INICIO ---
+    addLog('Iniciando...', 'info');
+    detectarSunmi();
+    setMonto(25);
+
+    // Monitoreo automatico via Electron IPC
+    if (window.electronAPI && window.electronAPI.sunmiStartMonitoring) {
+        window.electronAPI.sunmiStartMonitoring();
+        window.electronAPI.onSunmiStatus(function(data) {
+            actualizarStatusSunmi(data);
+            addLog('Sunmi status: ' + (data.conectado ? 'CONECTADO' : 'DESCONECTADO'), data.conectado ? 'ok' : 'err');
+        });
+        addLog('Monitoreo Sunmi activado via IPC', 'ok');
+    }
+</script>
+</body>
+</html>

@@ -9341,6 +9341,11 @@ function finalizeAndClear() {
     sales = sales.filter(s => s.status === 'pending');
     if (sales.length === 0) sales = [];
     saveSales();
+    if (window.db && window.db.saveSale) {
+        sales.forEach(s => {
+            window.db.saveSale(s).catch(e => console.error('[DB] Error saving pending sale:', e));
+        });
+    }
 
     if (typeof expenses !== 'undefined') {
         expenses = [];

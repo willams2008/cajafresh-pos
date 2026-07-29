@@ -2875,7 +2875,7 @@ window.Provisionar = (function() {
 
                         // BLOQUE 7a: Decrementar stock del producto en POS si existe
                         if (window.products && Array.isArray(window.products)) {
-                            var prodPOS = window.products.find(function(p) { return p.id === matOriginal.id || p.name === matOriginal.nombre; });
+                            var prodPOS = window.products.find(function(p) { return p.id === matOriginal.id || p.id === 'mat_spec_' + matOriginal.id || p.provisionarId === matOriginal.id || p.name === matOriginal.nombre; });
                             if (prodPOS && prodPOS.stock > 0) {
                                 prodPOS.stock = Math.max(0, (prodPOS.stock || 1) - 1);
                                 if (typeof window.saveProducts === 'function') window.saveProducts();

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <!-- Este SVG usa solo <path> para probar el fix de getBBox() -->
+  
+  <!-- Pieza curva 1: Forma de L -->
+  <path id="Forma_L" d="M 10 10 L 200 10 L 200 80 L 80 80 L 80 200 L 10 200 Z" fill="none" stroke="#333" stroke-width="1.5"/>
+  
+  <!-- Pieza curva 2: Rectángulo redondeado -->
+  <path id="Rect_Redondeado" d="M 230 10 Q 230 10 240 10 L 430 10 Q 440 10 440 20 L 440 160 Q 440 170 430 170 L 240 170 Q 230 170 230 160 Z" fill="none" stroke="#333" stroke-width="1.5"/>
+  
+  <!-- Pieza curva 3: Triángulo -->
+  <path id="Triangulo" d="M 470 170 L 570 10 L 670 170 Z" fill="none" stroke="#333" stroke-width="1.5"/>
+  
+  <!-- Pieza curva 4: Arco decorativo -->
+  <path id="Arco_Decorativo" d="M 10 230 L 300 230 A 50 50 0 0 1 300 330 L 10 330 Z" fill="none" stroke="#333" stroke-width="1.5"/>
+</svg>

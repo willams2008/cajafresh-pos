@@ -1,0 +1,15 @@
+Ambas cosas.
+
+Primero: Dame el HTML COMPLETO de la interfaz (index.html o sandbox) que incluye los IDs del DOM que esperan los 6 modulos. Necesito:
+
+- form-material, mat-nombre, mat-tipo, mat-ancho, mat-largo, mat-espesor, mat-precio, mat-id
+- tabla-materiales-body con botones .btn-eliminar-material
+- cad-select-material
+- cad-canvas con drag drop zone para DXF/SVG/PDF
+- btn-ejecutar-nesting, nesting-resultados-container
+- costo-margen-input, costo-hora-input, btn-generar-pdf, costos-resumen-container
+- Layout de 3 tabs: Materiales, CAD, Costos
+
+Dame el HTML COMPLETO listo para copiar y pegar, con estilos incluidos.
+
+Segundo: Incluye un mecanismo de carga para DXF/SVG (drag and drop sobre el canvas) en el mismo HTML.

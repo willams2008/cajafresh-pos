@@ -181,53 +181,235 @@
                 </div>
             </div>
 
-            <!-- FINANCIAL TAB -->
-            <div id="view-financial" class="tab-view hidden">
-                <div class="pulso-banner" style="padding: 20px; margin-bottom: 16px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.3);">
-                    <div class="title" style="font-size: 20px;">Resumen Financiero</div>
-                    <div class="subtitle">Ganancias y rendimiento acumulado.</div>
+            <!-- PERFORMANCE / RENDIMIENTO TAB -->
+            <div id="view-performance" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 16px; margin-bottom: 14px; background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                    <div class="title" style="font-size: 18px;">Rendimiento y Métricas POS</div>
+                    <div class="subtitle">Análisis global o por sucursal en tiempo real.</div>
                 </div>
                 
-                <div id="financial-summary-content">
+                <!-- Selector de Sucursal y Fecha -->
+                <div class="card" style="padding: 12px; margin-bottom: 14px; display:flex; flex-direction:column; gap:10px;">
+                    <div>
+                        <label style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:4px;">Filtrar por Sucursal</label>
+                        <select id="perf-store-select" onchange="loadGlobalPerformance()" style="width:100%; padding:10px; background:var(--bg); border:1px solid var(--outline); border-radius:10px; font-size:13px; font-weight:800;">
+                            <option value="">Todas las sucursales</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:4px;">Seleccionar Fecha</label>
+                        <input type="date" id="perf-date-select" onchange="loadGlobalPerformance()" style="width:100%; padding:10px; background:var(--bg); border:1px solid var(--outline); border-radius:10px; font-size:13px; font-weight:800; font-family:inherit;">
+                    </div>
+                </div>
+
+                <div id="performance-view-content">
                     <div class="spinner" style="margin: 40px auto;"></div>
                 </div>
             </div>
 
-            <!-- POS TAB (Placeholder) -->
+            <!-- VENDER POS TAB (Ventas desde App del Jefe) -->
+            <div id="view-sell" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 16px; margin-bottom: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="title" style="font-size: 18px;">Venta Directa Jefe</div>
+                    <div class="subtitle">Registra una venta rápida desde tu teléfono.</div>
+                </div>
+                
+                <div class="card" style="padding: 12px; margin-bottom: 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:12px; font-weight:800; color:var(--text-muted);">SUCURSAL EMISORA</span>
+                        <select id="boss-sell-store-select" style="padding:6px 10px; background:var(--bg); border:1px solid var(--outline); border-radius:8px; font-size:12px; font-weight:800; outline:none;">
+                            <!-- Dinámico -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Carrito Resumen -->
+                <div class="card" style="padding: 14px; margin-bottom: 12px; background:#f0fdf4; border-color:#bbf7d0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:10px; font-weight:800; color:#059669; text-transform:uppercase;">Carrito Actual</div>
+                            <div id="boss-cart-count" style="font-size:12px; font-weight:700; color:var(--text-muted);">0 artículos seleccionados</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div id="boss-cart-total-usd" style="font-size:22px; font-weight:900; color:#10b981;">$0.00</div>
+                            <div id="boss-cart-total-ves" style="font-size:10px; font-weight:700; color:var(--text-muted);">Bs 0.00</div>
+                        </div>
+                    </div>
+                    <div id="boss-cart-items-list" style="margin-top:10px; max-height:120px; overflow-y:auto;" class="custom-scrollbar"></div>
+                    <button onclick="openBossCheckoutModal()" id="btn-boss-checkout" disabled style="width:100%; margin-top:10px; padding:10px; background:#10b981; color:white; border:none; border-radius:10px; font-size:13px; font-weight:900; cursor:pointer; opacity:0.5;">
+                        <i class="fas fa-check-circle"></i> Procesar y Cobrar Venta
+                    </button>
+                </div>
+
+                <!-- Selector de Productos para Venta -->
+                <div class="card" style="padding: 12px; margin-bottom: 10px;">
+                    <div style="position:relative">
+                        <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px"></i>
+                        <input type="text" id="boss-sell-search" placeholder="Buscar producto para agregar..." oninput="filterBossSellCatalog(this.value)" style="width:100%;padding:10px 10px 10px 36px;background:var(--bg);border:1px solid var(--outline);border-radius:10px;font-size:13px;">
+                    </div>
+                </div>
+                <div id="boss-sell-catalog-list"></div>
+            </div>
+
+            <!-- AUDITORÍA CAJAS EN VIVO TAB -->
             <div id="view-pos" class="tab-view hidden">
-                <div class="empty">
-                    <i class="fas fa-tv" style="font-size: 40px; color: var(--outline); margin-bottom: 16px; display: block;"></i>
-                    Próximamente: Vista en tiempo real de las cajas activas.
+                <div class="pulso-banner" style="padding: 16px; margin-bottom: 16px; background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);">
+                    <div class="title" style="font-size: 18px;">Auditoría de Cajas en Vivo</div>
+                    <div class="subtitle">Supervisa cajeros activos y estado de pantallas en tiempo real.</div>
+                </div>
+                <div id="live-states-grid">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+
+            <!-- EMPLEADOS / RENDIMIENTO TAB -->
+            <div id="view-employees" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 16px; margin-bottom: 16px; background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);">
+                    <div class="title" style="font-size: 18px;">Métricas de Personal</div>
+                    <div class="subtitle">Rendimiento y volumen de ventas por cajero.</div>
+                </div>
+                <div id="employees-list-container">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+
+            <!-- TRANSFERENCIAS DE MERCANCÍA TAB -->
+            <div id="view-transfers" class="tab-view hidden">
+                <div class="pulso-banner" style="padding: 16px; margin-bottom: 12px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+                    <div class="title" style="font-size: 18px;">Transferencias entre Tiendas</div>
+                    <div class="subtitle">Envía y solicita mercancía entre almacén y kioskos.</div>
+                </div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="font-size:13px; font-weight:800; color:var(--text);">Historial de Envíos</div>
+                    <button onclick="openNewTransferModal()" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">
+                        <i class="fas fa-paper-plane"></i> Nueva Transferencia
+                    </button>
+                </div>
+
+                <div id="transfers-list-container">
+                    <div class="spinner" style="margin: 40px auto;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Procesar Venta Jefe -->
+        <div class="modal" id="boss-checkout-modal">
+            <div class="modal-content" style="max-width:380px;">
+                <div class="modal-title"><i class="fas fa-cash-register" style="color:var(--primary)"></i> Cobrar Venta</div>
+                <div style="text-align:center; padding:10px 0; background:var(--bg); border-radius:12px; margin-bottom:14px;">
+                    <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Monto Total a Cobrar</div>
+                    <div id="boss-modal-total-usd" style="font-size:26px; font-weight:900; color:var(--primary);">$0.00</div>
+                    <div id="boss-modal-total-ves" style="font-size:12px; font-weight:700; color:var(--text-muted);">Bs 0.00</div>
+                </div>
+                
+                <div class="field">
+                    <label>Nombre del Cliente</label>
+                    <input type="text" id="boss-checkout-client" placeholder="Cliente Ocasional / Nombre">
+                </div>
+
+                <div class="field">
+                    <label>Método de Pago</label>
+                    <select id="boss-checkout-method" style="width:100%; padding:10px; border:1px solid var(--outline); border-radius:8px; font-size:13px; font-weight:700; background:fff;">
+                        <option value="cash-usd">💵 Efectivo USD ($)</option>
+                        <option value="cash-ves">💵 Efectivo Bs</option>
+                        <option value="pago-movil">📱 Pago Móvil</option>
+                        <option value="zelle">⚡ Zelle</option>
+                        <option value="card-ves">💳 Punto de Venta / Tarjeta</option>
+                        <option value="fiado">📋 Fiado / Crédito</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button onclick="confirmBossCheckout()" id="btn-confirm-boss-checkout" style="flex:1; padding:12px; background:var(--primary); color:white; border:none; border-radius:10px; font-size:13px; font-weight:900; cursor:pointer;">
+                        Confirmar y Guardar
+                    </button>
+                    <button onclick="closeBossCheckoutModal()" style="padding:12px 16px; background:var(--outline); color:var(--text); border:none; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Nueva Transferencia -->
+        <div class="modal" id="new-transfer-modal">
+            <div class="modal-content" style="max-width:380px;">
+                <div class="modal-title"><i class="fas fa-dolly" style="color:var(--info)"></i> Transferencia de Mercancía</div>
+                
+                <div class="field">
+                    <label>Tienda Origen (Resta Stock)</label>
+                    <select id="transfer-origin-store" style="width:100%; padding:10px; border:1px solid var(--outline); border-radius:8px; font-size:13px; font-weight:700; background:#fff;"></select>
+                </div>
+
+                <div class="field">
+                    <label>Tienda Destino (Suma Stock)</label>
+                    <select id="transfer-target-store" style="width:100%; padding:10px; border:1px solid var(--outline); border-radius:8px; font-size:13px; font-weight:700; background:#fff;"></select>
+                </div>
+
+                <div class="field">
+                    <label>Producto a Transferir</label>
+                    <select id="transfer-product-select" style="width:100%; padding:10px; border:1px solid var(--outline); border-radius:8px; font-size:13px; font-weight:700; background:#fff;"></select>
+                </div>
+
+                <div class="field">
+                    <label>Cantidad (Unidades)</label>
+                    <input type="number" id="transfer-qty" min="1" value="1" placeholder="Ej. 10">
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button onclick="saveNewTransfer()" style="flex:1; padding:12px; background:var(--primary); color:white; border:none; border-radius:10px; font-size:13px; font-weight:900; cursor:pointer;">
+                        Enviar Transferencia
+                    </button>
+                    <button onclick="closeNewTransferModal()" style="padding:12px 16px; background:var(--outline); color:var(--text); border:none; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">
+                        Cancelar
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Bottom Navigation -->
-        <nav class="bottom-nav">
+        <nav class="bottom-nav" style="display:grid; grid-template-columns:repeat(7, 1fr);">
             <div class="nav-item active" onclick="switchMainTab('panel', this)">
-                <i class="fas fa-th-large"></i>
+                <i class="fas fa-chart-pie"></i>
                 <span>Panel</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('performance', this)">
+                <i class="fas fa-chart-line"></i>
+                <span>Métricas</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('sell', this)">
+                <i class="fas fa-cash-register"></i>
+                <span>Vender</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('pos', this)">
+                <i class="fas fa-user-shield"></i>
+                <span>Cajas</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('employees', this)">
+                <i class="fas fa-users"></i>
+                <span>Personal</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('transfers', this)">
+                <i class="fas fa-exchange-alt"></i>
+                <span>Envíos</span>
             </div>
             <div class="nav-item" onclick="switchMainTab('inventory', this)">
                 <i class="fas fa-boxes"></i>
                 <span>Stock</span>
-            </div>
-            <div class="nav-item" onclick="switchMainTab('financial', this)">
-                <i class="fas fa-chart-line"></i>
-                <span>Balance</span>
-            </div>
-            <div class="nav-item" onclick="switchMainTab('pos', this)">
-                <i class="fas fa-desktop"></i>
-                <span>En Vivo</span>
             </div>
         </nav>
     </div>
 
     <!-- Vista Detalle (Inventario/Ventas) -->
     <div id="detail-view">
-        <div class="detail-header">
-            <div class="back-btn" onclick="closeDetail()"><i class="fas fa-arrow-left"></i></div>
-            <div id="detail-title" class="brand-title">Sucursal</div>
+        <div class="detail-header" style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div class="back-btn" onclick="closeDetail()"><i class="fas fa-arrow-left"></i></div>
+                <div id="detail-title" class="brand-title">Sucursal</div>
+            </div>
+            <button onclick="deleteStore(currentStoreId, event)" title="Eliminar Sucursal" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.3); color:var(--error); padding:6px 12px; border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">
+                <i class="fas fa-trash-alt"></i> Eliminar Sede
+            </button>
         </div>
         <div class="detail-tabs">
             <div class="tab-btn active" id="tab-sales" onclick="setTab('sales')">Ventas</div>

@@ -113,10 +113,30 @@ contextBridge.exposeInMainWorld('db', {
     deletePO: (id) => ipcRenderer.invoke('db-delete-po', id),
     
     // Cashups / Corte Z
-    getCashups: () => ipcRenderer.invoke('db-get-cashups'),
-    getCashupByDate: (date) => ipcRenderer.invoke('db-get-cashup-by-date', date),
-    saveCashup: (cashup) => ipcRenderer.invoke('db-save-cashup', cashup),
-    getTodaySalesSummary: () => ipcRenderer.invoke('db-get-today-sales-summary')
+    getCashups: (storeId) => ipcRenderer.invoke('db-get-cashups', storeId),
+    getCashupByDate: (storeId, date) => ipcRenderer.invoke('db-get-cashup-by-date', storeId, date),
+    saveCashup: (storeId, cashup) => ipcRenderer.invoke('db-save-cashup', storeId, cashup),
+    getTodaySalesSummary: (storeId) => ipcRenderer.invoke('db-get-today-sales-summary', storeId),
+
+    // Movements / Merma
+    getMovements: (storeId, startDate, endDate, type) => ipcRenderer.invoke('db-get-movements', storeId, startDate, endDate, type),
+    saveMovement: (storeId, movement) => ipcRenderer.invoke('db-save-movement', storeId, movement),
+    
+    // Product Change History & Soft-Delete
+    getProductChanges: (storeId, productId, limit) => ipcRenderer.invoke('db-get-product-changes', storeId, productId, limit),
+    restoreProduct: (storeId, id, cashier) => ipcRenderer.invoke('db-restore-product', storeId, id, cashier),
+    getDeletedProducts: (storeId) => ipcRenderer.invoke('db-get-deleted-products', storeId),
+    deleteProductPermanent: (storeId, id) => ipcRenderer.invoke('db-delete-product-permanent', storeId, id),
+    setMeta: (storeId, key, value) => ipcRenderer.invoke('db-set-meta', storeId, key, value),
+    getMeta: (storeId, key) => ipcRenderer.invoke('db-get-meta', storeId, key),
+    getProductById: (storeId, productId) => ipcRenderer.invoke('db-get-product-by-id', storeId, productId),
+    
+    // Users / Auth
+    getUsers: () => ipcRenderer.invoke('db-get-users'),
+    getUser: (username) => ipcRenderer.invoke('db-get-user', username),
+    saveUser: (user) => ipcRenderer.invoke('db-save-user', user),
+    deleteUser: (userId) => ipcRenderer.invoke('db-delete-user', userId),
+    updateUserLastLogin: (userId) => ipcRenderer.invoke('db-update-user-last-login', userId)
 });
 
 // --- CLOUD SYNC (Multi-Sucursal) ---
@@ -137,5 +157,13 @@ contextBridge.exposeInMainWorld('cloudSync', {
     onStatusChange: (callback) => ipcRenderer.on('cloud-sync-status', (_, data) => callback(data)),
     onProductUpdatedRemote: (callback) => ipcRenderer.on('product-updated-remote', (_, data) => callback(data)),
     onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (_, data) => callback(data)),
-    onExchangeRateUpdatedRemote: (callback) => ipcRenderer.on('exchange-rate-updated-remote', (_, data) => callback(data))
+    onExchangeRateUpdatedRemote: (callback) => ipcRenderer.on('exchange-rate-updated-remote', (_, data) => callback(data)),
+    addDeletedProductId: (id) => ipcRenderer.invoke('sync-add-deleted-product', id),
+    removeDeletedProductId: (id) => ipcRenderer.invoke('sync-remove-deleted-product', id),
+    // License Activation System
+    registerMachine: (machineId, appId, deviceName, userType, userInfo) => ipcRenderer.invoke('license-register-machine', { machineId, appId, deviceName, userType, userInfo }),
+    checkLicense: (machineId) => ipcRenderer.invoke('license-check-status', machineId),
+    licenseHeartbeat: (machineId, version) => ipcRenderer.invoke('license-heartbeat', { machineId, version }),
+    getAllLicenses: () => ipcRenderer.invoke('license-get-all'),
+    updateLicense: (machineId, status, reason) => ipcRenderer.invoke('license-update-status', { machineId, status, reason })
 });
