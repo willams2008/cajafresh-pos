@@ -1,6 +1,6 @@
 {
   "name": "puntopila-pos",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Sistema POS Punto Pila - Gestión Inteligente",
   "main": "main.js",
   "scripts": {
@@ -52,15 +52,19 @@
   "author": "Punto Pila",
   "license": "ISC",
   "devDependencies": {
+    "@babel/parser": "^8.0.4",
     "@electron/packager": "^19.0.5",
+    "acorn": "^8.18.0",
     "asar": "^3.2.0",
     "electron": "32.0.0",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "esprima": "^4.0.1"
   },
   "dependencies": {
     "adbkit": "^2.11.1",
     "cloudflared": "^0.7.1",
     "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
     "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "jspdf": "^4.2.1",
