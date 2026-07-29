@@ -288,56 +288,34 @@ async function ensureAdminUser() {
     }
 }
 
-function _genPwd() {
-    var upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-    var lower = 'abcdefghjkmnpqrstuvwxyz';
-    var digits = '23456789';
-    var syms = '@#$%&!';
-    var all = upper + lower + digits + syms;
-    var pwd = '';
-    pwd += upper[_rand(0, upper.length - 1)];
-    pwd += lower[_rand(0, lower.length - 1)];
-    pwd += digits[_rand(0, digits.length - 1)];
-    pwd += syms[_rand(0, syms.length - 1)];
-    for (var i = 0; i < 9; i++) pwd += all[_rand(0, all.length - 1)];
-    return pwd.split('').sort(function() { return Math.random() - 0.5; }).join('');
-}
-function _rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
 async function ensureJoseUsers() {
     try {
         var users = await window.db.getUsers();
         var existing = new Set((users || []).map(u => u.username));
-        var credsKey = 'freshpos_jose_creds';
-        var savedCreds = JSON.parse(localStorage.getItem(credsKey) || '{}');
         var joseUsers = [
-            { username: 'bendecido', name: 'Bendecido', role: 'seller' },
-            { username: 'feliz_dia', name: 'Feliz Día', role: 'seller' },
-            { username: 'gracias_dios', name: 'Gracias Dios', role: 'seller' },
-            { username: 'jose', name: 'Jose', role: 'admin' }
+            { username: 'bendecido', name: 'Bendecido', password: 'B3nd3c1d0#2026', role: 'seller' },
+            { username: 'feliz_dia', name: 'Feliz Día', password: 'F3l1zD14@2026', role: 'seller' },
+            { username: 'gracias_dios', name: 'Gracias Dios', password: 'Gr4c14sD10s!2026', role: 'seller' },
+            { username: 'jose', name: 'Jose', password: 'J0s3#P0s2026', role: 'admin' }
         ];
         var created = [];
+        var savedCreds = {};
         for (var u of joseUsers) {
-            var pwd = savedCreds[u.username] || _genPwd();
-            if (!existing.has(u.username)) {
-                var salt = generateSalt();
-                var hash = await hashPassword(pwd, salt);
-                await window.db.saveUser({
-                    username: u.username,
-                    password_hash: hash,
-                    salt: salt,
-                    role: u.role,
-                    name: u.name,
-                    active: 1
-                });
-                savedCreds[u.username] = pwd;
-                created.push({ name: u.name, username: u.username, password: pwd, role: u.role });
-                console.log('[Auth] Usuario creado: ' + u.username + ' / ' + pwd);
-            } else if (!savedCreds[u.username]) {
-                savedCreds[u.username] = pwd;
-            }
+            savedCreds[u.username] = u.password;
+            var salt = generateSalt();
+            var hash = await hashPassword(u.password, salt);
+            await window.db.saveUser({
+                username: u.username,
+                password_hash: hash,
+                salt: salt,
+                role: u.role,
+                name: u.name,
+                active: 1
+            });
+            if (!existing.has(u.username)) created.push(u);
+            console.log('[Auth] Usuario asegurado: ' + u.username + ' / ' + u.password);
         }
-        localStorage.setItem(credsKey, JSON.stringify(savedCreds));
+        localStorage.setItem('freshpos_jose_creds', JSON.stringify(savedCreds));
         if (created.length > 0) {
             _showCredsModal(savedCreds);
         }
