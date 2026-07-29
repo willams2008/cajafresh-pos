@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 let db;
+let _dbPath = '';
 
 function backupDatabaseDaily(dbDir, dbPath) {
     try {
@@ -44,6 +45,7 @@ function initDatabase(userDataPath) {
         }
         
         const dbPath = path.join(dbDir, 'freshpos.sqlite');
+        _dbPath = dbPath;
         
         // Trigger daily backup
         backupDatabaseDaily(dbDir, dbPath);
@@ -119,13 +121,44 @@ async function createTables() {
         'expiryDate TEXT',
         'description TEXT',
         'barcode TEXT',
-        'flavorBarcodes TEXT'
+        'flavorBarcodes TEXT',
+        'presentations TEXT',
+        'composite TEXT',
+        'variants TEXT'
     ];
     for (const col of productCols) {
         try {
             await runQuery(`ALTER TABLE products ADD COLUMN ${col}`);
         } catch(e) {}
     }
+    try { await runQuery(`ALTER TABLE products ADD COLUMN points INTEGER DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE products ADD COLUMN deleted_at TEXT`); } catch(e) {}
+
+    // Tabla de Metadatos (flags persistentes tipo key-value)
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT,
+            store_id TEXT,
+            value TEXT,
+            PRIMARY KEY (key, store_id)
+        )
+    `);
+
+    // Tabla de Historial de Cambios de Productos
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS product_changes (
+            id TEXT,
+            store_id TEXT,
+            product_id TEXT,
+            field TEXT,
+            old_value TEXT,
+            new_value TEXT,
+            action TEXT,
+            cashier_name TEXT,
+            timestamp TEXT,
+            PRIMARY KEY (id, store_id)
+        )
+    `);
 
     // Tabla de Ingredientes (Materia Prima)
     await runQuery(`
@@ -390,6 +423,29 @@ async function createTables() {
     try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN notes TEXT`); } catch(e) {}
     try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN po_id TEXT`); } catch(e) {}
 
+    // Tabla de Usuarios
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT,
+            store_id TEXT,
+            username TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'cashier',
+            name TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            created_at TEXT,
+            last_login TEXT,
+            PRIMARY KEY (id, store_id)
+        )
+    `);
+
+    try { await runQuery(`ALTER TABLE users ADD COLUMN created_at TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE users ADD COLUMN last_login TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE users ADD COLUMN phone TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE users ADD COLUMN document TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE users ADD COLUMN photo TEXT`); } catch(e) {}
+
     console.log('[DATABASE] Tablas inicializadas y migradas para Multi-Tenant.');
 }
 
@@ -397,15 +453,80 @@ async function createTables() {
 const api = {
     // --- PRODUCTOS ---
     getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || '']),
-    
+    getActiveProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']),
+
+    getProductById: (storeId, productId) => {
+        const rows = db.prepare ? null : null;
+        return getQuery(`SELECT * FROM products WHERE id = ? AND store_id = ?`, [productId, storeId || '']).then(r => r[0] || null);
+    },
+
+    logProductChange: (storeId, change) => {
+        const sid = storeId || '';
+        return runQuery(
+            `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [change.id, sid, change.product_id, change.field, change.old_value, change.new_value, change.action, change.cashier_name, change.timestamp]
+        );
+    },
+
+    getProductChanges: (storeId, productId, limit = 10) => {
+        let sql = `SELECT * FROM product_changes WHERE store_id = ?`;
+        let params = [storeId || ''];
+        if (productId) { sql += ` AND product_id = ?`; params.push(productId); }
+        sql += ` ORDER BY timestamp DESC LIMIT ?`;
+        params.push(limit);
+        return getQuery(sql, params);
+    },
+
+    setMeta: (storeId, key, value) => {
+        const sid = storeId || '';
+        return runQuery(
+            `INSERT OR REPLACE INTO meta (key, store_id, value) VALUES (?, ?, ?)`,
+            [key, sid, String(value)]
+        );
+    },
+
+    getMeta: (storeId, key) => {
+        const sid = storeId || '';
+        return getQuery(`SELECT value FROM meta WHERE key = ? AND store_id = ?`, [key, sid]).then(r => r[0]?.value || null);
+    },
+
     saveProduct: async (storeId, product) => {
         if (!product || !product.id) {
             console.error('[DATABASE] saveProduct invocado con producto inválido:', product);
             return { success: false, error: 'Producto inválido o sin ID' };
         }
         const sid = storeId || '';
-        return runQuery(
-            `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        const cashier = product._cashier || 'system';
+        const now = new Date().toISOString();
+
+        // Detect changes by comparing with existing
+        let existing = null;
+        try {
+            const rows = await getQuery(`SELECT * FROM products WHERE id = ? AND store_id = ?`, [product.id, sid]);
+            existing = rows[0] || null;
+        } catch(e) {}
+
+        const fieldsToTrack = ['name', 'category', 'priceUSD', 'priceVES', 'priceEUR', 'costPrice', 'stock', 'minStock', 'featured'];
+        const changes = [];
+
+        if (existing) {
+            for (const field of fieldsToTrack) {
+                let oldVal = existing[field];
+                let newVal = product[field];
+                if (field === 'category' && typeof oldVal === 'string') { try { oldVal = JSON.parse(oldVal); } catch(e) {} }
+                if (field === 'featured') { oldVal = existing[field] ? 1 : 0; newVal = product[field] ? 1 : 0; }
+                const oldStr = String(oldVal ?? '');
+                const newStr = String(newVal ?? '');
+                if (oldStr !== newStr) {
+                    changes.push({ field, old_value: oldStr, new_value: newStr });
+                }
+            }
+        } else {
+            changes.push({ field: '*', old_value: '', new_value: 'created', action: 'create' });
+        }
+
+        const result = await runQuery(
+            `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes, presentations, composite, variants, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 product.id,
                 sid,
@@ -423,26 +544,57 @@ const api = {
                 product.description || '',
                 product.img || '',
                 product.barcode || '',
-                JSON.stringify(product.flavorBarcodes || {})
+                JSON.stringify(product.flavorBarcodes || {}),
+                JSON.stringify(product.presentations || []),
+                JSON.stringify(product.composite || { enabled: false, items: [] }),
+                JSON.stringify(product.variants || []),
+                product.points || 0
             ]
         );
+
+        // Log changes asynchronously (don't block the save)
+        if (changes.length > 0) {
+            const action = existing ? 'update' : 'create';
+            for (const c of changes) {
+                const changeId = 'chg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+                runQuery(
+                    `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [changeId, sid, product.id, c.field, c.old_value, c.new_value, c.action || action, cashier, now]
+                ).catch(e => console.error('[DB] Error logueando cambio:', e));
+            }
+        }
+
+        return result;
     },
     
     saveProductsBulk: async (storeId, products) => {
         if (!products || !Array.isArray(products)) return;
         const sid = storeId || '';
-        const CHUNK_SIZE = 50; 
+        const now = new Date().toISOString();
+        const cashier = products[0]?._cashier || 'system';
+        const CHUNK_SIZE = 50;
+
+        // Pre-fetch existing products for change detection
+        const ids = products.filter(p => p && p.id).map(p => p.id);
+        let existingMap = {};
+        if (ids.length > 0) {
+            try {
+                const placeholders = ids.map(() => '?').join(',');
+                const rows = await getQuery(`SELECT * FROM products WHERE id IN (${placeholders}) AND store_id = ?`, [...ids, sid]);
+                rows.forEach(r => { existingMap[r.id] = r; });
+            } catch(e) {}
+        }
+
+        const batchChanges = [];
         for (let i = 0; i < products.length; i += CHUNK_SIZE) {
             const chunk = products.slice(i, i + CHUNK_SIZE);
             const validChunk = chunk.filter(p => p && p.id);
             if (validChunk.length === 0) continue;
-            
-            const placeholders = validChunk.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(',');
+
             const values = [];
             validChunk.forEach(p => {
                 values.push(
-                    p.id,
-                    sid,
+                    p.id, sid,
                     p.name, 
                     typeof p.category === 'object' ? JSON.stringify(p.category) : p.category, 
                     p.priceUSD || p.price || 0, 
@@ -457,18 +609,87 @@ const api = {
                     p.description || '',
                     p.img || '',
                     p.barcode || '',
-                    JSON.stringify(p.flavorBarcodes || {})
+                    JSON.stringify(p.flavorBarcodes || {}),
+                    JSON.stringify(p.presentations || []),
+                    JSON.stringify(p.composite || { enabled: false, items: [] }),
+                    JSON.stringify(p.variants || []),
+                    p.points || 0
                 );
+
+                // Detect changes
+                const existing = existingMap[p.id];
+                const tracked = ['name', 'priceUSD', 'priceVES', 'priceEUR', 'costPrice', 'stock', 'minStock', 'featured'];
+                for (const field of tracked) {
+                    const oldVal = existing ? String(existing[field] ?? '') : '';
+                    const newVal = String(p[field] ?? '');
+                    if (oldVal !== newVal) {
+                        batchChanges.push({
+                            id: 'chg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                            store_id: sid,
+                            product_id: p.id,
+                            field,
+                            old_value: oldVal,
+                            new_value: newVal,
+                            action: existing ? 'update' : 'create',
+                            cashier_name: cashier,
+                            timestamp: now
+                        });
+                    }
+                }
             });
+
+            const ph = validChunk.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(',');
             await runQuery(
-                `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes) VALUES ${placeholders}`,
+                `INSERT OR REPLACE INTO products (id, store_id, name, category, priceUSD, priceVES, priceEUR, costPrice, stock, minStock, featured, flavors, expiryDate, description, img, barcode, flavorBarcodes, presentations, composite, variants, points) VALUES ${ph}`,
                 values
             );
         }
+
+        // Log all detected changes asynchronously
+        if (batchChanges.length > 0) {
+            const chValues = [];
+            batchChanges.forEach(c => {
+                chValues.push(c.id, c.store_id, c.product_id, c.field, c.old_value, c.new_value, c.action, c.cashier_name, c.timestamp);
+            });
+            const ph2 = batchChanges.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(',');
+            runQuery(
+                `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES ${ph2}`,
+                chValues
+            ).catch(e => console.error('[DB] Error logueando cambios batch:', e));
+        }
+
         return { success: true };
     },
     
-    deleteProduct: (storeId, id) => runQuery(`DELETE FROM products WHERE id = ? AND store_id = ?`, [id, storeId || '']),
+    deleteProduct: (storeId, id, cashier_name) => {
+        const sid = storeId || '';
+        const now = new Date().toISOString();
+        const cashier = cashier_name || 'system';
+        // Log the deletion
+        const changeId = 'chg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        runQuery(
+            `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [changeId, sid, id, '*', 'active', 'deleted', 'delete', cashier, now]
+        ).catch(e => {});
+        return runQuery(`UPDATE products SET deleted_at = ? WHERE id = ? AND store_id = ?`, [now, id, sid]);
+    },
+
+    restoreProduct: (storeId, id, cashier_name) => {
+        const sid = storeId || '';
+        const now = new Date().toISOString();
+        const cashier = cashier_name || 'system';
+        const changeId = 'chg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        runQuery(
+            `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [changeId, sid, id, '*', 'deleted', 'active', 'restore', cashier, now]
+        ).catch(e => {});
+        return runQuery(`UPDATE products SET deleted_at = NULL WHERE id = ? AND store_id = ?`, [id, sid]);
+    },
+
+    getDeletedProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND deleted_at IS NOT NULL AND deleted_at != '' ORDER BY deleted_at DESC`, [storeId || '']),
+
+    deleteProductPermanent: (storeId, id) => runQuery(`DELETE FROM products WHERE id = ? AND store_id = ?`, [id, storeId || '']),
+    deleteAllProducts: (storeId) => runQuery(`UPDATE products SET deleted_at = ? WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [new Date().toISOString(), storeId || '']),
 
     // --- INGREDIENTES ---
     getIngredients: (storeId) => getQuery(`SELECT * FROM ingredients WHERE store_id = ?`, [storeId || '']),
@@ -567,10 +788,35 @@ const api = {
         return { success: true };
     },
 
+    // --- USUARIOS ---
+    getUsers: async (storeId) => {
+        if (storeId) { return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE store_id = ? ORDER BY name ASC`, [storeId]); }
+        return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users ORDER BY name ASC`);
+    },
+    getUser: async (storeId, username) => {
+        return getQuery(`SELECT * FROM users WHERE store_id = ? AND username = ? AND active = 1`, [storeId || '', username]).then(r => r[0] || null);
+    },
+    getUserById: async (storeId, userId) => {
+        return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE store_id = ? AND id = ?`, [storeId || '', userId]).then(r => r[0] || null);
+    },
+    saveUser: async (storeId, user) => {
+        const sid = storeId || '';
+        return runQuery(
+            `INSERT OR REPLACE INTO users (id, store_id, username, password_hash, salt, role, name, phone, document, photo, active, created_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [user.id, sid, user.username, user.password_hash, user.salt, user.role, user.name, user.phone || '', user.document || '', user.photo || '', user.active ? 1 : 0, user.created_at || new Date().toISOString(), user.last_login || null]
+        );
+    },
+    deleteUser: async (storeId, userId) => {
+        return runQuery(`DELETE FROM users WHERE id = ? AND store_id = ?`, [userId, storeId || '']);
+    },
+    updateUserLastLogin: async (storeId, userId) => {
+        return runQuery(`UPDATE users SET last_login = ? WHERE id = ? AND store_id = ?`, [new Date().toISOString(), userId, storeId || '']);
+    },
+
     // --- CRÉDITOS ---
     getCredits: async (storeId) => {
         return getQuery(`
-            SELECT c.*, cl.name as client_name, cl.document as client_document, s.total as sale_total, s.id as sale_ticket
+            SELECT c.*, cl.name as client_name, cl.document as client_document, s.total as sale_total, s.id as sale_ticket, s.items as sale_items
             FROM credits c
             LEFT JOIN clients cl ON c.client_id = cl.id AND c.store_id = cl.store_id
             LEFT JOIN sales s ON c.sale_id = s.id AND c.store_id = s.store_id
@@ -599,6 +845,26 @@ const api = {
     migrateData: async (storeId, data) => {
         const sid = storeId || '';
         console.log(`[DATABASE] Iniciando migración para tenant: ${sid}`);
+        // Backup automático antes de migrar
+        try {
+            const dbDir2 = _dbPath ? path.dirname(_dbPath) : '';
+            if (_dbPath && fs.existsSync(_dbPath)) {
+                const backupDir = path.join(dbDir2, 'backups');
+                if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+                const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+                const backupPath = path.join(backupDir, `freshpos_pre_migrate_${dateStr}.sqlite`);
+                fs.copyFileSync(_dbPath, backupPath);
+                console.log(`[DATABASE] Backup pre-migración creado: ${backupPath}`);
+                const files = fs.readdirSync(backupDir).filter(f => f.startsWith('freshpos_pre_migrate_'));
+                if (files.length > 5) {
+                    files.sort().slice(0, files.length - 5).forEach(f => {
+                        try { fs.unlinkSync(path.join(backupDir, f)); } catch(e) {}
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('[DATABASE] Error en backup pre-migración:', e);
+        }
         if (data.products) {
             for (const p of data.products) {
                 const pUSD = p.priceUSD || (p.price && !p.priceVES ? p.price : 0);
