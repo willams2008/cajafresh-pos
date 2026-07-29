@@ -3036,7 +3036,7 @@ window.editProduct = (id) => {
     setTimeout(() => { modal.classList.add('modal-fade-in'); document.getElementById('product-modal-content').classList.add('modal-scale-in'); }, 10);
 
     if (window.db && window.db.getProductChanges) {
-        window.db.getProductChanges(null, id, 10).then(changes => {
+        window.db.getProductChanges(_getStoreId(), id, 10).then(changes => {
             renderProductChanges(id, changes);
         }).catch(() => {});
     }
@@ -3094,7 +3094,7 @@ window.showFullProductHistory = async function() {
     setTimeout(() => { modal.classList.add('modal-fade-in'); document.getElementById('product-history-modal').querySelector('.pointer-events-auto')?.classList.add('modal-scale-in'); }, 10);
 
     try {
-        const changes = await window.db.getProductChanges(null, pid, 500);
+        const changes = await window.db.getProductChanges(_getStoreId(), pid, 500);
         if (!changes || changes.length === 0) {
             list.innerHTML = '<div class="text-center text-slate-400 py-8"><i class="fas fa-inbox text-3xl mb-2"></i><p>Sin cambios registrados</p></div>';
             return;
@@ -3150,6 +3150,9 @@ window.deleteProduct = (id) => {
     Swal.fire({ title: '¿Eliminar?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' }).then((res) => {
 
         if (res.isConfirmed) {
+            if (window.db && window.db.deleteProduct) {
+                window.db.deleteProduct(id).catch(e => console.error('[DB] Error soft-delete:', e));
+            }
             products = products.filter(p => p.id !== id);
             saveProducts(); renderInventory(); renderProducts();
         }
@@ -3790,6 +3793,7 @@ function processPayment() {
             observations: document.getElementById('checkout-observations').value.trim(),
             totalUSD: currentTotalUSD,
             totalVES: currentTotalVES,
+            totalEUR: currentTotalUSD * ((settings.euroRate && settings.exchangeRate) ? (settings.exchangeRate / settings.euroRate) : 0.94),
             exchangeRate: settings.exchangeRate,
             totalCostUSD: cart.reduce((acc, item) => {
                 const prod = products.find(p => p.id === item.id || p.id === item.parentId);
@@ -8866,7 +8870,7 @@ function _calcCierreTotals() {
     });
     const er = settings.exchangeRate || 50;
     const totalUSD = usd + (ves / er) + (card / er) + (pm / er) + (transfer / er) + eur;
-    const totalVES = ves + card + pm + transfer;
+    const totalVES = ves + card + pm + transfer + (eur * (settings.euroRate || er));
     return { usd, ves, eur, card, pm, transfer, totalUSD, totalVES, txCount };
 }
 

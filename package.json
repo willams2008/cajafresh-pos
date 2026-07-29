@@ -1,6 +1,6 @@
 {
   "name": "puntopila-pos",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Sistema POS Punto Pila - Gestión Inteligente",
   "main": "main.js",
   "scripts": {
