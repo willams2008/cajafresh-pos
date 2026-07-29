@@ -204,6 +204,44 @@
             #sidebar-toggle-btn.collapsed { left: 0; }
         }
         canvas { display: none; }
+
+        #cart-sidebar.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            flex: 0 0 0 !important;
+            overflow: hidden;
+            border: none;
+            padding: 0;
+        }
+        @media (max-width: 900px) {
+            #cart-sidebar:not(.collapsed) { width: 280px !important; }
+            .products-grid-area { padding: 12px !important; }
+        }
+        @media (max-width: 768px) {
+            #cart-sidebar:not(.collapsed) { width: 260px !important; }
+        }
+
+        @keyframes welcomeSlideUp {
+            0%{opacity:0;transform:translateY(20px)}
+            100%{opacity:1;transform:translateY(0)}
+        }
+        #welcome-step-2.welcome-enter > .bg-white,
+        #welcome-step-3.welcome-enter > .bg-white {
+            animation: welcomeSlideUp 0.4s ease-out;
+        }
+
+        .variant-card {
+            transition: box-shadow 0.2s;
+        }
+        .variant-card:hover {
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
+        }
+        .variant-body-open .variant-arrow {
+            transform: rotate(180deg);
+        }
+        .accordion-header-open #composite-arrow {
+            transform: rotate(180deg);
+        }
 </style>
 </head>
 
@@ -217,6 +255,103 @@
                 Punto<span class="text-brand-600">Pila</span>
             </h1>
             <p class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 opacity-80">Cargando Sistema POS...</p>
+        </div>
+    </div>
+
+    <!-- Activation Overlay (Code Entry) -->
+    <div id="activation-overlay" class="hidden fixed inset-0 z-[9999] bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
+                <div class="text-center mb-6">
+                    <div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+                        <i class="fas fa-key text-brand-500"></i>
+                    </div>
+                    <h2 class="text-lg font-black text-slate-800 dark:text-white">Activar este Equipo</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ingresa tu código de membresía</p>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" id="activation-code-input" placeholder="Código de Membresía" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all text-center text-lg uppercase tracking-widest" maxlength="30" autocomplete="off">
+                    <div id="activation-error" class="hidden text-center text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2"></div>
+                </div>
+                <button id="activation-activate-btn" class="w-full mt-5 py-3.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-black text-sm shadow-lg shadow-brand-500/30 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-unlock-alt"></i> Activar
+                </button>
+                <p class="text-center text-[10px] text-slate-400 mt-4">¿No tienes código? Contacta a tu proveedor</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss Registration Wizard (after valid code) -->
+    <div id="boss-wizard-overlay" class="hidden fixed inset-0 z-[9999] bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6">
+                <div class="text-center mb-6">
+                    <div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                        <i class="fas fa-crown text-amber-500"></i>
+                    </div>
+                    <h2 class="text-lg font-black text-slate-800 dark:text-white">Registro del Jefe</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Completa tus datos para configurar el POS</p>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" id="boss-name-input" placeholder="Nombre completo" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all">
+                    <input type="text" id="boss-phone-input-welcome" placeholder="Teléfono (Ej: 584141234567)" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all">
+                    <input type="text" id="boss-ci-input" placeholder="Cédula de Identidad (Ej: V-12345678)" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all">
+                    <input type="text" id="boss-device-name-input" placeholder="Nombre de este equipo (Ej: Caja Principal)" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all">
+                </div>
+                <button id="boss-save-btn" class="w-full mt-5 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-check"></i> Guardar y Comenzar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Block Overlay (Deactivated / Trial Expired) -->
+    <div id="block-overlay" class="hidden fixed inset-0 z-[99999] bg-slate-900/95 flex items-center justify-center p-4">
+        <div class="w-full max-w-sm text-center">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 shadow-lg shadow-red-500/30 flex items-center justify-center">
+                <i class="fas fa-shield-halved text-2xl text-white"></i>
+            </div>
+            <h2 class="text-xl font-black text-white mb-2" id="block-title">SISTEMA BLOQUEADO</h2>
+            <p class="text-sm text-slate-400 mb-6" id="block-message">Esta PC no está autorizada. Contacta al administrador.</p>
+            <div class="bg-slate-800/50 rounded-2xl p-4 mb-6">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">ID del equipo</p>
+                <p class="text-sm font-mono text-slate-300 break-all" id="block-machine-id">—</p>
+            </div>
+            <p class="text-xs text-slate-600">Contacta a tu proveedor con este ID para reactivar.</p>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="hidden fixed inset-0 z-[9998] bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-black tracking-tighter text-slate-900 dark:text-white mb-1">
+                    Punto<span class="text-brand-600">Pila</span>
+                </h1>
+                <p id="login-subtitle" class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Sistema Inteligente POS</p>
+                <p id="login-business-name" class="text-sm font-black text-brand-600 mt-1 hidden"></p>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Usuario</label>
+                    <input type="text" id="login-username" autocomplete="username" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all" placeholder="Ingresa tu usuario">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Contraseña</label>
+                    <input type="password" id="login-password" autocomplete="current-password" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all" placeholder="Ingresa tu contraseña">
+                </div>
+                <p id="login-error" class="text-rose-500 text-xs font-bold hidden"></p>
+                <button id="login-btn" class="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-black text-sm shadow-lg shadow-brand-500/30 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Iniciar Sesión
+                </button>
+                <button id="forgot-password-btn" class="w-full py-2.5 rounded-xl bg-transparent hover:bg-slate-50 text-slate-400 hover:text-brand-600 font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 border border-slate-100 hover:border-brand-200">
+                    <i class="fas fa-key text-[10px]"></i>
+                    Olvidé mi contraseña
+                </button>
+                <p class="text-center text-[10px] text-slate-400">Sin conexión a internet? <button onclick="skipLogin()" class="text-brand-500 hover:text-brand-600 font-bold">Acceso sin conexión</button></p>
+            </div>
+            <div id="login-version" class="text-center mt-4 text-[10px] text-slate-400 font-medium"></div>
         </div>
     </div>
 
@@ -395,6 +530,13 @@
             </nav>
         </div>
 
+        <!-- License Status Indicator -->
+        <div id="license-status-indicator" class="hidden lg:flex items-center gap-2 px-4 py-2 mx-2 mb-0 rounded-lg bg-slate-50 border border-slate-200 cursor-default">
+            <i id="license-status-icon" class="fas fa-circle text-[8px] text-emerald-500"></i>
+            <span id="license-status-text" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex-1">Licencia Activa</span>
+            <span id="license-status-sub" class="text-[9px] text-slate-400">—</span>
+        </div>
+
         <div class="hidden lg:block shrink-0 bg-white border-t border-slate-100 dark:bg-slate-900 dark:border-slate-800">
             <div class="p-3 space-y-2">
                 <!-- USD siempre visible + toggle en misma fila -->
@@ -448,6 +590,9 @@
                         <p class="text-[9px] text-slate-400 dark:text-slate-500 truncate" id="auto-close-indicator">Auto Cierre 18:15</p>
                     </div>
                 </div>
+                <button onclick="logoutUser()" title="Cerrar sesión" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-400 hover:text-rose-500 transition-all text-xs">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
             </div>
         </div>
     </aside>
@@ -540,103 +685,78 @@
 
                 <!-- Product Grid -->
                 <div class="flex-1 overflow-y-auto p-6 scroll-smooth custom-scrollbar">
-                    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 pb-20" id="products-grid">
+                    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 pb-20" id="products-grid">
                         <!-- JS renders here -->
                     </div>
                 </div>
             </div>
 
             <!-- Cart Sidebar -->
-            <aside
-                class="w-[340px] lg:w-[400px] bg-white shadow-2xl flex flex-col z-20 border-l border-slate-200 flex-shrink-0">
-                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-lg flex items-center">
-                            <i class="fas fa-shopping-cart text-brand-500 mr-2"></i> Orden Actual
-                        </h3>
-                        <p class="text-xs text-slate-500 font-medium mt-1" id="order-number-display">Ticket #0001</p>
+            <aside id="cart-sidebar"
+                class="w-[280px] md:w-[320px] lg:w-[400px] bg-white shadow-2xl flex flex-col z-20 border-l border-slate-200 flex-shrink-0 transition-all duration-300">
+                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 cursor-pointer select-none shrink-0" id="cart-sidebar-header" onclick="toggleCartSidebar()" title="Plegar/Expandir carrito">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <i class="fas fa-shopping-cart text-brand-500"></i>
+                        <span class="font-bold text-slate-800 text-lg truncate sidebar-header-text">Orden Actual</span>
+                        <span class="text-[10px] text-slate-500 font-medium mt-0.5 sidebar-header-text" id="order-number-display">#0001</span>
                     </div>
-                    <button id="clear-cart-btn"
-                        class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                        title="Vaciar Carrito">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </div>
-
-                <!-- Cuentas Abiertas (Tabs) -->
-                <div id="cuentas-bar" class="px-3 py-2 border-b border-slate-100 bg-slate-50/80">
-                    <div class="flex items-center justify-between mb-2">
-                        <button id="toggle-cuentas-btn" class="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-brand-600 transition-colors">
-                            <i class="fas fa-layer-group text-brand-500"></i> Cuentas <span id="cuentas-count-badge" class="bg-brand-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black ml-1 hidden">0</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button id="clear-cart-btn"
+                            class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                            title="Vaciar Carrito" onclick="event.stopPropagation()">
+                            <i class="fas fa-trash-alt"></i>
                         </button>
-                        <div class="flex gap-1">
-                            <button id="save-cuenta-btn" class="w-7 h-7 rounded-lg bg-brand-50 text-brand-500 hover:bg-brand-100 flex items-center justify-center transition-all text-xs" title="Guardar orden como cuenta">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="cuentas-list" class="hidden space-y-1.5 max-h-[180px] overflow-y-auto custom-scrollbar transition-all">
-                        <!-- JS renders tabs here -->
-                        <div id="cuentas-empty" class="text-center py-3 text-[10px] text-slate-400 font-bold uppercase">Sin cuentas abiertas</div>
+                        <i class="fas fa-chevron-down text-slate-400 transition-transform duration-300" id="cart-sidebar-arrow"></i>
                     </div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30" id="cart-items">
-                    <!-- JS renders cart here -->
-                </div>
-
-                <div class="bg-white border-t border-slate-200 p-6 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-10">
-                    <div class="mb-4 space-y-3">
-                        <!-- Descuento Panel -->
-                        <div class="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><i class="fas fa-tag"></i> Descuento</span>
-                            <div class="flex items-center gap-1 max-w-[120px]">
-                                <input type="number" id="cart-discount-input" min="0" step="0.01" class="w-full bg-transparent border-none text-slate-700 dark:text-white font-bold p-0 focus:ring-0 outline-none text-xs text-right" placeholder="0.00" value="0">
-                                <select id="cart-discount-type" class="bg-transparent border-none text-slate-500 font-black p-0 focus:ring-0 outline-none text-xs cursor-pointer">
-                                    <option value="usd">$</option>
-                                    <option value="percent">%</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Desglose de Facturación (Subtotal, Descuento Aplicado, IVA) -->
-                        <div class="px-6 py-2.5 bg-slate-50 dark:bg-slate-900/40 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-2">
-                             <div class="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
-                                 <span class="font-bold uppercase tracking-wider text-[9px]">Subtotal</span>
-                                 <span id="cart-subtotal" class="font-black">$0.00</span>
-                             </div>
-                             <div id="cart-discount-row" class="flex justify-between items-center text-xs text-rose-500 dark:text-rose-400 hidden">
-                                 <span class="font-bold uppercase tracking-wider text-[9px]">Descuento</span>
-                                 <span id="cart-discount-applied" class="font-black">-$0.00</span>
-                             </div>
-                             <div id="cart-tax-row" class="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 hidden">
-                                 <span class="font-bold uppercase tracking-wider text-[9px]" id="cart-tax-label">IVA (16%)</span>
-                                 <span id="cart-tax" class="font-black">$0.00</span>
-                             </div>
-                             <div class="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between items-center">
-                                 <span class="text-[11px] font-black text-slate-700 dark:text-white uppercase tracking-widest">TOTAL USD</span>
-                                 <span id="cart-total" class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">$0.00</span>
-                             </div>
-                        </div>
-                        
-                        <div class="px-6 py-1 space-y-3">
-                            <div class="flex justify-between items-center group">
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">BOLÍVARES (VES)</span>
-                                <span id="cart-total-ves" class="text-xl font-black text-brand-700 dark:text-brand-400">Bs 0.00</span>
-                            </div>
-                            <div class="flex justify-between items-center group">
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">EUROS (EUR)</span>
-                                <span id="cart-total-eur" class="text-xl font-black text-blue-700 dark:text-blue-400">0.00 €</span>
-                            </div>
-                        </div>
+                <div id="cart-sidebar-body" class="flex flex-col flex-1 overflow-hidden min-h-0">
+                    <div class="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30" id="cart-items">
+                        <!-- JS renders cart here -->
                     </div>
-                    <button id="show-checkout-btn"
-                        class="w-full bg-brand-600 hover:bg-brand-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-brand-500/30 transition-all flex justify-center items-center disabled:opacity-50 disabled:grayscale text-lg"
-                        disabled>
-                        Pagar Ahora <i class="fas fa-arrow-right ml-2 text-xl"></i>
-                    </button>
+
+                    <div class="bg-white border-t border-slate-200 shadow-[0_-8px_20px_-6px_rgba(0,0,0,0.08)] z-10 px-5 py-4 space-y-2">
+                        <!-- Totales -->
+                        <div class="px-4 py-3 bg-gradient-to-b from-slate-50 to-white rounded-2xl border border-slate-200/60 space-y-1.5">
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subtotal</span>
+                                <span id="cart-subtotal" class="text-sm font-bold text-slate-600">$0.00</span>
+                            </div>
+                            <div id="cart-discount-row" class="flex justify-between items-center py-0.5 hidden">
+                                <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Descuento</span>
+                                <span id="cart-discount-applied" class="text-sm font-bold text-rose-500">-$0.00</span>
+                            </div>
+                            <div id="cart-tax-row" class="flex justify-between items-center py-0.5 hidden">
+                                <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider" id="cart-tax-label">IVA (16%)</span>
+                                <span id="cart-tax" class="text-sm font-bold text-emerald-600">$0.00</span>
+                            </div>
+                            <div class="border-t border-slate-200 pt-2 mt-1 space-y-1.5">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">USD</span>
+                                    <span id="cart-total" class="text-base font-black text-slate-900">$0.00</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">VES</span>
+                                    <span id="cart-total-ves" class="text-base font-black text-brand-700">Bs 0,00</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">EUR</span>
+                                    <span id="cart-total-eur" class="text-base font-black text-blue-700">0,00 €</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="show-checkout-btn"
+                            class="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:grayscale disabled:shadow-none text-base active:scale-[0.98]"
+                            disabled>
+                            <span>Pagar Ahora</span>
+                            <i class="fas fa-arrow-right text-sm"></i>
+                        </button>
+                    </div>
                 </div>
             </aside>
+            <button id="cart-toggle-float" onclick="toggleCartSidebar()" class="fixed right-0 top-1/2 -translate-y-1/2 w-8 h-16 bg-white border border-brand-500 border-r-0 rounded-l-lg shadow-lg flex items-center justify-center z-30 cursor-pointer hover:bg-brand-50 transition-all hidden" title="Expandir carrito">
+                <i class="fas fa-shopping-cart text-brand-500 text-sm"></i>
+            </button>
         </section>
 
         <!-- === VISTA CLIENTES === -->
@@ -1360,6 +1480,14 @@
 
                 <!-- Sales Table -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+                        <h3 class="text-sm font-bold text-slate-700">Historial de Ventas</h3>
+                        <div class="relative flex-1 max-w-xs ml-auto">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="sales-search-input" placeholder="Buscar por ticket, cliente o método..." oninput="filterSalesTable(this.value)"
+                                class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all">
+                        </div>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse min-w-[600px]">
                             <thead>
@@ -2242,6 +2370,7 @@
                                 <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket</th>
                                 <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
                                 <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Items</th>
                                 <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Monto</th>
                                 <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Acciones</th>
                             </tr>
@@ -2665,6 +2794,20 @@
 
                     <div class="mt-8 pt-8 border-t border-slate-100">
                         <div class="flex items-center gap-4 mb-6">
+                            <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-xl">
+                                <i class="fas fa-users-cog"></i>
+                            </div>
+                            <h3 class="font-black text-slate-800">Usuarios del Sistema</h3>
+                        </div>
+                        <div id="users-management-container">
+                            <div class="text-center py-4 text-slate-400 text-sm">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Cargando usuarios...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 pt-8 border-t border-slate-100">
+                        <div class="flex items-center gap-4 mb-6">
                             <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl">
                                 <i class="fas fa-print"></i>
                             </div>
@@ -2696,6 +2839,19 @@
                             <span>WhatsApp Profesional (Envíos en Segundo Plano)</span>
                             <span id="wa-status-badge" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 text-[8px] font-bold uppercase transition-all">Buscando...</span>
                         </label>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Alertar cada N ventas</label>
+                                <input type="number" id="settings-wa-interval" min="0" max="100" value="0" class="w-full bg-slate-100 border-2 border-transparent rounded-2xl py-3 px-4 text-sm font-bold focus:bg-white focus:border-brand-500 transition-all outline-none" placeholder="0 = Desactivado">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Estado</label>
+                                <div class="w-full bg-slate-100 rounded-2xl py-3 px-4 text-sm font-bold text-slate-500 flex items-center gap-2">
+                                    <i class="fas fa-chart-line text-brand-500"></i>
+                                    <span id="wa-interval-status">Desactivado</span>
+                                </div>
+                            </div>
+                        </div>
                         <div id="wa-qr-container" class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[200px] transition-all">
                             <div id="wa-qr-placeholder" class="text-center">
                                 <i class="fas fa-qrcode text-4xl text-slate-300 mb-3"></i>
@@ -2764,6 +2920,22 @@
                         </div>
                     </div>
 
+                    <!-- Mantenimiento -->
+                    <div class="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200 mt-8">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-xl">
+                                <i class="fas fa-tools"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-black text-slate-800">Mantenimiento</h3>
+                                <p class="text-[10px] uppercase font-bold text-slate-400 mt-0.5 tracking-widest">Limpieza y gestión de datos locales</p>
+                            </div>
+                        </div>
+                        <button onclick="clearLocalProducts()" class="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-2xl transition-all shadow-lg shadow-rose-500/30 flex items-center gap-2 text-sm">
+                            <i class="fas fa-broom"></i> Limpiar Inventario Local
+                        </button>
+                        <p class="text-[10px] text-slate-400 mt-3 font-bold">Esto borra SOLO los productos de este equipo. Los datos en la nube (Supabase) no se ven afectados.</p>
+                    </div>
 
                     <!-- Túnel Cloudflare (Dominio Fijo) -->
                     <div class="bg-slate-900 p-8 rounded-[32px] shadow-sm border border-slate-700 mt-8 text-white">
@@ -3226,81 +3398,7 @@
             <!-- content -->
         </div>
 
-        <!-- === VISTA ARQUEO DE CAJA === -->
-        <section id="view-cashup" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
-            <header class="bg-white px-8 py-6 shadow-sm border-b border-emerald-100 shrink-0">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">Arqueo de Caja</h2>
-                    <p class="text-sm text-slate-500 mt-1">Cuadre diario: registra el efectivo en caja y verifica diferencias.</p>
-                </div>
-            </header>
-            <div class="p-8">
-                <!-- Resumen de Ventas -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Ventas USD</p>
-                        <p class="text-2xl font-black text-emerald-600" id="cashup-sales-usd">$0.00</p>
-                    </div>
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Ventas VES</p>
-                        <p class="text-2xl font-black text-brand-600" id="cashup-sales-ves">Bs 0</p>
-                    </div>
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Efectivo USD</p>
-                        <p class="text-2xl font-black text-emerald-600" id="cashup-cash-usd">$0.00</p>
-                    </div>
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Efectivo VES</p>
-                        <p class="text-2xl font-black text-brand-600" id="cashup-cash-ves">Bs 0</p>
-                    </div>
-                </div>
-
-                <!-- Formulario de Conteo -->
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 mb-8">
-                    <h3 class="font-black text-slate-700 mb-4">Conteo Físico de Caja</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Efectivo USD (billetes/monedas)</label>
-                            <input type="number" id="cashup-count-usd" step="0.01" value="0" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-lg font-black focus:border-emerald-500 outline-none transition-all">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">Efectivo VES (bolívares)</label>
-                            <input type="number" id="cashup-count-ves" step="0.01" value="0" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-lg font-black focus:border-brand-500 outline-none transition-all">
-                        </div>
-                    </div>
-                    <button onclick="calculateCashup()" class="mt-6 px-8 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-all shadow-lg shadow-brand-500/30">
-                        <i class="fas fa-calculator mr-2"></i> Calcular Diferencia
-                    </button>
-                    <div id="cashup-results" class="hidden mt-6 p-6 rounded-2xl border-2">
-                        <!-- Results injected here -->
-                    </div>
-                    <button onclick="saveCashup()" id="btn-save-cashup" class="mt-4 px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/30 hidden">
-                        <i class="fas fa-check mr-2"></i> Registrar Arqueo
-                    </button>
-                </div>
-
-                <!-- Historial de Arqueos -->
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-8 py-5 border-b border-slate-100">
-                        <h3 class="font-black text-slate-700">Historial de Arqueos</h3>
-                    </div>
-                    <table class="w-full text-left">
-                        <thead class="bg-slate-50/30">
-                            <tr>
-                                <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                                <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Efectivo USD</th>
-                                <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Efectivo VES</th>
-                                <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ventas USD</th>
-                                <th class="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Diferencia USD</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50" id="cashup-history-body">
-                            <!-- JS renders here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
+        <!-- === VISTA HISTORIAL (se integra en el modal de cierre) === -->
 
         <!-- === VISTA MOVIMIENTOS Y MERMA === -->
         <section id="view-movements" class="flex-1 flex flex-col h-full hidden opacity-0 transition-opacity duration-300 view-section bg-slate-50 absolute inset-0 w-full overflow-y-auto custom-scrollbar">
@@ -3492,210 +3590,197 @@
 
     <!-- Checkout Modal -->
     <div id="checkout-modal"
-        class="fixed inset-0 bg-slate-900/60 z-50 items-center justify-center p-4 hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col max-h-[92vh] overflow-hidden transform transition-all duration-300"
             id="checkout-modal-content">
 
-            <div class="px-8 py-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
-                <h3 class="font-bold text-2xl text-slate-800 dark:text-white">Pago</h3>
-                <button
-                    class="close-checkout-modal w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-300 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
+            <!-- === TOP: Total + Close === -->
+            <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-6 pt-6 pb-7 shrink-0 relative overflow-hidden">
+                <div class="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/5 blur-3xl"></div>
+                <div class="absolute -left-4 bottom-0 w-24 h-24 rounded-full bg-white/[0.03] blur-2xl"></div>
+                <button class="close-checkout-modal absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white/70 hover:text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-sm z-10">
+                    <i class="fas fa-times text-xs pointer-events-none"></i>
                 </button>
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                            <i class="fas fa-receipt text-white text-[10px]"></i>
+                        </div>
+                        <span class="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">PuntoPila POS</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-white/50 uppercase tracking-[0.2em] mt-3">Total a Pagar</p>
+                    <div class="text-5xl font-black text-white mt-0.5 tracking-tight drop-shadow-sm" id="checkout-total-display">$0.00</div>
+                    <div class="flex items-center gap-3 mt-2.5">
+                        <span class="text-sm font-semibold text-white/80" id="checkout-total-ves-display">Bs 0</span>
+                        <span class="w-1 h-1 rounded-full bg-white/30"></span>
+                        <span class="text-sm font-semibold text-white/80" id="checkout-total-eur-display">€0</span>
+                        <span class="w-1 h-1 rounded-full bg-white/30"></span>
+                        <span class="text-sm font-semibold text-amber-300" id="checkout-points-display"></span>
+                    </div>
+                </div>
             </div>
 
-            <div class="px-8 py-6 bg-slate-50 dark:bg-slate-900 flex-1 overflow-y-auto custom-scrollbar">
+            <!-- === FORM === -->
+            <div class="bg-white px-5 py-5 flex-1 overflow-y-auto custom-scrollbar space-y-4">
 
-                <!-- Desglose en Checkout -->
-                <div id="checkout-breakdown" class="mb-4 p-4 bg-slate-100/50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-1.5 text-xs text-slate-500 dark:text-slate-400 hidden">
-                    <div class="flex justify-between">
-                        <span class="font-bold uppercase tracking-wider text-[9px]">Subtotal:</span>
-                        <span id="checkout-subtotal-val" class="font-black text-slate-700 dark:text-slate-300">$0.00</span>
-                    </div>
-                    <div id="checkout-discount-row" class="flex justify-between text-rose-500 hidden">
-                        <span class="font-bold uppercase tracking-wider text-[9px]">Descuento:</span>
-                        <span id="checkout-discount-val" class="font-black">-$0.00</span>
-                    </div>
-                    <div id="checkout-tax-row" class="flex justify-between text-emerald-600 dark:text-emerald-400 hidden">
-                        <span class="font-bold uppercase tracking-wider text-[9px]" id="checkout-tax-label">IVA:</span>
-                        <span id="checkout-tax-val" class="font-black">$0.00</span>
+                <!-- Método de Pago -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Método de Pago</label>
+                    <div class="grid grid-cols-5 gap-2">
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-usd">
+                            <i class="fas fa-dollar-sign text-lg"></i>
+                            <span>USD</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-ves">
+                            <i class="fas fa-money-bill-wave text-lg"></i>
+                            <span>VES</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-eur">
+                            <i class="fas fa-euro-sign text-lg"></i>
+                            <span>EUR</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="card-ves">
+                            <i class="fas fa-credit-card text-lg"></i>
+                            <span>Punto</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="pago-movil">
+                            <i class="fas fa-mobile-alt text-lg"></i>
+                            <span>P.Móvil</span>
+                        </button>
                     </div>
                 </div>
 
-                <div
-                    class="grid grid-cols-3 gap-2 mb-4 bg-brand-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 p-2.5 rounded-2xl shadow-inner">
-                    <div class="text-left pl-1">
-                        <p class="text-slate-400 font-bold text-[8px] uppercase tracking-widest mb-0.5">USD</p>
-                        <div class="text-lg font-black text-slate-800 dark:text-white" id="checkout-total-display">$0.00</div>
-                    </div>
-                    <div class="text-center border-x border-slate-200 dark:border-slate-600">
-                        <p class="text-brand-500 font-bold text-[8px] uppercase tracking-widest mb-0.5">VES</p>
-                        <div class="text-lg font-black text-slate-800 dark:text-white" id="checkout-total-ves-display">Bs 0</div>
-                    </div>
-                    <div class="text-right pr-1">
-                        <p class="text-blue-500 font-bold text-[8px] uppercase tracking-widest mb-0.5">EUR</p>
-                        <div class="text-lg font-black text-slate-600 dark:text-slate-300" id="checkout-total-eur-display">0 €</div>
-                    </div>
-                </div>
-
-                <!-- Mixed Payments List -->
-                <div id="mixed-payments-list" class="mb-4 space-y-2 empty:hidden">
-                    <!-- Pagos añadidos se listarán aquí -->
-                </div>
-                
-                <div id="mixed-remaining-container" class="mb-6 p-4 rounded-2xl bg-amber-50 border-2 border-amber-100 flex justify-between items-center transition-all duration-300 hidden">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white shadow-sm">
-                            <i class="fas fa-balance-scale"></i>
-                        </div>
-                        <p class="text-amber-700 text-xs font-black uppercase tracking-widest">Saldo Restante</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xl font-black text-amber-600 tracking-tight" id="checkout-remaining-usd">$0.00</div>
-                        <div class="text-[10px] font-bold text-amber-500" id="checkout-remaining-ves">Eq: Bs 0.00</div>
-                    </div>
-                </div>
-
-                <!-- Payment Symbols Selector -->
-                <div class="flex justify-center gap-6 mb-8">
-                    <button
-                        class="payment-tab w-16 h-16 rounded-full border-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-emerald-400 hover:text-emerald-500 active:scale-95 transition-all flex items-center justify-center shadow-sm"
-                        data-method="cash-usd" title="Dólares">
-                        <i class="fas fa-dollar-sign text-2xl"></i>
-                    </button>
-                    <button
-                        class="payment-tab w-16 h-16 rounded-full border-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-brand-400 hover:text-brand-500 active:scale-95 transition-all flex items-center justify-center shadow-sm"
-                        data-method="cash-ves" title="Bolívares">
-                        <i class="fas fa-money-bill-wave text-2xl"></i>
-                    </button>
-                    <button
-                        class="payment-tab w-16 h-16 rounded-full border-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-blue-400 hover:text-blue-500 active:scale-95 transition-all flex items-center justify-center shadow-sm"
-                        data-method="cash-eur" title="Euros">
-                        <i class="fas fa-euro-sign text-2xl"></i>
-                    </button>
-                    <button
-                        class="payment-tab w-16 h-16 rounded-full border-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-brand-400 hover:text-brand-500 active:scale-95 transition-all flex items-center justify-center shadow-sm"
-                        data-method="card-ves" title="Punto de Venta">
-                        <i class="fas fa-credit-card text-2xl"></i>
-                    </button>
-                    <button
-                        class="payment-tab w-16 h-16 rounded-full border-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:border-purple-400 hover:text-purple-500 active:scale-95 transition-all flex items-center justify-center shadow-sm"
-                        data-method="pago-movil" title="Pago Móvil">
-                        <i class="fas fa-mobile-alt text-2xl"></i>
-                    </button>
-                </div>
-
-                <!-- Dynamic Info Container (Hidden until symbol pressed) -->
-                <div id="payment-details-container" class="hidden reveal-enter">
+                <!-- Monto + Cambio -->
+                <div id="payment-details-container" class="hidden space-y-3">
                     <div id="cash-section">
-                        <div class="mb-5 flex gap-2 items-end">
+                        <div class="flex gap-3 items-end">
                             <div class="flex-1">
-                                <label class="block text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest mb-3"
-                                    id="label-amount-received">Monto a Pagar</label>
-                                <div class="relative group">
+                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5" id="label-amount-received">Monto Recibido</label>
+                                <div class="relative">
                                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <span class="text-slate-400 dark:text-slate-500 font-black text-2xl"
-                                            id="currency-input-symbol">$</span>
+                                        <span class="text-brand-600 font-black text-lg" id="currency-input-symbol">$</span>
                                     </div>
-                                    <input type="number" step="0.01" id="amount-received"
-                                        class="block w-full pl-12 pr-4 py-5 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-3xl text-3xl font-black text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-600 focus:border-brand-500 dark:focus:border-brand-500 focus:ring-0 transition-all outline-none"
-                                        placeholder="0.00">
-                                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center">
-                                        <button onclick="document.getElementById('amount-received').value = ''; validatePayment();" 
-                                            class="text-slate-300 hover:text-red-500 transition-colors">
-                                            <i class="fas fa-times-circle text-xl"></i>
-                                        </button>
-                                    </div>
+                                    <input type="number" step="0.01" id="amount-received" class="block w-full pl-10 pr-4 py-3.5 bg-white border-2 border-slate-200 focus:border-brand-500 rounded-2xl text-2xl font-black text-slate-800 placeholder-slate-300 outline-none transition-all" placeholder="0.00">
                                 </div>
                             </div>
-                            <button id="add-payment-btn" class="h-[76px] px-6 bg-brand-100 hover:bg-brand-200 text-brand-600 rounded-3xl font-black transition-all flex flex-col items-center justify-center shrink-0 border-2 border-brand-200" title="Añadir Pago Parcial">
-                                <i class="fas fa-plus text-xl mb-1"></i>
-                                <span class="text-[9px] uppercase tracking-widest">Añadir</span>
+                            <button id="add-payment-btn" class="h-14 w-14 flex items-center justify-center bg-brand-50 hover:bg-brand-500 text-brand-600 hover:text-white rounded-2xl transition-all duration-200 shrink-0 border-2 border-brand-100 hover:border-brand-500" title="Pago Parcial">
+                                <i class="fas fa-plus text-xl"></i>
                             </button>
                         </div>
-
-                        <div id="change-container"
-                            class="mb-6 p-5 rounded-3xl bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 flex justify-between items-center transition-all duration-300">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-sm">
-                                    <i class="fas fa-hand-holding-dollar text-brand-500"></i>
-                                </div>
-                                <p class="text-slate-500 dark:text-slate-400 text-xs font-black uppercase tracking-widest">Cambio/Vuelto</p>
-                            </div>
+                        <div id="change-container" class="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-100 transition-all duration-300 mt-2">
+                            <span class="text-xs font-bold text-emerald-700 uppercase tracking-widest">Cambio</span>
                             <div class="text-right">
-                                <div class="text-2xl font-black text-slate-800 dark:text-white tracking-tight"
-                                    id="checkout-change">$0.00</div>
-                                <div class="text-[11px] font-bold text-slate-400" id="checkout-change-secundary">Eq: Bs 0.00
-                                </div>
+                                <div class="text-xl font-black text-emerald-600" id="checkout-change">$0.00</div>
+                                <div class="text-xs font-bold text-emerald-600/60" id="checkout-change-secundary"></div>
                             </div>
                         </div>
                     </div>
-
-                    <div id="card-section" class="hidden mb-8 p-6 rounded-3xl bg-brand-50 dark:bg-brand-900/10 border-2 border-brand-100 dark:border-brand-900/30 text-center">
-                        <div class="w-16 h-16 bg-brand-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/30">
-                            <i class="fas fa-credit-card text-white text-2xl"></i>
-                        </div>
-                        <p class="text-brand-600 dark:text-brand-400 text-xs font-black uppercase tracking-widest mb-1">Monto a Cobrar en Punto</p>
-                        <h4 class="text-3xl font-black text-brand-700 dark:text-brand-300" id="tpv-amount-bs">Bs 0.00</h4>
-                        <p class="text-[10px] text-brand-400 mt-2 italic font-medium">Procese el pago en el terminal bancario.</p>
+                    <div id="card-section" class="hidden bg-brand-50 rounded-2xl border-2 border-brand-100 p-4 text-center">
+                        <p class="text-brand-600 text-xs font-bold uppercase tracking-widest mb-1">Monto en Punto</p>
+                        <div class="text-xl font-black text-brand-700" id="tpv-amount-bs">Bs 0.00</div>
+                        <p class="text-[10px] text-brand-400 mt-1">Procese en el terminal bancario.</p>
                     </div>
-
-                    <!-- Pago Movil Inputs (Visible only when Pago Movil selected) -->
-                    <div id="pm-extra-fields" class="hidden space-y-4 mb-6 p-5 bg-purple-50 dark:bg-purple-900/10 border-2 border-purple-100 dark:border-purple-900/30 rounded-3xl animate-fade-in">
-                        <div class="flex items-center gap-2 mb-2">
-                             <div class="w-2 h-2 rounded-full bg-purple-500"></div>
-                             <span class="text-[10px] font-black uppercase tracking-widest text-purple-600 dark:text-purple-400">Datos de Verificación</span>
-                        </div>
+                    <div id="pm-extra-fields" class="hidden bg-purple-50 rounded-2xl border-2 border-purple-100 p-4 space-y-3">
+                        <p class="text-xs font-bold uppercase tracking-widest text-purple-600">Verificación</p>
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 ml-1">Cédula Titular</label>
-                                <input type="text" id="pm-id" placeholder="V-12345678" class="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-purple-100 dark:border-slate-700 rounded-xl text-sm font-bold focus:border-purple-500 outline-none transition-all dark:text-white">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 ml-1">Teléfono Pago</label>
-                                <input type="text" id="pm-phone" placeholder="0414..." class="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-purple-100 dark:border-slate-700 rounded-xl text-sm font-bold focus:border-purple-500 outline-none transition-all dark:text-white">
-                            </div>
+                            <input type="text" id="pm-id" placeholder="Cédula" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold focus:border-purple-500 outline-none transition-all text-slate-700">
+                            <input type="text" id="pm-phone" placeholder="Teléfono" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold focus:border-purple-500 outline-none transition-all text-slate-700">
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1 ml-1">Últimos 4 de Referencia</label>
-                            <input type="text" id="pm-ref" placeholder="Ej: 9876" maxlength="4" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-purple-100 dark:border-slate-700 rounded-xl text-lg font-black tracking-[0.5em] text-center focus:border-purple-500 outline-none transition-all dark:text-white">
+                        <input type="text" id="pm-ref" placeholder="Ref. últimos 4" maxlength="4" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-base font-black tracking-[0.5em] text-center focus:border-purple-500 outline-none transition-all text-slate-700">
+                    </div>
+                </div>
+
+                <!-- Mixed Payments -->
+                <div id="mixed-payments-list" class="space-y-1.5 empty:hidden"></div>
+                <div id="mixed-remaining-container" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-amber-50 border-2 border-amber-200 hidden">
+                    <span class="text-xs font-bold text-amber-700">Saldo Restante</span>
+                    <span class="text-base font-black text-amber-600" id="checkout-remaining-usd">$0.00</span>
+                </div>
+
+                <!-- Cobrar -->
+                <button id="confirm-payment-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 active:scale-[0.98] text-white font-black text-base transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-brand-600/20" disabled>
+                    <i class="fas fa-check-circle text-lg"></i>
+                    Cobrar
+                </button>
+
+                <!-- Exacto + Fiado -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="exact-change-btn" class="py-3.5 rounded-2xl bg-transparent hover:bg-slate-50 text-slate-500 font-bold text-sm transition-all border-2 border-dashed border-slate-200 hover:border-amber-300 hover:text-amber-600 flex items-center justify-center gap-2">
+                        <i class="fas fa-bolt text-amber-400 text-sm"></i>
+                        Exacto
+                    </button>
+                    <button id="fiao-payment-btn" class="py-3.5 rounded-2xl bg-transparent hover:bg-amber-50 text-amber-700 font-bold text-sm transition-all border-2 border-dashed border-amber-200 hover:border-amber-400 flex items-center justify-center gap-2">
+                        <i class="fas fa-hand-holding-dollar text-sm"></i>
+                        Fiado
+                    </button>
+                </div>
+
+                <!-- Extras row -->
+                <div class="grid grid-cols-4 gap-2">
+                    <button class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-brand-50 text-slate-500 hover:text-brand-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-brand-200" onclick="toggleCuentas()">
+                        <i class="fas fa-layer-group text-brand-500 text-base"></i>
+                        Cuentas
+                        <span id="cuentas-count-badge" class="bg-brand-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black leading-none hidden -mt-1">0</span>
+                    </button>
+                    <button class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-rose-200" onclick="toggleDescuento()">
+                        <i class="fas fa-tag text-rose-400 text-base"></i>
+                        Descuento
+                    </button>
+                    <button id="save-cuenta-btn" class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-brand-50 text-slate-500 hover:text-brand-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-brand-200" onclick="event.stopPropagation(); saveCurrentAsCuenta();">
+                        <i class="fas fa-plus text-brand-500 text-base"></i>
+                        Guardar
+                    </button>
+                    <button class="close-checkout-modal flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-500 transition-all text-[10px] font-bold border border-slate-100 hover:border-red-200">
+                        <i class="fas fa-times text-slate-400 text-base"></i>
+                        Cancelar
+                    </button>
+                </div>
+
+                <!-- Cuentas content -->
+                <div id="cuentas-list" class="hidden bg-slate-50 rounded-2xl border border-slate-200 p-4">
+                    <div class="max-h-[120px] overflow-y-auto custom-scrollbar">
+                        <div id="cuentas-empty" class="text-center py-3 text-sm text-slate-400 font-medium italic">Sin cuentas abiertas</div>
+                    </div>
+                </div>
+
+                <!-- Descuento content -->
+                <div id="descuento-content" class="hidden bg-slate-50 rounded-2xl border border-slate-200 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <label class="text-xs font-semibold text-slate-500">Valor</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="cart-discount-input" min="0" step="0.01" class="w-24 bg-white border-2 border-slate-200 rounded-xl text-slate-700 font-bold p-2 outline-none text-sm text-right transition-all focus:border-rose-400" placeholder="0" value="0">
+                            <select id="cart-discount-type" class="bg-white border-2 border-slate-200 rounded-xl text-slate-500 font-bold p-2 outline-none text-sm cursor-pointer transition-all focus:border-rose-400">
+                                <option value="usd">$</option>
+                                <option value="percent">%</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <!-- Observations Section -->
-                <div class="mt-6 border-t border-slate-100 pt-4">
-                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Observaciones /
-                        Notas</label>
-                    <textarea id="checkout-observations" rows="2"
-                        class="w-full px-4 py-2 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none text-sm font-medium dark:text-white transition-all resize-none"
-                        placeholder="Opcional: añadir información adicional..."></textarea>
+                <!-- Desglose -->
+                <div id="checkout-breakdown" class="hidden bg-slate-50 rounded-2xl border border-slate-200 divide-y divide-slate-200 overflow-hidden">
+                    <div class="flex justify-between px-4 py-2.5">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Subtotal</span>
+                        <span id="checkout-subtotal-val" class="text-sm font-black text-slate-700">$0.00</span>
+                    </div>
+                    <div id="checkout-discount-row" class="flex justify-between px-4 py-2.5 text-rose-500 hidden">
+                        <span class="text-xs font-bold uppercase">Descuento</span>
+                        <span id="checkout-discount-val" class="text-sm font-black">-$0.00</span>
+                    </div>
+                    <div id="checkout-tax-row" class="flex justify-between px-4 py-2.5 text-emerald-600 hidden">
+                        <span class="text-xs font-bold uppercase" id="checkout-tax-label">IVA</span>
+                        <span id="checkout-tax-val" class="text-sm font-black">$0.00</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="px-8 py-6 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 grid grid-cols-1 gap-3 shrink-0">
+                <!-- Notas -->
+                <textarea id="checkout-observations" rows="1" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:bg-white focus:border-brand-500 rounded-2xl outline-none text-sm font-semibold text-slate-700 transition-all resize-none placeholder:text-slate-400" placeholder="Notas adicionales..."></textarea>
 
-                <!-- BOTÓN COBRO EXACTO -->
-                <button id="exact-change-btn"
-                    class="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-sm shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-bolt"></i>
-                    Cobro Exacto — <span id="exact-change-label">$0.00</span>
+                <!-- Mandar a Entregas -->
+                <button id="send-to-management-btn" class="w-full py-3.5 rounded-2xl border-2 border-indigo-200 bg-indigo-50/60 text-indigo-600 font-bold hover:bg-indigo-100 hover:border-indigo-300 transition-all text-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-box text-sm"></i> Mandar a Entregas App
                 </button>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <button class="close-checkout-modal py-4 rounded-xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
-                    <button id="confirm-payment-btn" class="py-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-lg shadow-brand-500/40 transition-all">Cobrar <i class="fas fa-check ml-1"></i></button>
-                </div>
-                <!-- BOTÓN GESTION APP -->
-                <button id="send-to-management-btn"
-                    class="w-full py-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-box"></i> Mandar a Entregas App
-                </button>
-                <!-- BOTÓN FIAO -->
-                <button id="fiao-payment-btn"
-                    class="w-full py-4 rounded-xl border-2 border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-hand-holding-dollar"></i> Dar a Crédito (Fiao)
-                </button>
             </div>
         </div>
     </div>
@@ -3793,6 +3878,14 @@
                                     class="w-full pl-9 pr-4 py-2.5 bg-rose-50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition-all font-black text-rose-700">
                             </div>
                         </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Puntos por Unidad</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500"><i class="fas fa-star"></i></span>
+                                <input type="number" id="product-points" min="0" value="0"
+                                    class="w-full pl-9 pr-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all font-black text-amber-700">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-4">
@@ -3853,18 +3946,39 @@
                         </div>
                     </div>
 
+                    <!-- VARIANTS SECTION -->
                     <div class="advanced-field" style="display: none;">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1"
-                            title="Escribe los sabores separados por coma (ej. Cola, Piña, Naranja)">Sabores / Variantes
-                            (opcional)</label>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400 font-bold"><i
-                                    class="fas fa-tags"></i></span>
-                            <input type="text" id="product-flavors" placeholder="Cola, Naranja, Limón..."
-                                class="w-full pl-11 pr-4 py-2.5 bg-purple-50 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all font-medium placeholder:text-purple-300">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                                <i class="fas fa-tags text-purple-500"></i> Sabores / Variantes
+                            </label>
+                            <button type="button" id="add-variant-btn" class="text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition-colors"><i class="fas fa-plus mr-1"></i>Agregar Variante</button>
                         </div>
-                        <div id="product-flavors-container" class="mt-2"></div>
-                        <div id="flavor-barcodes-container" class="mt-2" style="padding:8px;background:#f8fafc;border-radius:8px;"></div>
+                        <div id="variants-container" class="space-y-2"></div>
+                        <div id="variants-empty" class="text-center py-4 text-sm text-purple-400 bg-purple-50/50 rounded-xl border border-dashed border-purple-200">Sin variantes. Presiona "Agregar Variante" para añadir.</div>
+                    </div>
+
+                    <!-- COMPOSITE PRODUCT ACCORDION -->
+                    <div class="advanced-field" style="display: none;">
+                        <div class="accordion-header flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100/50 transition-colors" onclick="toggleSection('product-composite-body')">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-cubes text-amber-500"></i>
+                                <span class="text-sm font-bold text-amber-800">Producto Compuesto</span>
+                                <span class="text-xs text-amber-500 font-medium" id="composite-item-count">0 ítems</span>
+                                <i class="fas fa-info-circle text-amber-300 text-xs cursor-help" title="Marca esta opción si el producto se compone de sub-items que pueden venderse por unidad (ej. una caja de cigarros compuesta por cigarros individuales)."></i>
+                            </div>
+                            <i class="fas fa-chevron-down text-amber-400 transition-transform duration-200" id="composite-arrow"></i>
+                        </div>
+                        <div id="product-composite-body" class="mt-2" style="display: none;">
+                            <div class="bg-amber-50/50 border border-amber-200 rounded-xl p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-xs font-bold text-amber-700">Componentes del lote</span>
+                                    <button type="button" id="add-composite-row" class="text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"><i class="fas fa-plus mr-1"></i>Agregar componente</button>
+                                </div>
+                                <div id="composite-rows-container"></div>
+                                <div id="composite-empty" class="text-center py-4 text-sm text-amber-400">No hay componentes. Agrega los sub-items que componen este producto.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4 advanced-field" style="display: none;">
@@ -3935,6 +4049,19 @@
                 </div>
             </div>
             </form>
+
+            <!-- Product Change History -->
+            <div id="product-changes-section" class="hidden mt-6 border-t border-slate-100 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-bold text-sm text-slate-700"><i class="fas fa-history text-blue-500 mr-1"></i> Últimos Cambios</h4>
+                    <button type="button" onclick="showFullProductHistory()" class="text-xs text-brand-600 hover:text-brand-800 font-semibold">
+                        Ver historial completo <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+                <div id="product-changes-list" class="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
         </div>
 
         <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
@@ -3945,6 +4072,27 @@
                 Producto</button>
         </div>
     </div>
+    </div>
+    <!-- Full Product History Modal -->
+    <div id="product-history-modal"
+        class="fixed inset-0 bg-slate-900/60 z-[1060] items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col pointer-events-auto">
+            <div
+                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
+                <h3 class="font-bold text-xl text-slate-800" id="product-history-modal-title">Historial de Cambios</h3>
+                <button
+                    class="close-product-history-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="product-history-full-list" class="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                <!-- Populated by JS -->
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
+                <button
+                    class="close-product-history-modal py-2.5 px-5 rounded-xl border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-slate-50 hover:text-slate-800 transition-colors">Cerrar</button>
+            </div>
+        </div>
     </div>
     <!-- Client Modal -->
     <div id="client-modal"
@@ -4106,6 +4254,21 @@
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     <input type="text" id="admin-search-input" placeholder="Buscar función..." oninput="window.renderAdminFeatures()" class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-2 border-transparent rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all">
                 </div>
+            </div>
+            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-table text-slate-400 text-sm w-4 text-center"></i>
+                    <input type="text" id="settings-google-sheet-id" placeholder="Google Sheet ID (membresía)" class="flex-1 px-3 py-2 bg-slate-100 border-2 border-transparent rounded-lg text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all" title="ID del Google Sheet con códigos de membresía. Columnas: codigo, cliente, vencimiento. El sheet debe ser público.">
+                    <button onclick="window.testGoogleSheet()" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-flask mr-1"></i>Probar</button>
+                </div>
+            </div>
+            <!-- License Management -->
+            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+                <button onclick="const c=document.getElementById('license-admin-container');const i=this.querySelector('i');if(c.classList.contains('hidden')){c.classList.remove('hidden');i.className='fas fa-chevron-up mr-1';window.LicenseManager.renderLicenseAdmin(c)}else{c.classList.add('hidden');i.className='fas fa-chevron-down mr-1'}" class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all">
+                    <span><i class="fas fa-shield-alt mr-2 text-brand-500"></i>Gestión de Licencias</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div id="license-admin-container" class="hidden mt-3"></div>
             </div>
             <div class="p-6 flex-1 overflow-y-auto custom-scrollbar" id="admin-features-list">
                 <!-- Generado por JS -->
@@ -4323,90 +4486,369 @@
         </div>
     </div>
 
-    <!-- Cierre de Caja Modal -->
+    <!-- === CIERRE DE CAJA — INTERFAZ COMPLETA === -->
     <div id="cierre-modal"
-        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md flex flex-col overflow-hidden max-h-[90vh] transform scale-95 transition-transform duration-300" id="cierre-modal-content">
-            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-                <h3 class="font-black text-2xl text-slate-800 flex items-center gap-3">
-                    <i class="fas fa-file-invoice-dollar text-amber-600"></i> Cierre del Día
-                </h3>
-                <button onclick="document.getElementById('cierre-modal').classList.add('hidden'); document.getElementById('cierre-modal').classList.remove('flex')"
-                    class="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="p-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50">
-                <div class="text-center mb-6">
-                    <p class="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Resumen de Ventas Hoy</p>
-                    <p class="text-sm font-bold text-slate-500" id="cierre-date-display"></p>
-                </div>
+        class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[999] items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col max-h-[92vh] overflow-hidden transform scale-95 transition-all duration-300" id="cierre-modal-content">
 
-                <div class="grid grid-cols-1 gap-3">
-                    <!-- USD -->
-                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-dollar-sign"></i></div>
-                            <div><span class="font-bold text-slate-700">Efectivo USD</span><span class="block text-[10px] text-slate-400">${txCount} transacciones</span></div>
+            <!-- Header -->
+            <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-6 pt-5 pb-5 shrink-0 relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/5 blur-3xl"></div>
+                <div class="flex items-center justify-between relative z-10">
+                    <div>
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                                <i class="fas fa-file-invoice-dollar text-white text-xs"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">PuntoPila POS</span>
                         </div>
-                        <span id="cierre-total-usd" class="text-xl font-black text-emerald-600">$0.00</span>
+                        <h3 class="font-black text-xl text-white mt-1">Cierre del Día</h3>
                     </div>
-                    <!-- VES -->
-                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-money-bill-wave"></i></div>
-                            <span class="font-bold text-slate-700">Efectivo BS</span>
-                        </div>
-                        <span id="cierre-total-ves" class="text-xl font-black text-blue-600">Bs 0</span>
-                    </div>
-                    <!-- PUNTO -->
-                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-credit-card"></i></div>
-                            <span class="font-bold text-slate-700">Punto de Venta</span>
-                        </div>
-                        <span id="cierre-total-card" class="text-xl font-black text-indigo-600">Bs 0</span>
-                    </div>
-                    <!-- PAGO MÓVIL -->
-                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-mobile-screen-button"></i></div>
-                            <span class="font-bold text-slate-700">Pago Móvil</span>
-                        </div>
-                        <span id="cierre-total-pm" class="text-xl font-black text-sky-600">Bs 0</span>
-                    </div>
-                    <!-- TRANSFER -->
-                    <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-building-columns"></i></div>
-                            <span class="font-bold text-slate-700">Transferencia</span>
-                        </div>
-                        <span id="cierre-total-transfer" class="text-xl font-black text-teal-600">Bs 0</span>
-                    </div>
-                    <!-- TOTAL GENERAL -->
-                    <div class="bg-slate-900 p-5 rounded-3xl shadow-md flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-white/10 text-white rounded-2xl flex items-center justify-center text-lg"><i class="fas fa-calculator"></i></div>
-                            <span class="font-bold text-white">TOTAL USD</span>
-                        </div>
-                        <span id="cierre-total-general" class="text-2xl font-black text-emerald-400">$0.00</span>
-                    </div>
-                </div>
-
-                <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-4">
-                    <div class="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-sm"><i class="fas fa-whatsapp"></i></div>
-                    <p class="text-[10px] text-amber-800 font-bold leading-tight">Al confirmar, se guarda el Corte Z en la base de datos y se envía el resumen al WhatsApp del Jefe.</p>
+                    <button onclick="closeCierreModal()"
+                        class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="px-8 py-6 border-t border-slate-100 bg-white grid grid-cols-1 gap-3 shrink-0">
-                <button onclick="printCierreZ()" class="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-print"></i> IMPRIMIR CORTE Z
-                </button>
-                <button onclick="confirmFinalCierre()" class="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-black rounded-2xl shadow-lg shadow-brand-500/40 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-paper-plane"></i> FINALIZAR Y ENVIAR AL JEFE
-                </button>
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/60" id="cierre-scroll">
+
+                <!-- 📊 RESUMEN DE VENTAS -->
+                <div class="px-6 pt-5 pb-3">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Resumen de Ventas</h4>
+                        <span class="text-[10px] font-bold text-slate-400" id="cierre-date-display"></span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <!-- USD -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">USD</p>
+                            <p class="text-base font-black text-emerald-600 mt-0.5" id="cierre-usd-amount">$0.00</p>
+                        </div>
+                        <!-- VES -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">VES</p>
+                            <p class="text-base font-black text-blue-600 mt-0.5" id="cierre-ves-amount">Bs 0</p>
+                        </div>
+                        <!-- EUR -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-euro-sign"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">EUR</p>
+                            <p class="text-base font-black text-amber-600 mt-0.5" id="cierre-eur-amount">€0</p>
+                        </div>
+                        <!-- Punto -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Punto</p>
+                            <p class="text-base font-black text-indigo-600 mt-0.5" id="cierre-card-amount">Bs 0</p>
+                        </div>
+                        <!-- Pago Móvil -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-sky-100 text-sky-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-mobile-alt"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">P.Móvil</p>
+                            <p class="text-base font-black text-sky-600 mt-0.5" id="cierre-pm-amount">Bs 0</p>
+                        </div>
+                        <!-- Transfer -->
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
+                            <div class="w-8 h-8 mx-auto bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
+                                <i class="fas fa-building-columns"></i>
+                            </div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Transf.</p>
+                            <p class="text-base font-black text-teal-600 mt-0.5" id="cierre-transfer-amount">Bs 0</p>
+                        </div>
+                    </div>
+
+                    <!-- Total row -->
+                    <div class="mt-2 flex items-center justify-between bg-slate-800 rounded-2xl px-4 py-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 bg-white/10 text-white rounded-xl flex items-center justify-center text-sm">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-bold text-white/50 uppercase tracking-wider">Total General</p>
+                                <p class="text-xs text-white/70" id="cierre-tx-count">0 transacciones</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl font-black text-emerald-400" id="cierre-total-general">$0.00</p>
+                            <p class="text-[10px] font-bold text-white/50" id="cierre-total-general-ves">Bs 0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="mx-6 border-slate-200/60">
+
+                <!-- 🔓 APERTURA -->
+                <div class="px-6 py-3">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Apertura del Día</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </div>
+                                <span class="text-xs font-bold text-slate-500">USD Apertura</span>
+                            </div>
+                            <span class="text-base font-black text-slate-700" id="cierre-opening-usd">$0.00</span>
+                        </div>
+                        <div class="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <span class="text-xs font-bold text-slate-500">VES Apertura</span>
+                            </div>
+                            <span class="text-base font-black text-slate-700" id="cierre-opening-ves">Bs 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="mx-6 border-slate-200/60">
+
+                <!-- 💰 CONTEO FÍSICO POR BILLETES -->
+                <div class="px-6 py-3">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Conteo Físico por Billetes</h4>
+                        <span class="text-[10px] text-slate-400 font-medium">Ingrese cantidad de billetes</span>
+                    </div>
+
+                    <!-- USD Denomination -->
+                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-3">
+                        <div class="bg-emerald-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between cursor-pointer" onclick="toggleCollapse('usd-bills')">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-xs">
+                                    <i class="fas fa-dollar-sign"></i>
+                                </div>
+                                <span class="text-xs font-black text-emerald-700 uppercase">Efectivo USD</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] font-bold text-emerald-600" id="cierre-usd-total-counted">$0.00</span>
+                                <i class="fas fa-chevron-down text-emerald-400 text-xs transition-transform" id="usd-bills-chevron"></i>
+                            </div>
+                        </div>
+                        <div id="usd-bills" class="divide-y divide-slate-100">
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$100</span> ×</span>
+                                <input type="number" id="denom-usd-100" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-100-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$50</span> ×</span>
+                                <input type="number" id="denom-usd-50" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-50-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$20</span> ×</span>
+                                <input type="number" id="denom-usd-20" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-20-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$10</span> ×</span>
+                                <input type="number" id="denom-usd-10" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-10-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$5</span> ×</span>
+                                <input type="number" id="denom-usd-5" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-5-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$1</span> ×</span>
+                                <input type="number" id="denom-usd-1" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-1-total">$0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center bg-slate-50/50">
+                                <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-coins text-amber-500"></i> Monedas</span>
+                                <input type="number" id="denom-usd-coins" min="0" step="0.01" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center" placeholder="0.00">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-coins-total">$0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VES Denomination -->
+                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-3">
+                        <div class="bg-blue-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between cursor-pointer" onclick="toggleCollapse('ves-bills')">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xs">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <span class="text-xs font-black text-blue-700 uppercase">Efectivo VES</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] font-bold text-blue-600" id="cierre-ves-total-counted">Bs 0</span>
+                                <i class="fas fa-chevron-down text-blue-400 text-xs transition-transform" id="ves-bills-chevron"></i>
+                            </div>
+                        </div>
+                        <div id="ves-bills" class="divide-y divide-slate-100">
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 100</span> ×</span>
+                                <input type="number" id="denom-ves-100" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-100-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 50</span> ×</span>
+                                <input type="number" id="denom-ves-50" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-50-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 20</span> ×</span>
+                                <input type="number" id="denom-ves-20" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-20-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 10</span> ×</span>
+                                <input type="number" id="denom-ves-10" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-10-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 5</span> ×</span>
+                                <input type="number" id="denom-ves-5" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-5-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 2</span> ×</span>
+                                <input type="number" id="denom-ves-2" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-2-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
+                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 1</span> ×</span>
+                                <input type="number" id="denom-ves-1" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-1-total">Bs 0</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center bg-slate-50/50">
+                                <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-coins text-amber-500"></i> Monedas</span>
+                                <input type="number" id="denom-ves-coins" min="0" step="0.01" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center" placeholder="0.00">
+                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-coins-total">Bs 0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cuadre Pago Móvil y Punto -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">📱 Pago Móvil contado</label>
+                            <input type="number" id="cierre-count-pm" min="0" step="0.01" value="0" oninput="calcularCuadre()"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-purple-700 outline-none focus:border-purple-500 transition-all text-center">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">💳 Punto contado</label>
+                            <input type="number" id="cierre-count-card" min="0" step="0.01" value="0" oninput="calcularCuadre()"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-blue-700 outline-none focus:border-blue-500 transition-all text-center">
+                        </div>
+                    </div>
+
+                    <!-- Resultados del cuadre -->
+                    <div id="cierre-diff-container" class="hidden space-y-2">
+                        <div id="cierre-diff-usd-container"
+                            class="flex items-center justify-between px-4 py-3 rounded-2xl border-2 transition-all">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fas fa-circle-check text-base" id="cierre-diff-usd-icon"></i>
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dif. USD</span>
+                            </div>
+                            <span class="text-lg font-black" id="cierre-diff-usd">$0.00</span>
+                        </div>
+                        <div id="cierre-diff-ves-container"
+                            class="flex items-center justify-between px-4 py-3 rounded-2xl border-2 transition-all">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fas fa-circle-check text-base" id="cierre-diff-ves-icon"></i>
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dif. VES</span>
+                            </div>
+                            <span class="text-lg font-black" id="cierre-diff-ves">Bs 0</span>
+                        </div>
+                        <div id="cierre-diff-pm-container"
+                            class="flex items-center justify-between px-4 py-3 rounded-2xl border-2 transition-all">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fas fa-circle-check text-base" id="cierre-diff-pm-icon"></i>
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dif. Pago Móvil</span>
+                            </div>
+                            <span class="text-lg font-black" id="cierre-diff-pm">Bs 0</span>
+                        </div>
+                        <div id="cierre-diff-card-container"
+                            class="flex items-center justify-between px-4 py-3 rounded-2xl border-2 transition-all">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fas fa-circle-check text-base" id="cierre-diff-card-icon"></i>
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dif. Punto</span>
+                            </div>
+                            <span class="text-lg font-black" id="cierre-diff-card">Bs 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="mx-6 border-slate-200/60">
+
+                <!-- 📋 ACCIONES -->
+                <div class="px-6 py-4 space-y-2.5">
+                    <div class="bg-amber-50 rounded-2xl border border-amber-100 px-4 py-3 flex items-center gap-3">
+                        <div class="w-9 h-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                            <i class="fab fa-whatsapp"></i>
+                        </div>
+                        <p class="text-[10px] text-amber-800 font-semibold leading-snug">Al finalizar se guarda el Corte Z en la base de datos y se envía el resumen al WhatsApp del Jefe.</p>
+                    </div>
+
+                    <button onclick="printCierreZ()" class="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-bold text-sm transition-all flex items-center justify-center gap-2.5 shadow-md">
+                        <i class="fas fa-print"></i> Imprimir Corte Z
+                    </button>
+
+                    <button onclick="verHistorialArqueos()" class="w-full py-3.5 rounded-2xl bg-transparent hover:bg-slate-50 text-slate-500 font-bold text-sm transition-all border-2 border-dashed border-slate-200 flex items-center justify-center gap-2.5">
+                        <i class="fas fa-clock-rotate"></i> Historial de Arqueos
+                    </button>
+
+                    <button onclick="confirmFinalCierre()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 active:scale-[0.98] text-white font-black text-sm transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-brand-600/30">
+                        <i class="fas fa-paper-plane"></i> Finalizar y Enviar al Jefe
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Arqueos Modal -->
+    <div id="historial-arqueos-modal"
+        class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[1000] items-center justify-center p-4 hidden transition-all duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh] overflow-hidden">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 px-6 pt-5 pb-4 shrink-0">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-black text-lg text-white">Historial de Arqueos</h3>
+                        <p class="text-[10px] text-white/50 font-medium mt-0.5">Registro de todos los cortes de caja</p>
+                    </div>
+                    <button onclick="document.getElementById('historial-arqueos-modal').classList.add('hidden'); document.getElementById('historial-arqueos-modal').classList.remove('flex')"
+                        class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/70 flex items-center justify-center transition-all">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-slate-100">
+                            <th class="py-2.5 pr-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
+                            <th class="py-2.5 px-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">USD</th>
+                            <th class="py-2.5 px-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">VES</th>
+                            <th class="py-2.5 px-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Punto</th>
+                            <th class="py-2.5 pl-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Dif.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50" id="arqueos-history-body">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-sm text-slate-400 font-medium italic">Sin arqueos registrados</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -4542,7 +4984,95 @@
 
     <script src="assets/phone_scan_qr_b64.js"></script>
     <script>
+        window.toggleCuentas = function() {
+            const list = document.getElementById('cuentas-list');
+            const arrow = document.getElementById('cuentas-arrow');
+            if (list) {
+                list.classList.toggle('hidden');
+                if (arrow) arrow.classList.toggle('rotate-180');
+            }
+        };
+
+        window.toggleDescuento = function() {
+            const content = document.getElementById('descuento-content');
+            const arrow = document.getElementById('descuento-arrow');
+            if (content) {
+                content.classList.toggle('hidden');
+                if (arrow) arrow.classList.toggle('rotate-180');
+            }
+        };
+
+        window.saveCurrentAsCuenta = function() {
+            const list = document.getElementById('cuentas-list');
+            const empty = document.getElementById('cuentas-empty');
+            const badge = document.getElementById('cuentas-count-badge');
+            if (!list) return;
+            const totalEl = document.getElementById('checkout-total-display');
+            const total = totalEl ? totalEl.textContent : '$0.00';
+            const now = new Date();
+            const time = now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+            const card = document.createElement('div');
+            card.className = 'flex items-center justify-between px-2.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 mb-1.5 last:mb-0';
+            card.innerHTML = `
+                <div class="flex items-center gap-2 min-w-0">
+                    <i class="fas fa-receipt text-brand-500 text-[10px] shrink-0"></i>
+                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">${time}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-xs font-black text-slate-800 dark:text-white">${total}</span>
+                    <button onclick="this.closest('div').remove(); updateCuentaBadge();" class="text-slate-300 hover:text-red-400 transition-colors p-0.5">
+                        <i class="fas fa-times text-[9px]"></i>
+                    </button>
+                </div>
+            `;
+            list.appendChild(card);
+            if (empty) empty.classList.add('hidden');
+            updateCuentaBadge();
+            if (typeof window.closeCheckoutModal === 'function') window.closeCheckoutModal();
+        };
+
+        window.updateCuentaBadge = function() {
+            const list = document.getElementById('cuentas-list');
+            const badge = document.getElementById('cuentas-count-badge');
+            if (!list || !badge) return;
+            const items = list.querySelectorAll(':scope > div:not(#cuentas-empty)');
+            const count = items.length;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+                const empty = document.getElementById('cuentas-empty');
+                if (empty) empty.classList.remove('hidden');
+            }
+        };
+
+        window.toggleCartSidebar = function() {
+            const sidebar = document.getElementById('cart-sidebar');
+            const arrow = document.getElementById('cart-sidebar-arrow');
+            const floatBtn = document.getElementById('cart-toggle-float');
+            if (sidebar) {
+                const isCollapsed = sidebar.classList.toggle('collapsed');
+                if (arrow) arrow.style.transform = isCollapsed ? 'rotate(180deg)' : '';
+                if (floatBtn) floatBtn.classList.toggle('hidden', !isCollapsed);
+                document.getElementById('cart-sidebar-header').title = isCollapsed ? 'Expandir carrito' : 'Plegar carrito';
+            }
+        };
+
         window.toggleSection = function(el) {
+            if (typeof el === 'string') {
+                const body = document.getElementById(el);
+                if (body) {
+                    body.style.display = body.style.display === 'none' ? '' : 'none';
+                    const header = body.previousElementSibling;
+                    if (header && header.classList.contains('accordion-header')) {
+                        header.classList.toggle('accordion-header-open');
+                        const arrow = header.querySelector('.fa-chevron-down');
+                        if (arrow) arrow.classList.toggle('rotate-180');
+                    }
+                }
+                return;
+            }
             el.classList.toggle('collapsed');
             const body = el.nextElementSibling;
             if (body && body.classList.contains('nav-section-body')) {
@@ -4550,6 +5080,7 @@
             }
         };
     </script>
+    <script src="src/modules/license-manager.js"></script>
     <script src="app.js"></script>
     <script>
         // ============================================================

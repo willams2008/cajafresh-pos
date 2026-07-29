@@ -8681,6 +8681,8 @@ window.calcularCuadre = () => {
     const totals = window._lastCierreTotals || _calcCierreTotals();
     const countUSD = _calcDenomUSD();
     const countVES = _calcDenomVES();
+    const countPM = parseFloat(document.getElementById('cierre-count-pm')?.value) || 0;
+    const countCard = parseFloat(document.getElementById('cierre-count-card')?.value) || 0;
     const container = document.getElementById('cierre-diff-container');
     if (!container) return;
 
@@ -8688,8 +8690,10 @@ window.calcularCuadre = () => {
     const cashVES = totals.ves;
     const diffUSD = countUSD - cashUSD;
     const diffVES = countVES - cashVES;
+    const diffPM = countPM - (totals.pm || 0);
+    const diffCard = countCard - (totals.card || 0);
 
-    if (countUSD > 0 || countVES > 0) {
+    if (countUSD > 0 || countVES > 0 || countPM > 0 || countCard > 0) {
         container.classList.remove('hidden');
     } else {
         container.classList.add('hidden');
@@ -8715,6 +8719,8 @@ window.calcularCuadre = () => {
 
     setDiff('cierre-diff-usd', 'cierre-diff-usd-container', 'cierre-diff-usd-icon', diffUSD, formatUSD);
     setDiff('cierre-diff-ves', 'cierre-diff-ves-container', 'cierre-diff-ves-icon', diffVES, formatVES);
+    setDiff('cierre-diff-pm', 'cierre-diff-pm-container', 'cierre-diff-pm-icon', diffPM, formatVES);
+    setDiff('cierre-diff-card', 'cierre-diff-card-container', 'cierre-diff-card-icon', diffCard, formatVES);
 };
 
 window.verHistorialArqueos = async () => {
@@ -8907,7 +8913,12 @@ function _getCierreMsg() {
     msg += `💰 *TOTAL USD:* ${formatUSD(totals.totalUSD)}\n`;
     msg += `🇻🇪 *TOTAL VES:* ${formatVES(totals.totalVES)}\n`;
     msg += `🔄 *Transacciones:* ${totals.txCount}\n`;
-    if (countUSD > 0 || countVES > 0) {
+    const countPM = parseFloat(document.getElementById('cierre-count-pm')?.value) || 0;
+    const countCard = parseFloat(document.getElementById('cierre-count-card')?.value) || 0;
+    const diffPM = countPM - (totals.pm || 0);
+    const diffCard = countCard - (totals.card || 0);
+
+    if (countUSD > 0 || countVES > 0 || countPM > 0 || countCard > 0) {
         msg += `━━━━  CONTEO  ━━━━━━\n`;
         if (countUSD > 0) {
             msg += `💵 USD contado: ${formatUSD(countUSD)}\n`;
@@ -8916,6 +8927,14 @@ function _getCierreMsg() {
         if (countVES > 0) {
             msg += `🇻🇪 VES contado: ${formatVES(countVES)}\n`;
             msg += `📊 Dif VES: ${diffVES >= 0 ? '+' : ''}${formatVES(diffVES)}\n`;
+        }
+        if (countPM > 0) {
+            msg += `📱 P.Móvil contado: ${formatVES(countPM)}\n`;
+            msg += `📊 Dif P.Móvil: ${diffPM >= 0 ? '+' : ''}${formatVES(diffPM)}\n`;
+        }
+        if (countCard > 0) {
+            msg += `💳 Punto contado: ${formatVES(countCard)}\n`;
+            msg += `📊 Dif Punto: ${diffCard >= 0 ? '+' : ''}${formatVES(diffCard)}\n`;
         }
         msg += `━━  DESGLOSE  ────\n`;
         const u100 = _getDenomVal('denom-usd-100');
@@ -8955,6 +8974,9 @@ async function _saveCashupToDB() {
         const openingUSD = parseFloat(document.getElementById('cierre-opening-usd')?.textContent?.replace(/[$,]/g, '') || 0);
         const openingVES = parseFloat(document.getElementById('cierre-opening-ves')?.textContent?.replace(/[Bs,\s]/g, '') || 0);
 
+        const countPM = parseFloat(document.getElementById('cierre-count-pm')?.value) || 0;
+        const countCard = parseFloat(document.getElementById('cierre-count-card')?.value) || 0;
+
         const cashup = {
             id: 'cashup_' + Date.now(),
             date: new Date().toISOString().split('T')[0],
@@ -8972,8 +8994,12 @@ async function _saveCashupToDB() {
             transaction_count: totals.txCount,
             counted_usd: countUSD,
             counted_ves: countVES,
+            counted_pm: countPM,
+            counted_card: countCard,
             diff_usd: countUSD - totals.usd,
             diff_ves: countVES - totals.ves,
+            diff_pm: countPM - (totals.pm || 0),
+            diff_card: countCard - (totals.card || 0),
             cashier_name: currentRole || 'unknown',
             status: 'closed',
             notes: ''

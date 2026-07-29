@@ -313,6 +313,10 @@ async function createTables() {
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN transaction_count INTEGER DEFAULT 0`); } catch(e) {}
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_usd REAL DEFAULT 0`); } catch(e) {}
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_ves REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_pm REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_card REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_pm REAL DEFAULT 0`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_card REAL DEFAULT 0`); } catch(e) {}
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_ves REAL DEFAULT 0`); } catch(e) {}
     try { await runQuery(`ALTER TABLE cashups ADD COLUMN status TEXT DEFAULT 'open'`); } catch(e) {}
 
@@ -452,8 +456,8 @@ async function createTables() {
 // API Exportada para el Frontend (Casi todos los métodos ahora requieren storeId)
 const api = {
     // --- PRODUCTOS ---
-    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || '']),
-    getActiveProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']),
+    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']).catch(() => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || ''])),
+    getActiveProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']).catch(() => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || ''])),
 
     getProductById: (storeId, productId) => {
         const rows = db.prepare ? null : null;
@@ -892,8 +896,8 @@ const api = {
     saveCashup: (storeId, cashup) => {
         const sid = storeId || '';
         return runQuery(
-            `INSERT OR REPLACE INTO cashups (id, store_id, date, opening_usd, opening_ves, cash_usd, cash_ves, sales_usd, sales_ves, sales_pago_movil, sales_transfer, sales_card, sales_eur, expenses_total, transaction_count, counted_usd, counted_ves, diff_usd, diff_ves, cashier_name, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [cashup.id, sid, cashup.date, cashup.opening_usd || 0, cashup.opening_ves || 0, cashup.cash_usd || 0, cashup.cash_ves || 0, cashup.sales_usd || 0, cashup.sales_ves || 0, cashup.sales_pago_movil || 0, cashup.sales_transfer || 0, cashup.sales_card || 0, cashup.sales_eur || 0, cashup.expenses_total || 0, cashup.transaction_count || 0, cashup.counted_usd || 0, cashup.counted_ves || 0, cashup.diff_usd || 0, cashup.diff_ves || 0, cashup.cashier_name || '', cashup.status || 'closed', cashup.notes || '']
+            `INSERT OR REPLACE INTO cashups (id, store_id, date, opening_usd, opening_ves, cash_usd, cash_ves, sales_usd, sales_ves, sales_pago_movil, sales_transfer, sales_card, sales_eur, expenses_total, transaction_count, counted_usd, counted_ves, counted_pm, counted_card, diff_usd, diff_ves, diff_pm, diff_card, cashier_name, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [cashup.id, sid, cashup.date, cashup.opening_usd || 0, cashup.opening_ves || 0, cashup.cash_usd || 0, cashup.cash_ves || 0, cashup.sales_usd || 0, cashup.sales_ves || 0, cashup.sales_pago_movil || 0, cashup.sales_transfer || 0, cashup.sales_card || 0, cashup.sales_eur || 0, cashup.expenses_total || 0, cashup.transaction_count || 0, cashup.counted_usd || 0, cashup.counted_ves || 0, cashup.counted_pm || 0, cashup.counted_card || 0, cashup.diff_usd || 0, cashup.diff_ves || 0, cashup.diff_pm || 0, cashup.diff_card || 0, cashup.cashier_name || '', cashup.status || 'closed', cashup.notes || '']
         );
     },
 

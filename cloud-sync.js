@@ -301,9 +301,14 @@ class CloudSync {
                     expiryDate: rp.expiry_date || '',
                     description: ''
                 };
-                // Siempre actualizar campos que vienen de la nube (nombre, categoría, etc.)
-                if (rp.name) localProduct.name = rp.name;
-                if (rp.category) localProduct.category = rp.category;
+                // Actualizar campos de la nube - solo si el producto es NUEVO (no existía local)
+                if (!existing) {
+                    if (rp.name) localProduct.name = rp.name;
+                    if (rp.category) localProduct.category = rp.category;
+                } else {
+                    // Si el producto ya existe, solo actualizar nombre si la nube tiene un nombre válido
+                    if (rp.name && rp.name !== 'Sin nombre') localProduct.name = rp.name;
+                }
                 if (rp.img_url) localProduct.img = rp.img_url;
                 if (rp.expiry_date) localProduct.expiryDate = rp.expiry_date;
                 await localDbApi.saveProduct(this.storeId, localProduct);
@@ -311,6 +316,18 @@ class CloudSync {
             }
 
             console.log(`[CLOUD-SYNC] ✅ ${imported} productos importados a la BD local.`);
+
+            // Limpiar productos previamente eliminados que la nube re-importó
+            if (this.deletedProductIds.size > 0) {
+                let cleaned = 0;
+                for (const pid of this.deletedProductIds) {
+                    try {
+                        await localDbApi.deleteProductPermanent(this.storeId, pid);
+                        cleaned++;
+                    } catch(e) {}
+                }
+                if (cleaned > 0) console.log(`[CLOUD-SYNC] 🗑️ ${cleaned} productos eliminados permanentemente (deletedProductIds).`);
+            }
 
             // Notificar al renderer para que recargue la lista
             try {
