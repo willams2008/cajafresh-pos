@@ -288,6 +288,44 @@ async function ensureAdminUser() {
     }
 }
 
+async function ensureJoseUsers() {
+    try {
+        var users = await window.db.getUsers();
+        var existing = new Set((users || []).map(u => u.username));
+        var joseUsers = [
+            { username: 'bendecido', name: 'Bendecido', password: 'bendecido123', role: 'seller' },
+            { username: 'feliz_dia', name: 'Feliz Día', password: 'felizdia123', role: 'seller' },
+            { username: 'gracias_dios', name: 'Gracias Dios', password: 'gracias123', role: 'seller' },
+            { username: 'jose', name: 'Jose', password: 'jose123', role: 'admin' }
+        ];
+        var created = [];
+        for (var u of joseUsers) {
+            if (!existing.has(u.username)) {
+                var salt = generateSalt();
+                var hash = await hashPassword(u.password, salt);
+                await window.db.saveUser({
+                    username: u.username,
+                    password_hash: hash,
+                    salt: salt,
+                    role: u.role,
+                    name: u.name,
+                    active: 1
+                });
+                created.push(u);
+                console.log('[Auth] Usuario creado: ' + u.username + ' / ' + u.password);
+            }
+        }
+        if (created.length > 0 && typeof Swal !== 'undefined') {
+            var msg = created.map(function(u) {
+                return '👤 ' + u.name + ' (' + u.role + ')\n   Usuario: ' + u.username + ' | Clave: ' + u.password;
+            }).join('\n\n');
+            Swal.fire({ title: '✅ Usuarios creados', html: '<pre style="text-align:left;font-size:14px">' + msg + '</pre>', icon: 'success', confirmButtonText: 'OK' });
+        }
+    } catch (e) {
+        console.error('[Auth] Error creando usuarios Jose:', e);
+    }
+}
+
 async function loginUser(username, password) {
     try {
         var user = await window.db.getUser(username);
@@ -1434,6 +1472,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Auto-create default admin user if none exist
             await ensureAdminUser();
+            await ensureJoseUsers();
 
             // Auto-configure Cloud Sync if credentials exist
             const activeSid = _getStoreId();
@@ -1489,11 +1528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // TRIAL INFO: Actualizar días restantes en configuración
             window.updateTrialInfo();
-            
-            // MASTER TOUR: Si el wizard terminó pero el tour pro no se ha hecho
-            if (localStorage.getItem('freshpos_wizard_done') && !localStorage.getItem('puntopila_master_tour_done')) {
-                setTimeout(() => window.startMasterTour(), 2500);
-            }
             
             // DASHBOARD SYNC: Enviar datos cada 60s
             syncDashboardData();
@@ -2999,7 +3033,6 @@ window.editProduct = (id) => {
     document.getElementById('product-min-stock').value = p.minStock;
     document.getElementById('product-img').value = p.img || '';
     document.getElementById('product-featured').checked = p.featured || false;
-    document.getElementById('product-flavors').value = (p.flavors || []).join(', ');
     document.getElementById('product-expiry').value = p.expiryDate || '';
     document.getElementById('product-description').value = p.description || '';
     document.getElementById('product-barcode').value = p.barcode || '';
