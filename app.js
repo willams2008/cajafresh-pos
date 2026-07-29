@@ -291,7 +291,8 @@ async function ensureAdminUser() {
 async function ensureJoseUsers() {
     try {
         var users = await window.db.getUsers();
-        var existing = new Set((users || []).map(u => u.username));
+        var userMap = {};
+        (users || []).forEach(function(u) { userMap[u.username] = u; });
         var joseUsers = [
             { username: 'bendecido', name: 'Bendecido', password: 'B3nd3c1d0#2026', role: 'seller' },
             { username: 'feliz_dia', name: 'Feliz Día', password: 'F3l1zD14@2026', role: 'seller' },
@@ -305,6 +306,7 @@ async function ensureJoseUsers() {
             var salt = generateSalt();
             var hash = await hashPassword(u.password, salt);
             await window.db.saveUser({
+                id: userMap[u.username] ? userMap[u.username].id : undefined,
                 username: u.username,
                 password_hash: hash,
                 salt: salt,
@@ -312,7 +314,7 @@ async function ensureJoseUsers() {
                 name: u.name,
                 active: 1
             });
-            if (!existing.has(u.username)) created.push(u);
+            if (!userMap[u.username]) created.push(u);
             console.log('[Auth] Usuario asegurado: ' + u.username + ' / ' + u.password);
         }
         localStorage.setItem('freshpos_jose_creds', JSON.stringify(savedCreds));
@@ -1497,7 +1499,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Auto-create default admin user if none exist
             await ensureAdminUser();
-            setTimeout(function() { ensureJoseUsers().catch(function(e) { console.error('[Jose] Error async:', e); }); }, 100);
+            await ensureJoseUsers();
 
             // Auto-configure Cloud Sync if credentials exist
             const activeSid = _getStoreId();
