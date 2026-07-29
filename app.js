@@ -358,7 +358,6 @@ window.showJoseCreds = function() {
         Swal.fire({ title: '🔑 Credenciales Jose', html: '<pre style="text-align:left;font-size:14px">' + msg + '</pre>', icon: 'info', confirmButtonText: 'OK' });
     } catch (e) { console.error(e); }
 }
-}
 
 async function loginUser(username, password) {
     try {
@@ -1506,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Auto-create default admin user if none exist
             await ensureAdminUser();
-            await ensureJoseUsers();
+            setTimeout(function() { ensureJoseUsers().catch(function(e) { console.error('[Jose] Error async:', e); }); }, 100);
 
             // Auto-configure Cloud Sync if credentials exist
             const activeSid = _getStoreId();
