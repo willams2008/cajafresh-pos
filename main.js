@@ -67,34 +67,51 @@ logStartup('📍 App Path: ' + app.getAppPath());
 logStartup('📍 User Data: ' + app.getPath('userData'));
 
 // Robust Cloudflared Path Resolution
-let { bin } = require('cloudflared');
+let cloudflared = null;
+let bin = null;
 try {
-    if (bin.includes('app.asar')) {
-        const unpackedBin = bin.replace('app.asar', 'app.asar.unpacked');
-        if (fs.existsSync(unpackedBin)) {
-            bin = unpackedBin;
-            logStartup('✅ Usando binario cloudflared desempaquetado: ' + bin);
-        } else {
-            logStartup('⚠️ Binario desempaquetado NO encontrado en: ' + unpackedBin);
-            logStartup('🔍 Reintentando con binario dentro de ASAR: ' + bin);
+    cloudflared = require('cloudflared');
+    if (cloudflared && cloudflared.bin) {
+        bin = cloudflared.bin;
+        if (bin.includes('app.asar')) {
+            const unpackedBin = bin.replace('app.asar', 'app.asar.unpacked');
+            if (fs.existsSync(unpackedBin)) {
+                bin = unpackedBin;
+                logStartup('✅ Usando binario cloudflared desempaquetado: ' + bin);
+            } else {
+                logStartup('⚠️ Binario desempaquetado NO encontrado en: ' + unpackedBin);
+                logStartup('🔍 Reintentando con binario dentro de ASAR: ' + bin);
+            }
         }
-    }
-    if (!fs.existsSync(bin)) {
-        const npmBin = path.join(__dirname, 'node_modules', 'cloudflared', 'bin', 'cloudflared.exe');
-        if (fs.existsSync(npmBin)) {
-            bin = npmBin;
-            logStartup('✅ Usando binario cloudflared desde node_modules: ' + bin);
-        } else {
-            logStartup('❌ Binario cloudflared no encontrado en: ' + npmBin);
+        if (!fs.existsSync(bin)) {
+            const npmBin = path.join(__dirname, 'node_modules', 'cloudflared', 'bin', 'cloudflared.exe');
+            if (fs.existsSync(npmBin)) {
+                bin = npmBin;
+                logStartup('✅ Usando binario cloudflared desde node_modules: ' + bin);
+            } else {
+                logStartup('❌ Binario cloudflared no encontrado en: ' + npmBin);
+            }
         }
     }
 } catch (err) {
     logStartup('❌ Error resolviendo binario cloudflared: ' + err.message);
 }
 
-const localtunnel = require('localtunnel');
-const ngrok = require('ngrok');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+let localtunnel = null;
+try { localtunnel = require('localtunnel'); } catch (e) { logStartup('⚠️ localtunnel module not loaded: ' + e.message); }
+
+let ngrok = null;
+try { ngrok = require('ngrok'); } catch (e) { logStartup('⚠️ ngrok module not loaded: ' + e.message); }
+
+let Client = null;
+let LocalAuth = null;
+try {
+    const waModule = require('whatsapp-web.js');
+    Client = waModule.Client;
+    LocalAuth = waModule.LocalAuth;
+} catch (e) {
+    logStartup('⚠️ whatsapp-web.js module not loaded: ' + e.message);
+}
 
 const readline = require('readline');
 const licenseSystem = require('./license');
@@ -1581,6 +1598,10 @@ async function tryServeo() {
 async function tryLocaltunnel() {
     return new Promise(async (resolve) => {
         try {
+            if (!localtunnel) {
+                console.warn('⚠️ Localtunnel no disponible (módulo no cargado).');
+                return resolve(false);
+            }
             console.log('🔗 Intentando Localtunnel (Link Permanente)...');
             const tunnel = await localtunnel({ 
                 port: serverPort, 
@@ -1629,6 +1650,10 @@ function getPersistentSettings() {
 async function tryNgrok() {
     return new Promise(async (resolve) => {
         try {
+            if (!ngrok) {
+                console.warn('⚠️ Ngrok no disponible (módulo no cargado).');
+                return resolve(false);
+            }
             const userSettings = getPersistentSettings();
             const token = userSettings.ngrokAuthToken;
             const domain = userSettings.ngrokDomain || 'puntopila.emprende.ve';
@@ -1867,39 +1892,66 @@ ipcMain.on('license-activated', () => {
 // ==========================================
 // AUTO UPDATER (GitHub Releases)
 // ==========================================
-const { autoUpdater } = require('electron-updater');
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+let autoUpdater = null;
+try {
+    const updaterModule = require('electron-updater');
+    autoUpdater = updaterModule.autoUpdater;
+    if (autoUpdater) {
+        autoUpdater.autoDownload = true;
+        autoUpdater.autoInstallOnAppQuit = true;
+        autoUpdater.logger = require('electron').app ? console : null;
 
-autoUpdater.on('update-available', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-status', { status: 'available', info: info });
+        autoUpdater.on('update-available', (info) => {
+            console.log('[AUTO-UPDATE] ✅ Nueva versión disponible:', info.version);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', { status: 'available', info: info });
+            }
+        });
+        autoUpdater.on('update-not-available', (info) => {
+            console.log('[AUTO-UPDATE] Ya tienes la última versión.');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', { status: 'not-available' });
+            }
+        });
+        autoUpdater.on('error', (err) => {
+            console.error('[AUTO-UPDATE] ❌ Error:', err.message);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
+            }
+        });
+        autoUpdater.on('download-progress', (progressObj) => {
+            console.log(`[AUTO-UPDATE] ⬇️ Descargando: ${Math.round(progressObj.percent)}%`);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', { status: 'downloading', progress: progressObj });
+            }
+        });
+        autoUpdater.on('update-downloaded', (info) => {
+            console.log('[AUTO-UPDATE] 📦 Actualización descargada:', info.version);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-status', { status: 'downloaded', info: info });
+                const { dialog } = require('electron');
+                dialog.showMessageBox(mainWindow, {
+                    type: 'info',
+                    title: 'Actualización Lista',
+                    message: `La versión ${info.version} se descargó correctamente.`,
+                    detail: 'La actualización se instalará automáticamente al cerrar la aplicación.\n\n¿Deseas reiniciar ahora para aplicar los cambios?',
+                    buttons: ['Reiniciar Ahora', 'Más Tarde'],
+                    defaultId: 0
+                }).then(result => {
+                    if (result.response === 0) {
+                        autoUpdater.quitAndInstall();
+                    }
+                });
+            }
+        });
     }
-});
-autoUpdater.on('update-not-available', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-status', { status: 'not-available' });
-    }
-});
-autoUpdater.on('error', (err) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
-    }
-});
-autoUpdater.on('download-progress', (progressObj) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-status', { status: 'downloading', progress: progressObj });
-    }
-});
-autoUpdater.on('update-downloaded', (info) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update-status', { status: 'downloaded', info: info });
-    }
-});
+} catch (e) {
+    console.warn('[AUTO-UPDATE] ⚠️ No se pudo cargar electron-updater:', e.message);
+}
 
 ipcMain.on('check-for-updates', () => {
     try {
-        autoUpdater.checkForUpdates();
+        if (autoUpdater) autoUpdater.checkForUpdates();
     } catch(err) {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
@@ -1908,7 +1960,7 @@ ipcMain.on('check-for-updates', () => {
 });
 ipcMain.on('download-update', () => {
     try {
-        autoUpdater.downloadUpdate();
+        if (autoUpdater) autoUpdater.downloadUpdate();
     } catch(err) {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update-status', { status: 'error', error: err.message });
@@ -1916,7 +1968,7 @@ ipcMain.on('download-update', () => {
     }
 });
 ipcMain.on('install-update', () => {
-    autoUpdater.quitAndInstall();
+    if (autoUpdater) autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('get-app-version', () => {
@@ -1994,6 +2046,16 @@ app.whenReady().then(async () => {
     startServer();
     createWindow();
     setTimeout(initCloudSync, 3000);
+
+    // Auto-check for updates 10s after startup (independent of UI modules)
+    setTimeout(() => {
+        try {
+            console.log('[AUTO-UPDATE] 🔍 Buscando actualizaciones al inicio...');
+            autoUpdater.checkForUpdates();
+        } catch(e) {
+            console.error('[AUTO-UPDATE] Error al buscar actualizaciones:', e.message);
+        }
+    }, 10000);
 });
 
 app.on('window-all-closed', () => {
@@ -2198,7 +2260,7 @@ async function restartTunnelsHelper() {
             tunnelProcess = null;
         }
         // Para Ngrok específicamente
-        await ngrok.kill();
+        if (ngrok && typeof ngrok.kill === 'function') await ngrok.kill();
         currentTunnelUrl = null;
         isStartingTunnel = false; // Reset flags to allow starting
         startTunnelChain();
@@ -2482,38 +2544,55 @@ ipcMain.handle('license-update-status', async (event, { machineId, status, reaso
 // ==========================================
 // Sunmi P3 Integration
 // ==========================================
-const sunmiP3 = require('./integracion-sunmi.js');
+let sunmiP3 = null;
+try {
+    sunmiP3 = require('./integracion-sunmi.js');
+} catch (e) {
+    console.warn('[Sunmi] No se pudo cargar módulo integracion-sunmi.js:', e.message);
+}
 
 ipcMain.handle('sunmi-get-status', async () => {
-    const encontrado = await sunmiP3.detectar();
-    return {
-        conectado: encontrado,
-        producto: encontrado ? sunmiP3.device.productName : null,
-        fabricante: encontrado ? sunmiP3.device.manufacturerName : null,
-        serial: encontrado ? sunmiP3.device.serialNumber : null
-    };
+    if (!sunmiP3) return { conectado: false, producto: null, fabricante: null, serial: null };
+    try {
+        const encontrado = await sunmiP3.detectar();
+        return {
+            conectado: encontrado,
+            producto: (encontrado && sunmiP3.device) ? sunmiP3.device.productName : null,
+            fabricante: (encontrado && sunmiP3.device) ? sunmiP3.device.manufacturerName : null,
+            serial: (encontrado && sunmiP3.device) ? sunmiP3.device.serialNumber : null
+        };
+    } catch(e) {
+        return { conectado: false, producto: null, fabricante: null, serial: null };
+    }
 });
 
 ipcMain.handle('sunmi-start-monitoring', async () => {
-    sunmiP3.iniciarMonitoreo(3000);
-    sunmiP3.removeAllListeners('conectado');
-    sunmiP3.removeAllListeners('desconectado');
-    sunmiP3.on('conectado', (data) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('sunmi-status', { conectado: true, ...data });
-        }
-    });
-    sunmiP3.on('desconectado', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('sunmi-status', { conectado: false });
-        }
-    });
-    const status = await sunmiP3.detectar();
-    return { ok: true, conectado: status };
+    if (!sunmiP3) return { ok: false, conectado: false };
+    try {
+        sunmiP3.iniciarMonitoreo(3000);
+        sunmiP3.removeAllListeners('conectado');
+        sunmiP3.removeAllListeners('desconectado');
+        sunmiP3.on('conectado', (data) => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('sunmi-status', { conectado: true, ...data });
+            }
+        });
+        sunmiP3.on('desconectado', () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('sunmi-status', { conectado: false });
+            }
+        });
+        const status = await sunmiP3.detectar();
+        return { ok: true, conectado: status };
+    } catch(e) {
+        return { ok: false, conectado: false };
+    }
 });
 
 ipcMain.handle('sunmi-stop-monitoring', () => {
-    sunmiP3.detenerMonitoreo();
+    if (sunmiP3 && typeof sunmiP3.detenerMonitoreo === 'function') {
+        sunmiP3.detenerMonitoreo();
+    }
     return { ok: true };
 });
 

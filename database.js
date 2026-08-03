@@ -12,18 +12,18 @@ function backupDatabaseDaily(dbDir, dbPath) {
         if (!fs.existsSync(backupDir)) {
             fs.mkdirSync(backupDir, { recursive: true });
         }
-        
+
         // Local date string YYYY-MM-DD
         const today = new Date();
         const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         const backupFilename = `freshpos_backup_${dateStr}.sqlite`;
         const backupFilePath = path.join(backupDir, backupFilename);
-        
+
         if (!fs.existsSync(backupFilePath)) {
             fs.copyFileSync(dbPath, backupFilePath);
             console.log('[DATABASE] Backup diario creado:', backupFilename);
         }
-        
+
         // Delete older backups
         const files = fs.readdirSync(backupDir);
         files.forEach(file => {
@@ -32,7 +32,7 @@ function backupDatabaseDaily(dbDir, dbPath) {
                 console.log('[DATABASE] Backup antiguo eliminado:', file);
             }
         });
-    } catch(err) {
+    } catch (err) {
         console.error('[DATABASE] Error creando backup:', err);
     }
 }
@@ -43,22 +43,22 @@ function initDatabase(userDataPath) {
         if (!fs.existsSync(dbDir)) {
             fs.mkdirSync(dbDir, { recursive: true });
         }
-        
+
         const dbPath = path.join(dbDir, 'freshpos.sqlite');
         _dbPath = dbPath;
-        
+
         // Trigger daily backup
         backupDatabaseDaily(dbDir, dbPath);
-        
+
         console.log('[DATABASE] Conectando a:', dbPath);
-        
+
         db = new sqlite3.Database(dbPath, (err) => {
             if (err) {
                 console.error('[DATABASE] Error conectando:', err);
                 reject(err);
                 return;
             }
-            
+
             console.log('[DATABASE] Conexión establecida.');
             createTables().then(resolve).catch(reject);
         });
@@ -67,7 +67,7 @@ function initDatabase(userDataPath) {
 
 function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
-        db.run(sql, params, function(err) {
+        db.run(sql, params, function (err) {
             if (err) reject(err);
             else resolve(this);
         });
@@ -109,8 +109,8 @@ async function createTables() {
     // Migración para añadir store_id si no existe
     try {
         await runQuery(`ALTER TABLE products ADD COLUMN store_id TEXT`);
-    } catch(e) { /* Columna ya existe o error ignorado */ }
-    
+    } catch (e) { /* Columna ya existe o error ignorado */ }
+
     // Migraciones de nuevas columnas en products
     const productCols = [
         'priceEUR REAL',
@@ -129,10 +129,10 @@ async function createTables() {
     for (const col of productCols) {
         try {
             await runQuery(`ALTER TABLE products ADD COLUMN ${col}`);
-        } catch(e) {}
+        } catch (e) { }
     }
-    try { await runQuery(`ALTER TABLE products ADD COLUMN points INTEGER DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE products ADD COLUMN deleted_at TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE products ADD COLUMN points INTEGER DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE products ADD COLUMN deleted_at TEXT`); } catch (e) { }
 
     // Tabla de Metadatos (flags persistentes tipo key-value)
     await runQuery(`
@@ -199,10 +199,10 @@ async function createTables() {
     `);
     try {
         await runQuery(`ALTER TABLE clients ADD COLUMN store_id TEXT`);
-    } catch(e) {}
+    } catch (e) { }
     try {
         await runQuery(`ALTER TABLE clients ADD COLUMN type TEXT`);
-    } catch(e) { /* Columna ya existe */ }
+    } catch (e) { /* Columna ya existe */ }
 
     // Tabla de Ventas con store_id
     await runQuery(`
@@ -223,19 +223,19 @@ async function createTables() {
     `);
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN store_id TEXT`);
-    } catch(e) {}
+    } catch (e) { }
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN payments TEXT`);
-    } catch(e) {}
+    } catch (e) { }
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN cashier_name TEXT`);
-    } catch(e) {}
+    } catch (e) { }
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN status TEXT`);
-    } catch(e) {}
+    } catch (e) { }
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN discount REAL`);
-    } catch(e) {}
+    } catch (e) { }
 
     // Tabla de Créditos con store_id
     await runQuery(`
@@ -255,7 +255,7 @@ async function createTables() {
     `);
     try {
         await runQuery(`ALTER TABLE credits ADD COLUMN store_id TEXT`);
-    } catch(e) {}
+    } catch (e) { }
 
     // Tabla de Historial de Pagos de Créditos
     await runQuery(`
@@ -272,7 +272,7 @@ async function createTables() {
     `);
     try {
         await runQuery(`ALTER TABLE credit_payments ADD COLUMN store_id TEXT`);
-    } catch(e) {}
+    } catch (e) { }
 
     await runQuery(`
         CREATE TABLE IF NOT EXISTS settings (
@@ -284,8 +284,8 @@ async function createTables() {
     `);
     try {
         await runQuery(`ALTER TABLE settings ADD COLUMN store_id TEXT`);
-    } catch(e) {}
-    
+    } catch (e) { }
+
     // Tabla de Arqueos de Caja
     await runQuery(`
         CREATE TABLE IF NOT EXISTS cashups (
@@ -302,23 +302,23 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN store_id TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_usd REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_ves REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_pago_movil REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_transfer REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_card REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_eur REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN expenses_total REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN transaction_count INTEGER DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_usd REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_ves REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_pm REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_card REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_pm REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_card REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_ves REAL DEFAULT 0`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE cashups ADD COLUMN status TEXT DEFAULT 'open'`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN store_id TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_usd REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN opening_ves REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_pago_movil REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_transfer REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_card REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN sales_eur REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN expenses_total REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN transaction_count INTEGER DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_usd REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_ves REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_pm REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN counted_card REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_pm REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_card REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN diff_ves REAL DEFAULT 0`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE cashups ADD COLUMN status TEXT DEFAULT 'open'`); } catch (e) { }
 
     // Tabla de Movimientos/Merma
     await runQuery(`
@@ -336,7 +336,7 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE movements ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE movements ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Tabla de Transferencias de Stock
     await runQuery(`
@@ -355,7 +355,7 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Tabla de Puntos de Lealtad
     await runQuery(`
@@ -368,7 +368,7 @@ async function createTables() {
             PRIMARY KEY (client_id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE loyalty_points ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE loyalty_points ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Tabla de Facturas Electrónicas
     await runQuery(`
@@ -383,7 +383,7 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE invoices ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE invoices ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Tabla de Órdenes de Compra (Kiosko → Almacén)
     await runQuery(`
@@ -405,7 +405,7 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE purchase_orders ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE purchase_orders ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Tabla de Items de Órdenes de Compra
     await runQuery(`
@@ -421,11 +421,11 @@ async function createTables() {
             PRIMARY KEY (id, store_id)
         )
     `);
-    try { await runQuery(`ALTER TABLE po_items ADD COLUMN store_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE po_items ADD COLUMN store_id TEXT`); } catch (e) { }
 
     // Migración: añadir campos faltantes a stock_transfers
-    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN notes TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN po_id TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN notes TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE stock_transfers ADD COLUMN po_id TEXT`); } catch (e) { }
 
     // Tabla de Usuarios
     await runQuery(`
@@ -444,11 +444,13 @@ async function createTables() {
         )
     `);
 
-    try { await runQuery(`ALTER TABLE users ADD COLUMN created_at TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE users ADD COLUMN last_login TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE users ADD COLUMN phone TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE users ADD COLUMN document TEXT`); } catch(e) {}
-    try { await runQuery(`ALTER TABLE users ADD COLUMN photo TEXT`); } catch(e) {}
+    try { await runQuery(`ALTER TABLE users ADD COLUMN created_at TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE users ADD COLUMN last_login TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE users ADD COLUMN phone TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE users ADD COLUMN document TEXT`); } catch (e) { }
+    try { await runQuery(`ALTER TABLE users ADD COLUMN photo TEXT`); } catch (e) { }
+    try { await runQuery(`UPDATE users SET id = 'usr_' || username WHERE id IS NULL OR id = ''`); } catch (e) { }
+    try { await runQuery(`DELETE FROM users WHERE rowid NOT IN (SELECT max(rowid) FROM users GROUP BY LOWER(username))`); } catch (e) { }
 
     console.log('[DATABASE] Tablas inicializadas y migradas para Multi-Tenant.');
 }
@@ -456,12 +458,11 @@ async function createTables() {
 // API Exportada para el Frontend (Casi todos los métodos ahora requieren storeId)
 const api = {
     // --- PRODUCTOS ---
-    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']).catch(() => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || ''])),
-    getActiveProducts: (storeId) => getQuery(`SELECT * FROM products WHERE store_id = ? AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '']).catch(() => getQuery(`SELECT * FROM products WHERE store_id = ?`, [storeId || ''])),
+    getProducts: (storeId) => getQuery(`SELECT * FROM products WHERE (store_id = ? OR store_id IS NULL OR store_id = '' OR ? = '') AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '', storeId || '']).catch(() => getQuery(`SELECT * FROM products`, [])),
+    getActiveProducts: (storeId) => getQuery(`SELECT * FROM products WHERE (store_id = ? OR store_id IS NULL OR store_id = '' OR ? = '') AND (deleted_at IS NULL OR deleted_at = '')`, [storeId || '', storeId || '']).catch(() => getQuery(`SELECT * FROM products`, [])),
 
     getProductById: (storeId, productId) => {
-        const rows = db.prepare ? null : null;
-        return getQuery(`SELECT * FROM products WHERE id = ? AND store_id = ?`, [productId, storeId || '']).then(r => r[0] || null);
+        return getQuery(`SELECT * FROM products WHERE id = ?`, [productId]).then(r => r[0] || null);
     },
 
     logProductChange: (storeId, change) => {
@@ -508,7 +509,7 @@ const api = {
         try {
             const rows = await getQuery(`SELECT * FROM products WHERE id = ? AND store_id = ?`, [product.id, sid]);
             existing = rows[0] || null;
-        } catch(e) {}
+        } catch (e) { }
 
         const fieldsToTrack = ['name', 'category', 'priceUSD', 'priceVES', 'priceEUR', 'costPrice', 'stock', 'minStock', 'featured'];
         const changes = [];
@@ -517,7 +518,7 @@ const api = {
             for (const field of fieldsToTrack) {
                 let oldVal = existing[field];
                 let newVal = product[field];
-                if (field === 'category' && typeof oldVal === 'string') { try { oldVal = JSON.parse(oldVal); } catch(e) {} }
+                if (field === 'category' && typeof oldVal === 'string') { try { oldVal = JSON.parse(oldVal); } catch (e) { } }
                 if (field === 'featured') { oldVal = existing[field] ? 1 : 0; newVal = product[field] ? 1 : 0; }
                 const oldStr = String(oldVal ?? '');
                 const newStr = String(newVal ?? '');
@@ -534,12 +535,12 @@ const api = {
             [
                 product.id,
                 sid,
-                product.name, 
-                typeof product.category === 'object' ? JSON.stringify(product.category) : product.category, 
-                product.priceUSD ?? product.price ?? 0, 
-                product.priceVES ?? 0, 
-                product.priceEUR ?? 0, 
-                product.costPrice ?? 0, 
+                product.name,
+                typeof product.category === 'object' ? JSON.stringify(product.category) : product.category,
+                product.priceUSD ?? product.price ?? 0,
+                product.priceVES ?? 0,
+                product.priceEUR ?? 0,
+                product.costPrice ?? 0,
                 product.stock ?? 0,
                 product.minStock ?? 5,
                 product.featured ? 1 : 0,
@@ -570,7 +571,7 @@ const api = {
 
         return result;
     },
-    
+
     saveProductsBulk: async (storeId, products) => {
         if (!products || !Array.isArray(products)) return;
         const sid = storeId || '';
@@ -586,7 +587,7 @@ const api = {
                 const placeholders = ids.map(() => '?').join(',');
                 const rows = await getQuery(`SELECT * FROM products WHERE id IN (${placeholders}) AND store_id = ?`, [...ids, sid]);
                 rows.forEach(r => { existingMap[r.id] = r; });
-            } catch(e) {}
+            } catch (e) { }
         }
 
         const batchChanges = [];
@@ -599,12 +600,12 @@ const api = {
             validChunk.forEach(p => {
                 values.push(
                     p.id, sid,
-                    p.name, 
-                    typeof p.category === 'object' ? JSON.stringify(p.category) : p.category, 
-                    p.priceUSD || p.price || 0, 
-                    p.priceVES || 0, 
-                    p.priceEUR || 0, 
-                    p.costPrice || 0, 
+                    p.name,
+                    typeof p.category === 'object' ? JSON.stringify(p.category) : p.category,
+                    p.priceUSD || p.price || 0,
+                    p.priceVES || 0,
+                    p.priceEUR || 0,
+                    p.costPrice || 0,
                     p.stock || 0,
                     p.minStock || 5,
                     p.featured ? 1 : 0,
@@ -664,7 +665,7 @@ const api = {
 
         return { success: true };
     },
-    
+
     deleteProduct: (storeId, id, cashier_name) => {
         const sid = storeId || '';
         const now = new Date().toISOString();
@@ -674,7 +675,7 @@ const api = {
         runQuery(
             `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [changeId, sid, id, '*', 'active', 'deleted', 'delete', cashier, now]
-        ).catch(e => {});
+        ).catch(e => { });
         return runQuery(`UPDATE products SET deleted_at = ? WHERE id = ? AND store_id = ?`, [now, id, sid]);
     },
 
@@ -686,7 +687,7 @@ const api = {
         runQuery(
             `INSERT INTO product_changes (id, store_id, product_id, field, old_value, new_value, action, cashier_name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [changeId, sid, id, '*', 'deleted', 'active', 'restore', cashier, now]
-        ).catch(e => {});
+        ).catch(e => { });
         return runQuery(`UPDATE products SET deleted_at = NULL WHERE id = ? AND store_id = ?`, [id, sid]);
     },
 
@@ -697,7 +698,7 @@ const api = {
 
     // --- INGREDIENTES ---
     getIngredients: (storeId) => getQuery(`SELECT * FROM ingredients WHERE store_id = ?`, [storeId || '']),
-    
+
     saveIngredient: (storeId, ingredient) => {
         const sid = storeId || '';
         return runQuery(
@@ -705,12 +706,12 @@ const api = {
             [ingredient.id, sid, ingredient.name, ingredient.unit, ingredient.cost || 0, ingredient.stock || 0, ingredient.minStock || 0]
         );
     },
-    
+
     deleteIngredient: (storeId, id) => runQuery(`DELETE FROM ingredients WHERE id = ? AND store_id = ?`, [id, storeId || '']),
 
     // --- RECETAS ---
     getRecipes: (storeId) => getQuery(`SELECT * FROM recipes WHERE store_id = ?`, [storeId || '']),
-    
+
     saveRecipe: (storeId, recipe) => {
         const sid = storeId || '';
         return runQuery(
@@ -718,14 +719,14 @@ const api = {
             [recipe.id, sid, recipe.product_id, recipe.ingredient_id, recipe.quantity || 0]
         );
     },
-    
+
     deleteRecipe: (storeId, id) => runQuery(`DELETE FROM recipes WHERE id = ? AND store_id = ?`, [id, storeId || '']),
-    
+
     deleteRecipesByProduct: (storeId, productId) => runQuery(`DELETE FROM recipes WHERE product_id = ? AND store_id = ?`, [productId, storeId || '']),
 
     // --- CLIENTES ---
     getClients: (storeId) => getQuery(`SELECT * FROM clients WHERE store_id = ?`, [storeId || '']),
-    
+
     saveClient: (storeId, client) => {
         const sid = storeId || '';
         return runQuery(
@@ -738,37 +739,37 @@ const api = {
     getSales: (storeId, limit = 100) => getQuery(`
         SELECT s.*, cl.name as client_name, cl.document as client_document, cl.phone as client_phone 
         FROM sales s
-        LEFT JOIN clients cl ON s.client_id = cl.id AND s.store_id = cl.store_id
-        WHERE s.store_id = ?
+        LEFT JOIN clients cl ON s.client_id = cl.id
+        WHERE (s.store_id = ? OR s.store_id IS NULL OR s.store_id = '' OR ? = '')
         ORDER BY s.timestamp DESC 
         LIMIT ?
-    `, [storeId || '', limit]),
-    
+    `, [storeId || '', storeId || '', limit]),
+
     getSalesByDate: (storeId, startDate, endDate) => getQuery(`
         SELECT s.*, cl.name as client_name, cl.document as client_document, cl.phone as client_phone 
         FROM sales s
-        LEFT JOIN clients cl ON s.client_id = cl.id AND s.store_id = cl.store_id
-        WHERE s.store_id = ? AND s.timestamp >= ? AND s.timestamp <= ? 
+        LEFT JOIN clients cl ON s.client_id = cl.id
+        WHERE (s.store_id = ? OR s.store_id IS NULL OR s.store_id = '' OR ? = '') AND s.timestamp >= ? AND s.timestamp <= ? 
         ORDER BY s.timestamp DESC
-    `, [storeId || '', startDate, endDate]),
-    
+    `, [storeId || '', storeId || '', startDate, endDate]),
+
     saveSale: async (storeId, sale) => {
         const sid = storeId || '';
         await runQuery(
             `INSERT INTO sales (id, store_id, date, timestamp, total, method, client_id, items, pagoMovilRef, subtotal, tax, payments, cashier_name, status, discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                sale.id, 
-                sid, 
-                sale.date, 
-                sale.timestamp, 
-                sale.totalUSD || sale.total || 0, 
-                sale.method, 
-                sale.clientId || null, 
-                JSON.stringify(sale.items), 
-                sale.pmDetails?.ref || sale.pagoMovilRef || null, 
-                sale.subtotal || sale.totalUSD || sale.total || 0, 
-                sale.tax || 0, 
-                sale.payments || null, 
+                sale.id,
+                sid,
+                sale.date,
+                sale.timestamp,
+                sale.totalUSD || sale.total || 0,
+                sale.method,
+                sale.clientId || null,
+                JSON.stringify(sale.items),
+                sale.pmDetails?.ref || sale.pagoMovilRef || null,
+                sale.subtotal || sale.totalUSD || sale.total || 0,
+                sale.tax || 0,
+                sale.payments || null,
                 sale.cashierName || 'Cajero',
                 sale.status || 'paid',
                 sale.discount || 0
@@ -798,16 +799,22 @@ const api = {
         return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users ORDER BY name ASC`);
     },
     getUser: async (storeId, username) => {
-        return getQuery(`SELECT * FROM users WHERE store_id = ? AND username = ? AND active = 1`, [storeId || '', username]).then(r => r[0] || null);
+        const sid = storeId || '';
+        return getQuery(
+            `SELECT * FROM users WHERE (store_id = ? OR store_id = '' OR store_id IS NULL) AND LOWER(username) = LOWER(?) AND active = 1 ORDER BY rowid DESC`,
+            [sid, username]
+        ).then(r => r[0] || null);
     },
     getUserById: async (storeId, userId) => {
-        return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE store_id = ? AND id = ?`, [storeId || '', userId]).then(r => r[0] || null);
+        const sid = storeId || '';
+        return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE (store_id = ? OR store_id = '' OR store_id IS NULL) AND id = ?`, [sid, userId]).then(r => r[0] || null);
     },
     saveUser: async (storeId, user) => {
         const sid = storeId || '';
+        const userId = user.id || ('usr_' + (user.username || Date.now()));
         return runQuery(
             `INSERT OR REPLACE INTO users (id, store_id, username, password_hash, salt, role, name, phone, document, photo, active, created_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [user.id, sid, user.username, user.password_hash, user.salt, user.role, user.name, user.phone || '', user.document || '', user.photo || '', user.active ? 1 : 0, user.created_at || new Date().toISOString(), user.last_login || null]
+            [userId, sid, user.username, user.password_hash, user.salt, user.role, user.name, user.phone || '', user.document || '', user.photo || '', user.active !== undefined ? (user.active ? 1 : 0) : 1, user.created_at || new Date().toISOString(), user.last_login || null]
         );
     },
     deleteUser: async (storeId, userId) => {
@@ -828,7 +835,7 @@ const api = {
             ORDER BY c.date DESC
         `, [storeId || '']);
     },
-    
+
     addCreditPayment: async (storeId, creditId, amount, method) => {
         const sid = storeId || '';
         const paymentId = 'pay_' + Date.now();
@@ -836,9 +843,9 @@ const api = {
             `INSERT INTO credit_payments (id, store_id, credit_id, amount, date, method) VALUES (?, ?, ?, ?, ?, ?)`,
             [paymentId, sid, creditId, amount, new Date().toISOString(), method]
         );
-        
+
         await runQuery(`UPDATE credits SET amount_paid = amount_paid + ? WHERE id = ? AND store_id = ?`, [amount, creditId, sid]);
-        
+
         const credit = (await getQuery(`SELECT amount_owed, amount_paid FROM credits WHERE id = ? AND store_id = ?`, [creditId, sid]))[0];
         if (credit && credit.amount_paid >= credit.amount_owed) {
             await runQuery(`UPDATE credits SET status = 'PAID' WHERE id = ? AND store_id = ?`, [creditId, sid]);
@@ -862,7 +869,7 @@ const api = {
                 const files = fs.readdirSync(backupDir).filter(f => f.startsWith('freshpos_pre_migrate_'));
                 if (files.length > 5) {
                     files.sort().slice(0, files.length - 5).forEach(f => {
-                        try { fs.unlinkSync(path.join(backupDir, f)); } catch(e) {}
+                        try { fs.unlinkSync(path.join(backupDir, f)); } catch (e) { }
                     });
                 }
             }
@@ -977,7 +984,7 @@ const api = {
         // Save individual items
         if (po.items && po.items.length) {
             for (const item of po.items) {
-                const itemId = 'poi_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+                const itemId = 'poi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
                 await runQuery(
                     `INSERT INTO po_items (id, store_id, po_id, product_id, product_name, quantity, received_qty, cost_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                     [itemId, sid, po.id, item.product_id, item.product_name, item.quantity || 0, item.received_qty || 0, item.cost_price || 0]
@@ -1070,7 +1077,6 @@ async function migrateOrphanData(storeId) {
         { name: 'credit_payments', idCol: 'id' },
         { name: 'ingredients', idCol: 'id' },
         { name: 'recipes', idCol: 'id' },
-        { name: 'settings', idCol: 'key' },
         { name: 'cashups', idCol: 'id' },
         { name: 'movements', idCol: 'id' },
         { name: 'stock_transfers', idCol: 'id' },
@@ -1084,19 +1090,20 @@ async function migrateOrphanData(storeId) {
     for (const table of tables) {
         try {
             const orphans = await getQuery(
-                `SELECT ${table.idCol} FROM ${table.name} WHERE store_id IS NULL OR store_id = ''`
+                `SELECT ${table.idCol} FROM ${table.name} WHERE store_id IS NULL OR store_id = '' OR store_id != ?`,
+                [sid]
             );
             if (orphans && orphans.length > 0) {
                 await runQuery(
-                    `UPDATE ${table.name} SET store_id = ? WHERE store_id IS NULL OR store_id = ''`,
-                    [sid]
+                    `UPDATE ${table.name} SET store_id = ? WHERE store_id IS NULL OR store_id = '' OR store_id != ?`,
+                    [sid, sid]
                 );
                 totalMigrated += orphans.length;
             }
-        } catch(e) { /* tabla no existe aún */ }
+        } catch (e) { /* tabla no existe aún */ }
     }
     if (totalMigrated > 0) {
-        console.log(`[DATABASE] Migración: ${totalMigrated} registros huérfanos asignados al store ${sid}`);
+        console.log(`[DATABASE] Migración: ${totalMigrated} registros de la BD local reasignados automáticamente al store ${sid}`);
     }
     return totalMigrated;
 }

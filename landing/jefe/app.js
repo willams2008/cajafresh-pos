@@ -1693,7 +1693,7 @@ function renderLiveState(states) {
                         `).join('')}
                     </div>
                     <div style="padding:8px 16px; background:var(--bg); border-top:1px solid var(--outline); display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:10px; font-weight:700; color:var(--text-muted);">VISTA: ${s.current_view}</span>
+                        <span style="font-size:10px; font-weight:700; color:var(--text-muted);"><i class="fas fa-user" style="margin-right:4px;"></i> ${s.cashier_name || 'Cajero Activo'} • ${s.current_view || 'POS'}</span>
                         <button onclick="openDetail('${s.store_id}')" style="background:none; border:none; color:var(--info); font-size:11px; font-weight:800; cursor:pointer;">Ver Sede <i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>

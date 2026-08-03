@@ -7,7 +7,13 @@
  * sunmi.on('pago-detectado', (data) => { ... });
  */
 const EventEmitter = require('events');
-const usb = require('usb');
+
+let usb = null;
+try {
+    usb = require('usb');
+} catch (e) {
+    console.warn('[Sunmi] Módulo usb opcional no disponible:', e.message);
+}
 
 class SunmiP3 extends EventEmitter {
     constructor() {
@@ -22,6 +28,7 @@ class SunmiP3 extends EventEmitter {
     }
 
     async detectar() {
+        if (!usb || !usb.usb) return false;
         try {
             const devs = await usb.usb.getDevices();
             this.device = devs.find(d =>

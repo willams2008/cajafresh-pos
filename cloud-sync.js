@@ -413,7 +413,9 @@ class CloudSync {
             items_json: JSON.stringify(saleData.items || []),
             exchange_rate: saleData.exchangeRate || 0,
             client_name: saleData.client?.name || 'Venta Local',
-            status: saleData.status || 'paid'
+            status: saleData.status || 'paid',
+            cashier_name: saleData.cashier_name || saleData.cashier || (window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Principal'),
+            cashier_id: saleData.cashier_id || saleData.cashierId || (window.currentUser ? window.currentUser.id : null)
         };
 
         console.log(`[CLOUD-SYNC] 🛒 Enviando venta ${sale.id} ($${sale.total_usd}) a Supabase...`);
@@ -597,6 +599,7 @@ class CloudSync {
             total_ves: totals.ves || 0,
             active_items: cart.length,
             current_view: currentView,
+            cashier_name: (window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Activo'),
             last_activity: new Date().toISOString()
         };
 

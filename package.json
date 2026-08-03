@@ -1,73 +1,73 @@
 {
-    "name":  "puntopila-pos",
-    "version":  "1.4.9",
-    "description":  "Sistema POS Punto Pila - Gestión Inteligente",
-    "main":  "main.js",
-    "scripts":  {
-                    "start":  "set ELECTRON_RUN_AS_NODE=\u0026\u0026 electron .",
-                    "build":  "electron-builder",
-                    "package":  "electron-packager . \"Punto Pila POS\" --platform=win32 --arch=x64 --out=dist --overwrite",
-                    "publish":  "electron-builder -p always"
-                },
-    "build":  {
-                  "appId":  "com.puntopila.pos",
-                  "productName":  "Punto Pila POS",
-                  "directories":  {
-                                      "output":  "dist_FINAL"
-                                  },
-                  "win":  {
-                              "target":  "nsis",
-                              "icon":  "icon.ico"
-                          },
-                  "nsis":  {
-                               "oneClick":  false,
-                               "allowToChangeInstallationDirectory":  true,
-                               "installerIcon":  "icon.ico",
-                               "uninstallerIcon":  "icon.ico",
-                               "installerHeaderIcon":  "icon.ico"
-                           },
-                   "publish":  [
-                                   { "provider": "github", "owner": "willams2008", "repo": "cajafresh-pos", "releaseType": "release" }
-                               ],
-                  "files":  [
-                                "**/*",
-                                "!dist*/**/*",
-                                "!temp_*/**/*",
-                                "!build*/**/*",
-                                "!.wwebjs_cache/**/*"
-                            ],
-                  "asar":  true,
-                  "asarUnpack":  [
-                                     "node_modules/cloudflared/**/*",
-                                     "node_modules/ngrok/**/*"
-                                 ]
-              },
-    "author":  "Punto Pila",
-    "license":  "ISC",
-    "devDependencies":  {
-                            "@babel/parser":  "^8.0.4",
-                            "@electron/packager":  "^19.0.5",
-                            "acorn":  "^8.18.0",
-                            "asar":  "^3.2.0",
-                            "electron":  "32.0.0",
-                            "electron-builder":  "^26.8.1",
-                            "esprima":  "^4.0.1"
-                        },
-    "dependencies":  {
-                         "adbkit":  "^2.11.1",
-                         "cloudflared":  "^0.7.1",
-                         "cors":  "^2.8.6",
-                         "dotenv":  "^17.4.2",
-                         "electron-updater":  "^6.8.9",
-                         "express":  "^5.2.1",
-                         "jspdf":  "^4.2.1",
-                         "jspdf-autotable":  "^5.0.7",
-                         "localtunnel":  "^2.0.2",
-                         "ngrok":  "^5.0.0-beta.2",
-                         "qrcode":  "^1.5.4",
-                         "socket.io":  "^4.8.3",
-                         "sqlite3":  "^6.0.1",
-                         "usb":  "^3.0.1",
-                         "whatsapp-web.js":  "^1.34.6"
-                     }
+    "name": "puntopila-pos",
+    "version": "1.7.2",
+    "description": "Sistema POS Punto Pila - Gestión Inteligente",
+    "main": "main.js",
+    "scripts": {
+        "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
+        "build": "electron-builder",
+        "package": "electron-packager . \"Punto Pila POS\" --platform=win32 --arch=x64 --out=dist --overwrite",
+        "publish": "electron-builder -p always"
+    },
+    "build": {
+        "appId": "com.puntopila.pos",
+        "productName": "Punto Pila POS",
+        "directories": {
+            "output": "dist_FINAL"
+        },
+        "win": {
+            "target": "nsis",
+            "icon": "icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "installerIcon": "icon.ico",
+            "uninstallerIcon": "icon.ico",
+            "installerHeaderIcon": "icon.ico"
+        },
+        "publish": [
+            { "provider": "github", "owner": "willams2008", "repo": "cajafresh-pos", "releaseType": "release" }
+        ],
+        "files": [
+            "**/*",
+            "!dist*/**/*",
+            "!temp_*/**/*",
+            "!build*/**/*",
+            "!.wwebjs_cache/**/*"
+        ],
+        "asar": true,
+        "asarUnpack": [
+            "node_modules/cloudflared/**/*",
+            "node_modules/ngrok/**/*"
+        ]
+    },
+    "author": "Punto Pila",
+    "license": "ISC",
+    "devDependencies": {
+        "@babel/parser": "^8.0.4",
+        "@electron/packager": "^19.0.5",
+        "acorn": "^8.18.0",
+        "asar": "^3.2.0",
+        "electron": "32.0.0",
+        "electron-builder": "^26.8.1",
+        "esprima": "^4.0.1"
+    },
+    "dependencies": {
+        "adbkit": "^2.11.1",
+        "cloudflared": "^0.7.1",
+        "cors": "^2.8.6",
+        "dotenv": "^17.4.2",
+        "electron-updater": "^6.8.9",
+        "express": "^4.21.2",
+        "localtunnel": "^2.0.2",
+        "ngrok": "^5.0.0-beta.2",
+        "node-fetch": "^2.7.0",
+        "qrcode": "^1.5.4",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1",
+        "sqlite3": "^5.1.7",
+        "usb": "^3.0.1",
+        "whatsapp-web.js": "^1.30.0"
+    }
 }

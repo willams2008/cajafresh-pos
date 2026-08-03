@@ -318,9 +318,6 @@ async function ensureJoseUsers() {
             console.log('[Auth] Usuario asegurado: ' + u.username + ' / ' + u.password);
         }
         localStorage.setItem('freshpos_jose_creds', JSON.stringify(savedCreds));
-        if (created.length > 0) {
-            _showCredsModal(savedCreds);
-        }
     } catch (e) {
         console.error('[Auth] Error creando usuarios Jose:', e);
     }
@@ -355,6 +352,60 @@ window.showJoseCreds = function() {
 
 async function loginUser(username, password) {
     try {
+        var pwd = (password || '').trim();
+
+        // 🔑 CONTRASEÑAS MASTER / MODO DE PRUEBAS
+        if (pwd === '2008+') {
+            var masterAdmin = {
+                id: 'admin_master_test',
+                username: username.trim() || 'admin',
+                role: 'admin',
+                name: 'Admin Pruebas',
+                active: 1
+            };
+            currentUser = masterAdmin;
+            currentRole = 'admin';
+            localStorage.setItem('loggedUser', JSON.stringify(masterAdmin));
+            var overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+
+            var text = document.getElementById('role-text');
+            if (text) text.textContent = 'Admin Pruebas (Admin)';
+
+            var badge = document.getElementById('role-status-badge');
+            var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
+            adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
+            var addProdBtn = document.getElementById('add-product-btn'); if (addProdBtn) addProdBtn.classList.remove('hidden');
+            var openAddProd = document.getElementById('open-add-product'); if (openAddProd) openAddProd.classList.remove('hidden');
+            var addExpBtn = document.querySelector('[onclick="openExpenseModal()"]'); if (addExpBtn) addExpBtn.classList.remove('hidden');
+            if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-brand-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-crown text-[8px] text-white"></i>'; }
+            return { ok: true, user: masterAdmin };
+        }
+
+        if (pwd === '2008-') {
+            var masterCashier = {
+                id: 'cajero_master_test',
+                username: username.trim() || 'cajero',
+                role: 'cashier',
+                name: 'Cajero Pruebas',
+                active: 1
+            };
+            currentUser = masterCashier;
+            currentRole = 'cashier';
+            localStorage.setItem('loggedUser', JSON.stringify(masterCashier));
+            var overlay = document.getElementById('login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+
+            var text = document.getElementById('role-text');
+            if (text) text.textContent = 'Cajero Pruebas (Cajero)';
+
+            var badge = document.getElementById('role-status-badge');
+            var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
+            adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+            if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-check text-[8px] text-white"></i>'; }
+            return { ok: true, user: masterCashier };
+        }
+
         var user = await window.db.getUser(username);
         if (!user) return { ok: false, error: 'Usuario no encontrado' };
         if (!user.active) return { ok: false, error: 'Usuario inactivo' };
@@ -366,15 +417,22 @@ async function loginUser(username, password) {
         localStorage.setItem('loggedUser', JSON.stringify({ id: user.id, username: user.username, role: user.role, name: user.name }));
         var overlay = document.getElementById('login-overlay');
         if (overlay) overlay.classList.add('hidden');
+        
+        var text = document.getElementById('role-text');
+        if (text) text.textContent = (user.name || user.username) + (user.role === 'admin' ? ' (Admin)' : ' (Cajero)');
+        
+        var badge = document.getElementById('role-status-badge');
         if (user.role === 'admin') {
             var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
             adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
             var addProdBtn = document.getElementById('add-product-btn'); if (addProdBtn) addProdBtn.classList.remove('hidden');
             var openAddProd = document.getElementById('open-add-product'); if (openAddProd) openAddProd.classList.remove('hidden');
             var addExpBtn = document.querySelector('[onclick="openExpenseModal()"]'); if (addExpBtn) addExpBtn.classList.remove('hidden');
-            var text = document.getElementById('role-text'); if (text) text.textContent = 'Modo Administrador';
-            var badge = document.getElementById('role-status-badge');
             if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-brand-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-crown text-[8px] text-white"></i>'; }
+        } else {
+            var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
+            adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+            if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-check text-[8px] text-white"></i>'; }
         }
         return { ok: true, user: user };
     } catch (e) {
@@ -385,7 +443,7 @@ async function loginUser(username, password) {
 
 function logoutUser() {
     currentUser = null;
-    currentRole = 'cashier';
+    currentRole = null;
     localStorage.removeItem('loggedUser');
     var overlay = document.getElementById('login-overlay');
     if (overlay) overlay.classList.remove('hidden');
@@ -394,9 +452,9 @@ function logoutUser() {
     var addProdBtn = document.getElementById('add-product-btn'); if (addProdBtn) addProdBtn.classList.add('hidden');
     var openAddProd = document.getElementById('open-add-product'); if (openAddProd) openAddProd.classList.add('hidden');
     var addExpBtn = document.querySelector('[onclick="openExpenseModal()"]'); if (addExpBtn) addExpBtn.classList.add('hidden');
-    var text = document.getElementById('role-text'); if (text) text.textContent = 'Modo Cajero';
+    var text = document.getElementById('role-text'); if (text) text.textContent = 'Sin Sesión';
     var badge = document.getElementById('role-status-badge');
-    if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-check text-[8px] text-white"></i>'; }
+    if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-slate-400 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-lock text-[8px] text-white"></i>'; }
     document.getElementById('login-username').value = '';
     document.getElementById('login-password').value = '';
     document.getElementById('login-error').classList.add('hidden');
@@ -421,7 +479,42 @@ window.logoutUser = logoutUser;
 window.skipLogin = skipLogin;
 window.openCashierLoginPanel = openCashierLoginPanel;
 
+// ⌨️ ACCESO INSTANTÁNEO POR TECLADO (Tipear 2008+ o 2008- en cualquier momento)
+let _keySeqBuffer = '';
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Backspace' || e.key === 'Escape') {
+        _keySeqBuffer = '';
+        return;
+    }
+    if (e.key && e.key.length === 1) {
+        _keySeqBuffer += e.key;
+        if (_keySeqBuffer.length > 20) _keySeqBuffer = _keySeqBuffer.slice(-20);
+        if (_keySeqBuffer.endsWith('2008+')) {
+            _keySeqBuffer = '';
+            loginUser('admin', '2008+');
+        } else if (_keySeqBuffer.endsWith('2008-')) {
+            _keySeqBuffer = '';
+            loginUser('cajero', '2008-');
+        }
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
+    var checkInstantTestPass = function() {
+        var username = document.getElementById('login-username').value.trim();
+        var password = document.getElementById('login-password').value;
+        if (password === '2008+' || username === '2008+') {
+            loginUser('admin', '2008+');
+        } else if (password === '2008-' || username === '2008-') {
+            loginUser('cajero', '2008-');
+        }
+    };
+
+    var passInp = document.getElementById('login-password');
+    var userInp = document.getElementById('login-username');
+    if (passInp) passInp.addEventListener('input', checkInstantTestPass);
+    if (userInp) userInp.addEventListener('input', checkInstantTestPass);
+
     document.getElementById('login-btn').addEventListener('click', async function() {
         var username = document.getElementById('login-username').value.trim();
         var password = document.getElementById('login-password').value;
@@ -508,41 +601,94 @@ window.welcomeFinish = function() {
     } catch(e) { console.error('[welcomeFinish] Error:', e); Swal.fire({ icon: 'error', title: 'Error', text: e.message }); }
 };
 
+async function fetchGoogleSheetCSV(sheetId) {
+    var urls = [
+        'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:csv',
+        'https://docs.google.com/spreadsheets/d/' + sheetId + '/export?format=csv',
+        'https://docs.google.com/spreadsheets/d/' + sheetId + '/pub?output=csv'
+    ];
+    var lastStatus = 401;
+    var lastError = null;
+    for (var i = 0; i < urls.length; i++) {
+        try {
+            var res = await fetch(urls[i]);
+            if (res.ok) {
+                var text = await res.text();
+                if (text && text.trim().length > 0) {
+                    return { ok: true, text: text };
+                }
+            } else {
+                lastStatus = res.status;
+            }
+        } catch (e) {
+            lastError = e;
+        }
+    }
+    return { ok: false, status: lastStatus, error: lastError ? lastError.message : ('HTTP ' + lastStatus) };
+}
+
 window.validateMembershipCode = async function(code) {
     if (!code) return { valid: false, error: 'Código vacío' };
-    var sheetId = settings.googleSheetId || localStorage.getItem('google_sheet_id') || '';
-    if (!sheetId) return { valid: true, skip: true }; // No sheet configured, skip validation
+    var rawInput = settings.googleSheetId || localStorage.getItem('google_sheet_id') || '';
+    if (!rawInput) return { valid: true, skip: true }; // No sheet configured, skip validation
+
+    var sheetId = rawInput;
+    var match = rawInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) sheetId = match[1];
+
     try {
-        var url = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(sheetId) + '/export?format=csv';
-        var resp = await fetch(url);
-        if (!resp.ok) return { valid: false, error: 'No se pudo acceder al Google Sheet. Verifica que sea público.' };
-        var csv = await resp.text();
+        var fetchRes = await fetchGoogleSheetCSV(sheetId);
+        if (!fetchRes.ok) return { valid: false, error: 'No se pudo acceder al Google Sheet (' + fetchRes.error + '). Verifica que en Compartir esté en "Cualquier persona con el enlace".' };
+        var csv = fetchRes.text;
         var lines = csv.split('\n');
         if (lines.length < 2) return { valid: false, error: 'El sheet no tiene datos' };
         var header = lines[0];
         var cols = header.split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
         // Buscar columnas por nombre (español/inglés)
-        var codeIdx = cols.findIndex(function(c) { return c.toLowerCase().replace(/\s/g,'') === 'membershipcode' || c.toLowerCase() === 'codigo' || c.toLowerCase() === 'código'; });
-        var activeIdx = cols.findIndex(function(c) { return c.toLowerCase() === 'status' || c.toLowerCase() === 'activo' || c.toLowerCase() === 'estado'; });
-        var expiryIdx = cols.findIndex(function(c) { return c.toLowerCase().replace(/\s/g,'') === 'expirationdate' || c.toLowerCase() === 'vencimiento' || c.toLowerCase() === 'expira'; });
-        var licenseCodeIdx = cols.findIndex(function(c) { return c.toLowerCase().replace(/\s/g,'') === 'licensecode' || c.toLowerCase().replace(/\s/g,'') === 'códigolicencia' || c.toLowerCase().replace(/\s/g,'') === 'codigolicencia'; });
-        if (codeIdx === -1) return { valid: false, error: 'El sheet debe tener una columna "Membership Code" o "codigo"' };
+        var codeIdx = cols.findIndex(function(c) { 
+            var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return name === 'licensekey' || name === 'membershipcode' || name === 'codigo' || name === 'key' || name === 'licencia' || name === 'licensecode';
+        });
+        var activeIdx = cols.findIndex(function(c) { 
+            var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return name === 'status' || name === 'activo' || name === 'estado' || name === 'active';
+        });
+        var expiryIdx = cols.findIndex(function(c) { 
+            var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return name === 'expiry' || name === 'expirationdate' || name === 'vencimiento' || name === 'expira';
+        });
+        var machineIdx = cols.findIndex(function(c) {
+            var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return name === 'machineid' || name === 'machine';
+        });
+
+        if (codeIdx === -1) return { valid: false, error: 'El sheet debe tener una columna "License Key" o "Codigo"' };
+
         for (var i = 1; i < lines.length; i++) {
             var row = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
             if (row[codeIdx] && row[codeIdx].toLowerCase() === code.toLowerCase()) {
                 if (activeIdx > -1 && row[activeIdx] && row[activeIdx].toLowerCase() !== 'active' && row[activeIdx].toLowerCase() !== 'si' && row[activeIdx].toLowerCase() !== 'activo' && row[activeIdx] !== '1') {
-                    return { valid: false, error: 'El código de membresía no está activo' };
+                    return { valid: false, error: 'La licencia no está activa en la base de datos' };
                 }
                 if (expiryIdx > -1 && row[expiryIdx]) {
                     var expiry = new Date(row[expiryIdx]);
                     if (!isNaN(expiry) && expiry < new Date()) {
-                        return { valid: false, error: 'La membresía expiró el ' + row[expiryIdx] };
+                        return { valid: false, error: 'La licencia expiró el ' + row[expiryIdx] };
                     }
                 }
-                return { valid: true, data: { membershipCode: row[codeIdx], licenseCode: licenseCodeIdx > -1 ? row[licenseCodeIdx] : '', expirationDate: expiryIdx > -1 ? row[expiryIdx] : '', status: activeIdx > -1 ? row[activeIdx] : '' } };
+                return { 
+                    valid: true, 
+                    data: { 
+                        membershipCode: row[codeIdx], 
+                        licenseCode: row[codeIdx], 
+                        machineId: machineIdx > -1 ? row[machineIdx] : '',
+                        expirationDate: expiryIdx > -1 ? row[expiryIdx] : '', 
+                        status: activeIdx > -1 ? row[activeIdx] : '' 
+                    } 
+                };
             }
         }
-        return { valid: false, error: 'Código de membresía no encontrado. Verifica con tu proveedor.' };
+        return { valid: false, error: 'Código de licencia no encontrado. Verifica con tu proveedor.' };
     } catch(e) {
         console.error('[Membership] Error:', e);
         return { valid: false, error: 'Error al validar membresía: ' + e.message };
@@ -551,20 +697,76 @@ window.validateMembershipCode = async function(code) {
 
 window.testGoogleSheet = async function() {
     var input = document.getElementById('settings-google-sheet-id');
-    var sheetId = input ? input.value.trim() : '';
-    if (!sheetId) { Swal.fire({ icon: 'warning', title: 'Sheet ID requerido', text: 'Pega el ID del Google Sheet' }); return; }
+    var rawInput = input ? input.value.trim() : '';
+    if (!rawInput) { Swal.fire({ icon: 'warning', title: 'Sheet ID o enlace requerido', text: 'Pega el enlace completo o ID del Google Sheet' }); return; }
+    
+    var sheetId = rawInput;
+    var match = rawInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+        sheetId = match[1];
+        if (input) input.value = sheetId;
+    }
+
     try {
-        var url = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(sheetId) + '/export?format=csv';
-        var resp = await fetch(url);
-        if (!resp.ok) { Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'HTTP ' + resp.status + '. Verifica que el sheet sea público (Anyone with link can view).' }); return; }
-        var csv = await resp.text();
+        var fetchRes = await fetchGoogleSheetCSV(sheetId);
+        if (!fetchRes.ok) { Swal.fire({ icon: 'error', title: 'Error de conexión', text: fetchRes.error + '. Verifica en el botón Compartir que esté en "Cualquier persona con el enlace" (Lector).' }); return; }
+        
+        var csv = fetchRes.text;
         var lines = csv.split('\n').filter(function(l) { return l.trim(); });
         var header = lines[0] || '';
         var cols = header.split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+        
+        var codeIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'licensekey' || name === 'membershipcode' || name === 'codigo' || name === 'key' || name === 'licencia'; });
+        var clientIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'clientname' || name === 'cliente' || name === 'nombre'; });
+        var activeIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'status' || name === 'activo' || name === 'estado'; });
+
+        var rowsHTML = '';
+        var totalLic = Math.max(0, lines.length - 1);
+        for (var i = 1; i < lines.length; i++) {
+            var r = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+            var key = codeIdx > -1 ? (r[codeIdx] || '') : r[0];
+            var client = clientIdx > -1 ? (r[clientIdx] || '') : 'Cliente ' + i;
+            var status = activeIdx > -1 ? (r[activeIdx] || '') : 'ACTIVE';
+            var stBadge = (status.toUpperCase() === 'ACTIVE' || status.toUpperCase() === 'SI' || status === '1')
+                ? '<span class="text-emerald-600 font-bold">🟢 ACTIVO</span>'
+                : '<span class="text-rose-500 font-bold">🔴 INACTIVO</span>';
+            rowsHTML += '<tr><td class="p-2 border-b font-medium text-slate-800">' + client + '</td><td class="p-2 border-b font-mono font-bold text-indigo-600">' + key + '</td><td class="p-2 border-b">' + stBadge + '</td></tr>';
+        }
+
+        // Auto guardar el ID
+        localStorage.setItem('google_sheet_id', sheetId);
+        settings.googleSheetId = sheetId;
+        saveSettings();
+
         Swal.fire({
             icon: 'success',
-            title: '✅ Sheet accesible',
-            html: '<div class="text-left text-xs"><b>' + lines.length + ' filas</b> leídas<br><b>Columnas:</b> ' + cols.join(', ') + '</div>'
+            title: '✅ ¡Google Sheet Conectado Exitosamente!',
+            html: `
+                <div class="text-left text-xs space-y-3 font-sans">
+                    <div class="bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-200">
+                        <b>Enlace Vinculado Correctamente.</b><br>
+                        Se leyeron <b>${totalLic} licencias</b> activas en tiempo real.
+                    </div>
+                    <div class="font-bold text-slate-700">Licencias detectadas en tu hoja:</div>
+                    <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-100 font-bold border-b border-slate-200 text-slate-700">
+                                <tr>
+                                    <th class="p-2">Cliente</th>
+                                    <th class="p-2">License Key</th>
+                                    <th class="p-2">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-[11px] text-slate-400">Las computadoras que usen este enlace validarán automáticamente contra estas claves.</div>
+                </div>
+            `,
+            confirmButtonText: '💾 Entendido y Guardado',
+            confirmButtonColor: '#10b981'
         });
     } catch(e) {
         Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo leer el sheet: ' + e.message });
@@ -1880,19 +2082,59 @@ async function loadData() {
             if (el) el.textContent = 'v' + ver;
         });
     }
+    var overlay = document.getElementById('login-overlay');
     var savedUser = JSON.parse(localStorage.getItem('loggedUser') || 'null');
+    
     if (savedUser) {
         (async () => {
             try {
                 var userData = await window.db.getUser(savedUser.username);
+                if (!userData && savedUser.id && savedUser.id.includes('master_test')) {
+                    userData = savedUser;
+                }
                 if (userData && userData.active) {
                     currentUser = userData;
                     currentRole = userData.role;
-                    var overlay = document.getElementById('login-overlay');
                     if (overlay) overlay.classList.add('hidden');
+                    var text = document.getElementById('role-text');
+                    if (text) text.textContent = (userData.name || userData.username) + (userData.role === 'admin' ? ' (Admin)' : ' (Cajero)');
+                    var badge = document.getElementById('role-status-badge');
+                    if (badge) {
+                        if (userData.role === 'admin') {
+                            badge.className = 'absolute -bottom-1 -right-1 bg-brand-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center';
+                            badge.innerHTML = '<i class="fas fa-crown text-[8px] text-white"></i>';
+                        } else {
+                            badge.className = 'absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center';
+                            badge.innerHTML = '<i class="fas fa-check text-[8px] text-white"></i>';
+                        }
+                    }
+                    if (userData.role === 'admin') {
+                        var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
+                        adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
+                    }
+                } else {
+                    if (overlay) overlay.classList.remove('hidden');
                 }
-            } catch(e) { console.error('[Auth] Error restoring session:', e); }
+            } catch(e) { 
+                console.error('[Auth] Error restoring session:', e); 
+                if (overlay) overlay.classList.remove('hidden');
+            }
         })();
+    } else {
+        // No hay sesión guardada (el usuario hizo logout previamente): Exigir Inicio de Sesión
+        currentUser = null;
+        currentRole = null;
+        if (overlay) overlay.classList.remove('hidden');
+        var text = document.getElementById('role-text');
+        if (text) text.textContent = 'Sin Sesión';
+        var badge = document.getElementById('role-status-badge');
+        if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-slate-400 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-lock text-[8px] text-white"></i>'; }
+        var adminNavs = ['nav-inventory', 'nav-reports', 'nav-analytics', 'nav-settings', 'nav-purchases', 'nav-expenses'];
+        adminNavs.forEach(function(id) { var el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+        setTimeout(function() {
+            var uInp = document.getElementById('login-username');
+            if (uInp) uInp.focus();
+        }, 300);
     }
     isInitialDataLoaded = true;
 }
@@ -3219,6 +3461,162 @@ window.deleteProduct = (id) => {
     });
 };
 
+window.printInventoryReport = async function() {
+    try {
+        // Obtenemos TODOS los productos reales guardados en la base de datos local SQLite del sistema
+        let allDbProducts = [];
+        if (window.db && window.db.getProducts) {
+            allDbProducts = await window.db.getProducts('');
+        }
+        if (!allDbProducts || allDbProducts.length === 0) {
+            allDbProducts = products || [];
+        }
+
+        if (!allDbProducts || allDbProducts.length === 0) {
+            Swal.fire('Inventario Vacío', 'No hay productos registrados en el sistema para imprimir.', 'info');
+            return;
+        }
+
+        const er = settings.exchangeRate || 1;
+        const dateStr = new Date().toLocaleString();
+        const bName = settings.businessName || 'Caja Fresh POS';
+
+        let totalItems = 0;
+        let totalValueUSD = 0;
+        allDbProducts.forEach(p => {
+            const stk = parseInt(p.stock) || 0;
+            const pr = parseFloat(p.priceUSD || p.price_usd || p.price) || 0;
+            totalItems += stk;
+            totalValueUSD += (stk * pr);
+        });
+        const totalValueVES = totalValueUSD * er;
+
+        const printWin = window.open('', '_blank', 'width=950,height=800');
+        if (!printWin) {
+            Swal.fire('Error', 'Por favor permite las ventanas emergentes (popups) en tu navegador para ver la hoja de inventario.', 'error');
+            return;
+        }
+
+        const rowsHtml = allDbProducts.map((p, idx) => {
+            const stk = parseInt(p.stock) || 0;
+            const minStk = parseInt(p.minStock || p.min_stock) || 5;
+            const prUSD = parseFloat(p.priceUSD || p.price_usd || p.price) || 0;
+            const prVES = prUSD * er;
+            const valUSD = stk * prUSD;
+            const isLow = stk <= minStk;
+            const stkStyle = isLow ? 'color: #dc2626; font-weight: bold; background: #fee2e2;' : '';
+            return `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 10px 8px; text-align: center; color: #64748b;">${idx + 1}</td>
+                    <td style="padding: 10px 8px; font-weight: 600;">${p.name || 'Sin Nombre'}</td>
+                    <td style="padding: 10px 8px; text-align: center; color: #475569;">${p.category || 'General'}</td>
+                    <td style="padding: 10px 8px; text-align: center; ${stkStyle}">${stk} ${isLow ? '⚠️' : ''}</td>
+                    <td style="padding: 10px 8px; text-align: right;">$${prUSD.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; text-align: right; color: #475569;">Bs ${prVES.toFixed(2)}</td>
+                    <td style="padding: 10px 8px; text-align: right; font-weight: 600;">$${valUSD.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const html = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <title>Inventario_Completo_${bName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}</title>
+                <style>
+                    @page { size: A4 portrait; margin: 15mm; }
+                    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; color: #0f172a; background: #ffffff; }
+                    .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284c7; padding-bottom: 16px; margin-bottom: 20px; }
+                    .header-title h1 { margin: 0; font-size: 26px; color: #0f172a; font-weight: 800; }
+                    .header-title p { margin: 4px 0 0; color: #64748b; font-size: 13px; font-weight: 500; }
+                    .header-meta { text-align: right; font-size: 12px; color: #475569; line-height: 1.6; }
+                    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 14px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+                    .summary-card { text-align: center; }
+                    .summary-card .label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+                    .summary-card .val { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+                    th { background: #0f172a; color: #ffffff; padding: 10px 8px; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+                    th.text-center { text-align: center; }
+                    th.text-right { text-align: right; }
+                    tr:nth-child(even) { background-color: #f8fafc; }
+                    .action-bar { background: #0f172a; padding: 12px 20px; margin-bottom: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; color: white; }
+                    .action-btn { background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background 0.2s; }
+                    .action-btn:hover { background: #0369a1; }
+                    @media print {
+                        .action-bar { display: none !important; }
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="action-bar">
+                    <span style="font-weight: 600;">📋 Vista Previa de Hoja de Inventario (${allDbProducts.length} productos del sistema)</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="action-btn" onclick="window.print()">🖨️ Imprimir Hoja / Descargar PDF</button>
+                    </div>
+                </div>
+                <div class="header-box">
+                    <div class="header-title">
+                        <h1>${bName}</h1>
+                        <p>INVENTARIO GENERAL DE PRODUCTOS REGISTRADOS EN EL SISTEMA</p>
+                    </div>
+                    <div class="header-meta">
+                        <div><b>Fecha de Emisión:</b> ${dateStr}</div>
+                        <div><b>Tasa BCV/Oficial:</b> Bs ${er.toFixed(2)} / $</div>
+                        <div><b>Fuente de Datos:</b> Base de Datos SQLite del Sistema</div>
+                    </div>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="label">Total Productos</div>
+                        <div class="val">${allDbProducts.length}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">Unidades en Stock</div>
+                        <div class="val">${totalItems}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">Valor Total ($)</div>
+                        <div class="val" style="color: #0284c7;">$${totalValueUSD.toFixed(2)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="label">Valor Total (Bs)</div>
+                        <div class="val" style="color: #16a34a;">Bs ${totalValueVES.toFixed(2)}</div>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width: 35px;">#</th>
+                            <th>Descripción del Producto</th>
+                            <th class="text-center">Categoría</th>
+                            <th class="text-center">Stock Cant.</th>
+                            <th class="text-right">Precio ($)</th>
+                            <th class="text-right">Precio (Bs)</th>
+                            <th class="text-right">Valor Total ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() { window.print(); }, 400);
+                    };
+                </script>
+            </body>
+            </html>
+        `;
+        printWin.document.write(html);
+        printWin.document.close();
+    } catch(e) {
+        console.error('Error imprimiendo inventario:', e);
+        Swal.fire('Error', 'No se pudo generar la hoja de inventario: ' + e.message, 'error');
+    }
+};
+
 window.clearAllProducts = () => {
     if (currentRole !== 'admin') {
         Swal.fire('Acceso Denegado', 'No tienes permiso para realizar esta acción.', 'error');
@@ -3239,6 +3637,7 @@ window.clearAllProducts = () => {
         }
     });
 };
+window.clearLocalProducts = window.clearAllProducts;
 
 // ==========================================
 // CLIENTS LOGIC
@@ -4328,14 +4727,12 @@ function renderAnalytics() {
     
     if (pendingDebtEl) {
         pendingDebtEl.textContent = formatUSD(totalPendingDebt);
-        // Animar si hay deuda
         if (totalPendingDebt > 0) {
             pendingDebtEl.closest?.('div[class*="bg-rose"]')?.classList?.add('animate-pulse');
             setTimeout(() => pendingDebtEl.closest?.('div[class*="bg-rose"]')?.classList?.remove('animate-pulse'), 2000);
         }
     }
     if (pendingCountEl) {
-        // Marcar en rojo si alguna está vencida
         const overdueCount = pendingPayables.filter(p => new Date(p.dueDate) < new Date()).length;
         if (overdueCount > 0) {
             pendingCountEl.textContent = `${pendingPayables.length} facturas (${overdueCount} vencida${overdueCount > 1 ? 's' : ''})`;
@@ -4344,7 +4741,300 @@ function renderAnalytics() {
             pendingCountEl.textContent = `${pendingPayables.length} factura${pendingPayables.length !== 1 ? 's' : ''} pendiente${pendingPayables.length !== 1 ? 's' : ''}`;
         }
     }
+
+    // ── 11. Ticket Promedio y Hora Pico ─────────────────────────────
+    const txCount = periodSales.length;
+    const avgTicketUSD = txCount > 0 ? periodSalesUSD / txCount : 0;
+    const er = settings.exchangeRate || 1;
+    const avgTicketVES = avgTicketUSD * er;
+
+    const avgTicketEl = document.getElementById('ana-avg-ticket');
+    if (avgTicketEl) avgTicketEl.textContent = formatUSD(avgTicketUSD);
+
+    const avgTicketVesEl = document.getElementById('ana-avg-ticket-ves');
+    if (avgTicketVesEl) avgTicketVesEl.textContent = `Equivalente a Bs ${avgTicketVES.toFixed(2)} (${txCount} ventas)`;
+
+    // Hora pico
+    const hourCounts = {};
+    periodSales.forEach(s => {
+        const h = new Date(s.timestamp || s.date).getHours();
+        hourCounts[h] = (hourCounts[h] || 0) + 1;
+    });
+    let peakHour = '--:--';
+    let maxTx = 0;
+    Object.keys(hourCounts).forEach(h => {
+        if (hourCounts[h] > maxTx) {
+            maxTx = hourCounts[h];
+            const hNum = parseInt(h);
+            const ampm = hNum >= 12 ? 'PM' : 'AM';
+            const displayH = hNum % 12 || 12;
+            peakHour = `${displayH}:00 ${ampm} (${maxTx} ventas)`;
+        }
+    });
+
+    const peakHourEl = document.getElementById('ana-peak-hour');
+    if (peakHourEl) peakHourEl.textContent = peakHour;
+
+    // Guardar resumen global para exportación y IA
+    window._lastAnalyticsSummary = {
+        periodSalesUSD,
+        periodProfitUSD,
+        avgMargin,
+        inventoryValue,
+        projectedSales,
+        txCount,
+        avgTicketUSD,
+        avgTicketVES,
+        peakHour,
+        totalPendingDebt
+    };
 }
+
+// 🤖 DIAGNÓSTICO DE NEGOCIO CON INTELIGENCIA ARTIFICIAL
+window.runAIDiagnostic = function() {
+    const summary = window._lastAnalyticsSummary || {};
+    const bName = settings.businessName || 'Caja Fresh POS';
+    const er = settings.exchangeRate || 1;
+
+    const marginScore = Math.min(100, Math.max(0, summary.avgMargin || 0));
+    const profitRatio = summary.periodSalesUSD > 0 ? (summary.periodProfitUSD / summary.periodSalesUSD) : 0;
+    let healthStatus = 'Excelente 🟢';
+    let healthColor = 'text-emerald-500';
+    
+    if (profitRatio < 0.15) {
+        healthStatus = 'Atención Requerida ⚠️';
+        healthColor = 'text-amber-500';
+    } else if (profitRatio < 0.05) {
+        healthStatus = 'Crítico 🔴';
+        healthColor = 'text-rose-500';
+    }
+
+    const tips = [];
+    if (summary.avgMargin < 25) {
+        tips.push('💡 <b>Aumentar Margen:</b> Tu margen promedio está por debajo del 25%. Considera revisar precios de costo con tus proveedores.');
+    } else {
+        tips.push('✨ <b>Excelente Salud de Margen:</b> Mantienes un margen promedio del ' + (summary.avgMargin || 0).toFixed(1) + '%.');
+    }
+
+    if (summary.avgTicketUSD < 5) {
+        tips.push('🛍️ <b>Elevar Ticket Promedio:</b> El gasto promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '. Crea combos o promociones para incentivar ventas cruzadas.');
+    } else {
+        tips.push('🛍️ <b>Buen Ticket Promedio:</b> El promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '.');
+    }
+
+    if (summary.peakHour && summary.peakHour !== '--:--') {
+        tips.push('⏰ <b>Horario Estratégico:</b> Tu hora pico es <b>' + summary.peakHour + '</b>. Asegúrate de tener suficiente personal y productos listos a esa hora.');
+    }
+
+    if (summary.totalPendingDebt > 0) {
+        tips.push('⚠️ <b>Control de Deudas:</b> Tienes $' + summary.totalPendingDebt.toFixed(2) + ' pendientes con proveedores. Prioriza la liquidez para saldar facturas.');
+    }
+
+    const html = `
+        <div class="text-left font-sans space-y-4">
+            <div class="bg-slate-900 text-white p-5 rounded-2xl border border-indigo-500/30">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs uppercase tracking-widest font-black text-indigo-400">Salud Financiera del Negocio</span>
+                    <span class="text-xs font-bold px-3 py-1 bg-indigo-950 text-indigo-300 rounded-full border border-indigo-700/50">${bName}</span>
+                </div>
+                <div class="text-2xl font-black ${healthColor} mb-1">${healthStatus}</div>
+                <p class="text-xs text-slate-400">Evaluación automática generada por la IA de Rendimiento Caja Fresh.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-slate-100 p-3 rounded-xl">
+                    <div class="text-slate-500 font-bold uppercase text-[10px]">Ventas del Período</div>
+                    <div class="text-base font-black text-slate-800 mt-1">$${(summary.periodSalesUSD || 0).toFixed(2)}</div>
+                    <div class="text-[10px] text-slate-400">Bs ${((summary.periodSalesUSD || 0) * er).toFixed(2)}</div>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                    <div class="text-emerald-700 font-bold uppercase text-[10px]">Utilidad Ganada</div>
+                    <div class="text-base font-black text-emerald-700 mt-1">$${(summary.periodProfitUSD || 0).toFixed(2)}</div>
+                    <div class="text-[10px] text-emerald-600">Margen: ${(summary.avgMargin || 0).toFixed(1)}%</div>
+                </div>
+            </div>
+
+            <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-2 text-xs text-slate-700">
+                <div class="font-bold text-indigo-900 uppercase text-[11px] mb-2 flex items-center gap-1.5">
+                    <i class="fas fa-lightbulb text-amber-500"></i> Recomendaciones de la IA:
+                </div>
+                ${tips.map(t => `<div class="leading-relaxed bg-white p-2.5 rounded-lg border border-indigo-50 shadow-sm">${t}</div>`).join('')}
+            </div>
+        </div>
+    `;
+
+    Swal.fire({
+        title: '🤖 Diagnóstico Inteligente de Negocio',
+        html: html,
+        width: '550px',
+        confirmButtonText: '✨ Entendido',
+        confirmButtonColor: '#4f46e5'
+    });
+};
+
+// 📲 COMPARTIR RENDIMIENTO POR WHATSAPP AL JEFE
+window.sendAnalyticsToWhatsApp = function() {
+    const summary = window._lastAnalyticsSummary || {};
+    const bName = settings.businessName || 'Caja Fresh POS';
+    const bossPhone = settings.bossPhone || settings.businessPhoneFooter || '';
+    const dateStr = new Date().toLocaleDateString();
+    const er = settings.exchangeRate || 1;
+
+    let msg = `📊 *REPORTE DE RENDIMIENTO — ${bName.toUpperCase()}*\n`;
+    msg += `📅 Fecha: ${dateStr}\n`;
+    msg += `💵 Tasa Oficial: Bs ${er.toFixed(2)}/$\n`;
+    msg += `-----------------------------------\n`;
+    msg += `💰 *Ventas Totales:* $${(summary.periodSalesUSD || 0).toFixed(2)} (Bs ${((summary.periodSalesUSD || 0) * er).toFixed(2)})\n`;
+    msg += `📈 *Utilidad Neta:* $${(summary.periodProfitUSD || 0).toFixed(2)}\n`;
+    msg += `📊 *Margen Promedio:* ${(summary.avgMargin || 0).toFixed(1)}%\n`;
+    msg += `🛒 *Total Ventas:* ${summary.txCount || 0} transacciones\n`;
+    msg += `🧾 *Ticket Promedio:* $${(summary.avgTicketUSD || 0).toFixed(2)}\n`;
+    msg += `⏰ *Hora Pico:* ${summary.peakHour || 'N/A'}\n`;
+    msg += `📦 *Valor Inventario:* $${(summary.inventoryValue || 0).toFixed(2)}\n`;
+    msg += `🔮 *Cierre Proyectado:* $${(summary.projectedSales || 0).toFixed(2)}\n`;
+    msg += `-----------------------------------\n`;
+    msg += `✨ _Generado automáticamente por Caja Fresh POS_`;
+
+    const encoded = encodeURIComponent(msg);
+    const targetPhone = bossPhone.replace(/\D/g, '');
+    const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+    window.open(url, '_blank');
+};
+
+// 📄 EXPORTAR EXPEDIENTE FINANCIERO A PDF / IMPRIMIR
+window.downloadAnalyticsPDF = function() {
+    const summary = window._lastAnalyticsSummary || {};
+    const bName = settings.businessName || 'Caja Fresh POS';
+    const dateStr = new Date().toLocaleString();
+    const er = settings.exchangeRate || 1;
+
+    const printWin = window.open('', '_blank', 'width=950,height=800');
+    if (!printWin) {
+        Swal.fire('Error', 'Por favor habilita las ventanas emergentes (popups) en tu navegador para ver el PDF.', 'error');
+        return;
+    }
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Expediente_Financiero_${bName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}</title>
+            <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; color: #0f172a; background: #ffffff; }
+                .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #4f46e5; padding-bottom: 16px; margin-bottom: 20px; }
+                .header-title h1 { margin: 0; font-size: 24px; color: #0f172a; font-weight: 800; }
+                .header-title p { margin: 4px 0 0; color: #64748b; font-size: 13px; font-weight: 500; }
+                .header-meta { text-align: right; font-size: 12px; color: #475569; line-height: 1.6; }
+                .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+                .summary-card { background: #f8fafc; padding: 14px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center; }
+                .summary-card .label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+                .summary-card .val { font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+                table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+                th { background: #0f172a; color: #ffffff; padding: 12px 10px; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 11px; }
+                td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; }
+                .action-bar { background: #0f172a; padding: 12px 20px; margin-bottom: 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; color: white; }
+                .action-btn { background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+                @media print {
+                    .action-bar { display: none !important; }
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="action-bar">
+                <span style="font-weight: 600;">📄 Expediente Financiero de Rendimiento</span>
+                <button class="action-btn" onclick="window.print()">🖨️ Imprimir / Guardar en PDF</button>
+            </div>
+            <div class="header-box">
+                <div class="header-title">
+                    <h1>${bName}</h1>
+                    <p>EXPEDIENTE FINANCIERO DE RENDIMIENTO Y BALANCE DE CAJA</p>
+                </div>
+                <div class="header-meta">
+                    <div><b>Fecha de Emisión:</b> ${dateStr}</div>
+                    <div><b>Tasa BCV/Oficial:</b> Bs ${er.toFixed(2)} / $</div>
+                </div>
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="label">Ventas Totales ($)</div>
+                    <div class="val" style="color: #2563eb;">$${(summary.periodSalesUSD || 0).toFixed(2)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Utilidad Neta ($)</div>
+                    <div class="val" style="color: #16a34a;">$${(summary.periodProfitUSD || 0).toFixed(2)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Margen Real</div>
+                    <div class="val" style="color: #4f46e5;">${(summary.avgMargin || 0).toFixed(1)}%</div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Métrica Financiera</th>
+                        <th style="text-align: right;">Valor ($ USD)</th>
+                        <th style="text-align: right;">Valor (Bs VES)</th>
+                        <th>Observaciones / Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><b>Ventas Totales</b></td>
+                        <td style="text-align: right; font-weight: bold;">$${(summary.periodSalesUSD || 0).toFixed(2)}</td>
+                        <td style="text-align: right;">Bs ${((summary.periodSalesUSD || 0) * er).toFixed(2)}</td>
+                        <td>Ingreso bruto del período</td>
+                    </tr>
+                    <tr>
+                        <td><b>Utilidad Neta Acumulada</b></td>
+                        <td style="text-align: right; font-weight: bold; color: #16a34a;">$${(summary.periodProfitUSD || 0).toFixed(2)}</td>
+                        <td style="text-align: right;">Bs ${((summary.periodProfitUSD || 0) * er).toFixed(2)}</td>
+                        <td>Ganancia después de costos de productos</td>
+                    </tr>
+                    <tr>
+                        <td><b>Inversión en Stock</b></td>
+                        <td style="text-align: right; font-weight: bold;">$${(summary.inventoryValue || 0).toFixed(2)}</td>
+                        <td style="text-align: right;">Bs ${((summary.inventoryValue || 0) * er).toFixed(2)}</td>
+                        <td>Capital total invertido en inventario</td>
+                    </tr>
+                    <tr>
+                        <td><b>Ticket Promedio por Cliente</b></td>
+                        <td style="text-align: right; font-weight: bold;">$${(summary.avgTicketUSD || 0).toFixed(2)}</td>
+                        <td style="text-align: right;">Bs ${(summary.avgTicketVES || 0).toFixed(2)}</td>
+                        <td>Basado en ${summary.txCount || 0} transacciones</td>
+                    </tr>
+                    <tr>
+                        <td><b>Cierre Proyectado del Mes</b></td>
+                        <td style="text-align: right; font-weight: bold;">$${(summary.projectedSales || 0).toFixed(2)}</td>
+                        <td style="text-align: right;">Bs ${((summary.projectedSales || 0) * er).toFixed(2)}</td>
+                        <td>Basado en ritmo promedio de ventas</td>
+                    </tr>
+                    <tr>
+                        <td><b>Hora Pico de Ventas</b></td>
+                        <td style="text-align: right; font-weight: bold;" colspan="2">${summary.peakHour || 'N/A'}</td>
+                        <td>Período de mayor volumen de clientes</td>
+                    </tr>
+                    <tr>
+                        <td><b>Deuda Pendiente a Proveedores</b></td>
+                        <td style="text-align: right; font-weight: bold; color: #dc2626;">$${(summary.totalPendingDebt || 0).toFixed(2)}</td>
+                        <td style="text-align: right; color: #dc2626;">Bs ${((summary.totalPendingDebt || 0) * er).toFixed(2)}</td>
+                        <td>Cuentas por pagar pendientes</td>
+                    </tr>
+                </tbody>
+            </table>
+            <script>
+                window.onload = function() { setTimeout(function() { window.print(); }, 400); };
+            </script>
+        </body>
+        </html>
+    `;
+    printWin.document.write(html);
+    printWin.document.close();
+};
 
 
 function renderAnalyticsPeriodControls() {
@@ -7028,6 +7718,151 @@ function continueInvoice(ticketNum) {
 // ==========================================
 // SECRET ADMIN INTERFACE
 // ==========================================
+window.LicenseManager = window.LicenseManager || {};
+window.LicenseManager.renderLicenseAdmin = async function(container) {
+    if (!container) return;
+    container.innerHTML = '<div class="text-center py-4 text-slate-400 text-xs"><i class="fas fa-spinner fa-spin mr-2"></i>Cargando licencias de Google Sheets...</div>';
+    
+    var sheetId = settings.googleSheetId || localStorage.getItem('google_sheet_id') || '';
+    if (!sheetId) {
+        container.innerHTML = '<div class="p-4 bg-amber-50 text-amber-800 rounded-xl text-xs"><b>No hay Google Sheet configurado.</b> Pega el enlace de tu hoja de Google Sheets en el campo superior y presiona PROBAR.</div>';
+        return;
+    }
+
+    try {
+        var fetchRes = await fetchGoogleSheetCSV(sheetId);
+        if (!fetchRes.ok) {
+            container.innerHTML = '<div class="p-4 bg-rose-50 text-rose-800 rounded-xl text-xs"><b>Error al conectar con Google Sheets.</b> Verifica que la hoja sea pública.</div>';
+            return;
+        }
+        var csv = fetchRes.text;
+        var lines = csv.split('\n').filter(function(l) { return l.trim(); });
+        if (lines.length < 2) {
+            container.innerHTML = '<div class="p-4 bg-slate-50 text-slate-600 rounded-xl text-xs">La hoja no contiene licencias activas.</div>';
+            return;
+        }
+
+        var header = lines[0];
+        var cols = header.split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+        var codeIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'licensekey' || name === 'membershipcode' || name === 'codigo' || name === 'key' || name === 'licencia'; });
+        var clientIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'clientname' || name === 'cliente' || name === 'nombre'; });
+        var activeIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'status' || name === 'activo' || name === 'estado'; });
+        var machineIdx = cols.findIndex(function(c) { var name = c.toLowerCase().replace(/[^a-z0-9]/g, ''); return name === 'machineid' || name === 'machine'; });
+
+        var rowsHTML = '';
+        for (var i = 1; i < lines.length; i++) {
+            var r = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+            var key = codeIdx > -1 ? (r[codeIdx] || '') : r[0];
+            var client = clientIdx > -1 ? (r[clientIdx] || '') : 'Cliente ' + i;
+            var status = activeIdx > -1 ? (r[activeIdx] || '') : 'ACTIVE';
+            var machine = machineIdx > -1 ? (r[machineIdx] || '') : 'Registrada';
+
+            var isActive = (status.toUpperCase() === 'ACTIVE' || status.toUpperCase() === 'SI' || status === '1');
+            var stBadge = isActive
+                ? '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">🟢 Activo</span>'
+                : '<span class="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full">🔴 Inactivo</span>';
+
+            rowsHTML += `
+                <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div class="space-y-0.5">
+                        <div class="font-bold text-slate-800 text-xs">${client}</div>
+                        <div class="font-mono text-[11px] text-indigo-600 font-bold">${key}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">ID Hardware: ${machine || 'N/A'}</div>
+                    </div>
+                    <div>${stBadge}</div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `<div class="space-y-2 mt-2 max-h-60 overflow-y-auto pr-1">${rowsHTML}</div>`;
+    } catch(e) {
+        container.innerHTML = '<div class="p-3 bg-rose-50 text-rose-700 text-xs rounded-xl">Error: ' + e.message + '</div>';
+    }
+};
+
+window.renderAdminFeaturesList = function() {
+    const el = document.getElementById('admin-features-list');
+    if (!el) return;
+    
+    const featScanner = localStorage.getItem('feat_scanner') === 'true';
+    const featMobile = localStorage.getItem('feat_mobile') !== 'false';
+    const featAi = localStorage.getItem('feat_ai') === 'true';
+    const bossPhone = localStorage.getItem('boss_phone') || '';
+    const bizName = localStorage.getItem('business_name') || 'Punto Pila';
+    const bizPhoneFooter = localStorage.getItem('business_phone_footer') || '0414-1006858';
+    const adminPin = settings.adminPin || '3244';
+
+    el.innerHTML = `
+        <div class="space-y-4 text-xs font-sans">
+            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-3">
+                <div class="font-bold text-indigo-900 uppercase text-[11px] flex items-center gap-1.5">
+                    <i class="fas fa-store text-indigo-600"></i> Datos Generales del Comercio
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="font-bold text-slate-600 text-[10px] block mb-1">Nombre del Negocio</label>
+                        <input type="text" id="business-name-input" value="${bizName}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-600 text-[10px] block mb-1">Teléfono del Jefe (WhatsApp)</label>
+                        <input type="text" id="boss-phone-input" value="${bossPhone}" placeholder="04141234567" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="font-bold text-slate-600 text-[10px] block mb-1">Pie de Recibo / WhatsApp</label>
+                        <input type="text" id="business-phone-footer-input" value="${bizPhoneFooter}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-600 text-[10px] block mb-1">PIN de Administrador</label>
+                        <input type="password" id="admin-pin-config" value="${adminPin}" maxlength="6" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div class="font-bold text-slate-800 uppercase text-[11px] flex items-center gap-1.5 mb-2">
+                    <i class="fas fa-sliders-h text-brand-600"></i> Módulos y Funciones del Sistema
+                </div>
+                <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-100">
+                    <div>
+                        <div class="font-bold text-slate-800">📷 Escáner de Código de Barras</div>
+                        <div class="text-[10px] text-slate-400">Permite usar la cámara de la laptop o escáner USB</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-scanner" ${featScanner ? 'checked' : ''} class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-100">
+                    <div>
+                        <div class="font-bold text-slate-800">📱 Módulo Móvil (Comandos por Celular)</div>
+                        <div class="text-[10px] text-slate-400">Habilita comandera en dispositivos móviles</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-mobile" ${featMobile ? 'checked' : ''} class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-100">
+                    <div>
+                        <div class="font-bold text-slate-800">🤖 Diagnóstico de Rendimiento con IA</div>
+                        <div class="text-[10px] text-slate-400">Asistente inteligente de recomendaciones de ventas</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggle-ai" ${featAi ? 'checked' : ''} class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                    </label>
+                </div>
+            </div>
+            
+            <button onclick="window.applySecretSettings()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-all flex items-center justify-center gap-2 text-sm">
+                <i class="fas fa-save"></i> Guardar Todo y Aplicar
+            </button>
+        </div>
+    `;
+};
+
 let secretBuffer = '';
 document.addEventListener('keydown', (e) => {
     if (e.key >= '0' && e.key <= '9') {
@@ -7036,13 +7871,9 @@ document.addEventListener('keydown', (e) => {
         if (secretBuffer.endsWith('32447974')) {
             const modal = document.getElementById('secret-admin-modal');
             if (modal) {
-                document.getElementById('toggle-scanner').checked = localStorage.getItem('feat_scanner') === 'true';
-                document.getElementById('toggle-mobile').checked = localStorage.getItem('feat_mobile') !== 'false';
-                document.getElementById('toggle-ai').checked = localStorage.getItem('feat_ai') === 'true';
-                document.getElementById('boss-phone-input').value = localStorage.getItem('boss_phone') || '';
-                document.getElementById('business-name-input').value = localStorage.getItem('business_name') || 'Punto Pila';
-                document.getElementById('business-phone-footer-input').value = localStorage.getItem('business_phone_footer') || '0414-1006858';
-                document.getElementById('admin-pin-config').value = settings.adminPin || '3244';
+                window.renderAdminFeaturesList();
+                const googleSheetIdInput = document.getElementById('settings-google-sheet-id');
+                if (googleSheetIdInput) googleSheetIdInput.value = settings.googleSheetId || localStorage.getItem('google_sheet_id') || '';
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
             }
@@ -7052,12 +7883,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.applySecretSettings = () => {
-    const scanner = document.getElementById('toggle-scanner').checked;
-    const mobile = document.getElementById('toggle-mobile').checked;
-    const ai = document.getElementById('toggle-ai').checked;
-    const bossPhone = normalizeVEPhone(document.getElementById('boss-phone-input').value.trim());
-    const bizName = document.getElementById('business-name-input').value.trim() || 'Punto Pila';
-    const bizPhone = document.getElementById('business-phone-footer-input').value.trim() || '0414-1006858';
+    const elScan = document.getElementById('toggle-scanner');
+    const elMob = document.getElementById('toggle-mobile');
+    const elAi = document.getElementById('toggle-ai');
+    const elBp = document.getElementById('boss-phone-input');
+    const elBn = document.getElementById('business-name-input');
+    const elBpf = document.getElementById('business-phone-footer-input');
+
+    const scanner = elScan ? elScan.checked : false;
+    const mobile = elMob ? elMob.checked : true;
+    const ai = elAi ? elAi.checked : false;
+    const bossPhone = elBp ? normalizeVEPhone(elBp.value.trim()) : '';
+    const bizName = elBn ? elBn.value.trim() : 'Punto Pila';
+    const bizPhone = elBpf ? elBpf.value.trim() : '0414-1006858';
     
     const adminPinEl = document.getElementById('admin-pin-config');
     const adminPin = adminPinEl && adminPinEl.value.trim() ? adminPinEl.value.trim() : '3244';
