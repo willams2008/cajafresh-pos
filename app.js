@@ -3130,7 +3130,8 @@ function initInventory() {
         }
     });
 
-    document.getElementById('product-flavors').addEventListener('input', (e) => {
+    const productFlavorsEl = document.getElementById('product-flavors');
+    if (productFlavorsEl) productFlavorsEl.addEventListener('input', (e) => {
         const flavorsContainer = document.getElementById('product-flavors-container');
         if (!flavorsContainer) return;
         flavorsContainer.innerHTML = '';
@@ -10893,3 +10894,816 @@ document.addEventListener('DOMContentLoaded', () => {
     const forgotBtn = document.getElementById('forgot-password-btn');
     if (forgotBtn) forgotBtn.addEventListener('click', recoverBossPassword);
 });
+
+// ==========================================
+// TRANSFERENCIAS DE INVENTARIO
+// ==========================================
+
+window.renderTransfers = async function() {
+    const tbody = document.getElementById('transfers-table-body');
+    if (!tbody) return;
+    try {
+        const transfers = await window.db.getTransfers();
+        if (!transfers || transfers.length === 0) {
+            tbody.innerHTML = `<tr id="transfers-empty-row">
+                <td colspan="7" class="py-12 text-center text-slate-400">
+                    <i class="fas fa-right-left text-3xl mb-2 block"></i>
+                    <p class="font-medium">No hay transferencias registradas</p>
+                    <p class="text-xs">Crea una nueva transferencia para mover stock entre sucursales</p>
+                </td>
+            </tr>`;
+            return;
+        }
+        tbody.innerHTML = '';
+        transfers.forEach(t => {
+            const statusBadge = t.status === 'COMPLETED'
+                ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200"><i class="fas fa-check-circle mr-1"></i>Completada</span>'
+                : '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200"><i class="fas fa-clock mr-1"></i>Pendiente</span>';
+            const actions = t.status === 'COMPLETED'
+                ? `<button onclick="window.deleteTransfer('${t.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center mx-auto" title="Eliminar"><i class="fas fa-trash-alt"></i></button>`
+                : `<div class="flex items-center justify-center gap-1">
+                    <button onclick="window.completeTransfer('${t.id}')" class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center" title="Completar"><i class="fas fa-check"></i></button>
+                    <button onclick="window.deleteTransfer('${t.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                   </div>`;
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition-colors group";
+            tr.innerHTML = `
+                <td class="py-3 px-6 font-bold text-slate-800">${t.product_name || '---'}</td>
+                <td class="py-3 px-6 text-right font-mono font-bold text-slate-800">${t.quantity}</td>
+                <td class="py-3 px-6 text-slate-600">${t.from_store || '---'}</td>
+                <td class="py-3 px-6 text-slate-600">${t.to_store || '---'}</td>
+                <td class="py-3 px-6">${statusBadge}</td>
+                <td class="py-3 px-6 text-slate-500 text-sm">${t.date ? new Date(t.date).toLocaleDateString() : '---'}</td>
+                <td class="py-3 px-6 text-center">${actions}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch(e) {
+        console.error('Error loading transfers:', e);
+    }
+};
+
+window.openTransferModal = function(editTransfer) {
+    const isEdit = !!editTransfer;
+    const stores = ['Sucursal Principal', 'Almacén Norte', 'Almacén Sur', 'Depósito Central'];
+    const storeOpts = stores.map(s => `<option value="${s}">${s}</option>`).join('');
+    const productsHtml = (typeof products !== 'undefined' && products.length)
+        ? products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+        : '<option value="">No hay productos disponibles</option>';
+
+    Swal.fire({
+        title: isEdit ? 'Editar Transferencia' : 'Nueva Transferencia',
+        html: `
+            <div class="text-left space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Producto</label>
+                    <select id="swal-transfer-product" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-cyan-500 outline-none">${productsHtml}</select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Cantidad</label>
+                    <input type="number" id="swal-transfer-qty" value="${isEdit ? editTransfer.quantity : 1}" min="1" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-cyan-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Origen</label>
+                    <select id="swal-transfer-from" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-cyan-500 outline-none">${storeOpts}</select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Destino</label>
+                    <select id="swal-transfer-to" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-cyan-500 outline-none">${storeOpts}</select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Notas (opcional)</label>
+                    <textarea id="swal-transfer-notes" rows="2" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-cyan-500 outline-none">${isEdit ? (editTransfer.notes || '') : ''}</textarea>
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: isEdit ? 'Guardar Cambios' : 'Crear Transferencia',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#06b6d4',
+        preConfirm: () => {
+            const productSel = document.getElementById('swal-transfer-product');
+            const productId = productSel.value;
+            const productName = productSel.options[productSel.selectedIndex]?.text || '';
+            const qty = parseInt(document.getElementById('swal-transfer-qty').value) || 1;
+            const fromStore = document.getElementById('swal-transfer-from').value;
+            const toStore = document.getElementById('swal-transfer-to').value;
+            const notes = document.getElementById('swal-transfer-notes').value;
+            if (!productId) { Swal.showValidationMessage('Selecciona un producto'); return false; }
+            if (!fromStore || !toStore) { Swal.showValidationMessage('Selecciona origen y destino'); return false; }
+            if (fromStore === toStore) { Swal.showValidationMessage('Origen y destino no pueden ser iguales'); return false; }
+            return { productId, productName, quantity: qty, fromStore, toStore, notes };
+        }
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        const d = res.value;
+        const transfer = {
+            id: isEdit ? editTransfer.id : generateId(),
+            product_id: d.productId,
+            product_name: d.productName,
+            quantity: d.quantity,
+            from_store: d.fromStore,
+            to_store: d.toStore,
+            notes: d.notes || '',
+            date: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+            status: isEdit ? editTransfer.status : 'PENDING',
+            cashier_name: window.currentRole || 'admin'
+        };
+        try {
+            await window.db.saveTransfer(transfer);
+            Swal.fire({ title: 'Guardado', icon: 'success', timer: 1500, showConfirmButton: false });
+            window.renderTransfers();
+        } catch(e) {
+            Swal.fire('Error', 'No se pudo guardar la transferencia: ' + e.message, 'error');
+        }
+    });
+};
+
+window.completeTransfer = async function(id) {
+    try {
+        await window.db.updateTransferStatus(id, 'COMPLETED');
+        Swal.fire({ title: 'Transferencia Completada', icon: 'success', timer: 1500, showConfirmButton: false });
+        window.renderTransfers();
+    } catch(e) {
+        Swal.fire('Error', 'No se pudo completar la transferencia: ' + e.message, 'error');
+    }
+};
+
+window.deleteTransfer = async function(id) {
+    Swal.fire({
+        title: '¿Eliminar transferencia?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Eliminar'
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+            await window.db.deleteTransfer(id);
+            window.renderTransfers();
+        } catch(e) {
+            Swal.fire('Error', 'No se pudo eliminar: ' + e.message, 'error');
+        }
+    });
+};
+
+// ==========================================
+// PEDIDOS AL ALMACÉN (PURCHASE ORDERS)
+// ==========================================
+
+let poStatusFilter = 'all';
+
+window.renderPurchaseOrders = async function(status) {
+    if (status !== undefined) poStatusFilter = status;
+    const tbody = document.getElementById('po-table-body');
+    if (!tbody) return;
+    document.querySelectorAll('.po-filter-btn').forEach(btn => {
+        const s = btn.getAttribute('data-status');
+        if (s === poStatusFilter) {
+            btn.className = 'po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-brand-500 bg-brand-500 text-white transition-all';
+        } else {
+            btn.className = 'po-filter-btn px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all';
+        }
+    });
+    try {
+        const orders = await window.db.getPurchaseOrders(poStatusFilter);
+        if (!orders || orders.length === 0) {
+            tbody.innerHTML = `<tr id="po-empty-row">
+                <td colspan="6" class="py-12 text-center text-slate-400">
+                    <i class="fas fa-cart-shopping text-3xl mb-2 block"></i>
+                    <p class="font-medium">No hay pedidos registrados</p>
+                    <p class="text-xs">Crea un nuevo pedido de compra para solicitar productos al almacén</p>
+                </td>
+            </tr>`;
+            return;
+        }
+        let storeType = 'kiosko';
+        try { const s = await window.db.getSettings(); storeType = s?.storeType || 'kiosko'; } catch(e) {}
+        tbody.innerHTML = '';
+        orders.forEach(po => {
+            let badge = '';
+            if (po.status === 'PENDING') badge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200"><i class="fas fa-clock mr-1"></i>Pendiente</span>';
+            else if (po.status === 'APPROVED') badge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200"><i class="fas fa-check-circle mr-1"></i>Aprobado</span>';
+            else if (po.status === 'RECEIVED') badge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200"><i class="fas fa-warehouse mr-1"></i>Recibido</span>';
+            else badge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">' + po.status + '</span>';
+
+            const items = typeof po.items === 'string' ? JSON.parse(po.items) : (po.items || []);
+            const totalItems = items.reduce((sum, it) => sum + (it.quantity || 0), 0);
+            const totalCost = po.total_cost || items.reduce((sum, it) => sum + ((it.quantity || 0) * (it.cost_price || 0)), 0);
+
+            const isWarehouse = storeType === 'warehouse';
+            let actions = '';
+            if (po.status === 'PENDING') {
+                if (isWarehouse) {
+                    actions = `<div class="flex items-center justify-center gap-1">
+                        <button onclick="window.approvePO('${po.id}','${po.from_store}')" class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center" title="Aprobar"><i class="fas fa-check"></i></button>
+                        <button onclick="window.deletePO('${po.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                    </div>`;
+                } else {
+                    actions = `<div class="flex items-center justify-center gap-1">
+                        <span class="text-xs text-amber-500 italic">Esperando aprobación</span>
+                        <button onclick="window.deletePO('${po.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                    </div>`;
+                }
+            } else if (po.status === 'APPROVED') {
+                if (!isWarehouse) {
+                    actions = `<div class="flex items-center justify-center gap-1">
+                        <button onclick="window.openReceivePOModal('${po.id}')" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center" title="Recibir"><i class="fas fa-truck-loading"></i></button>
+                        <button onclick="window.deletePO('${po.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                    </div>`;
+                } else {
+                    actions = `<button onclick="window.deletePO('${po.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center mx-auto" title="Eliminar"><i class="fas fa-trash-alt"></i></button>`;
+                }
+            } else {
+                actions = `<button onclick="window.deletePO('${po.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center mx-auto" title="Eliminar"><i class="fas fa-trash-alt"></i></button>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition-colors group";
+            tr.innerHTML = `
+                <td class="py-3 px-6 font-bold text-slate-800 font-mono">#${po.id.slice(-6).toUpperCase()}</td>
+                <td class="py-3 px-6 text-right font-mono font-bold text-slate-800">${totalItems}</td>
+                <td class="py-3 px-6 text-right font-mono font-bold text-slate-800">${formatUSD(totalCost)}</td>
+                <td class="py-3 px-6">${badge}</td>
+                <td class="py-3 px-6 text-slate-500 text-sm">${po.date ? new Date(po.date).toLocaleDateString() : '---'}</td>
+                <td class="py-3 px-6 text-center">${actions}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch(e) {
+        console.error('Error loading purchase orders:', e);
+    }
+};
+
+window._poAllProducts = [];
+
+window.openPOModal = async function() {
+    const settings = await window.db.getSettings();
+    const isKiosko = (settings || {}).storeType === 'kiosko';
+    window._poStoreId = settings?.storeId || '';
+    window._poWarehouseStoreId = null;
+    window._poAllProducts = products ? [...products] : [];
+
+    if (isKiosko && window.cloudSync?.getWarehouseProducts) {
+        try {
+            const [whProducts, whStoreId] = await Promise.all([
+                window.cloudSync.getWarehouseProducts(),
+                window.cloudSync.getWarehouseStoreId().catch(() => null)
+            ]);
+            window._poWarehouseStoreId = whStoreId || null;
+            if (whProducts && whProducts.length > 0) {
+                whProducts.forEach(wp => {
+                    if (!window._poAllProducts.find(p => p.id === wp.product_id)) {
+                        window._poAllProducts.push({
+                            id: wp.product_id,
+                            name: wp.name + ' 📦',
+                            costPrice: parseFloat(wp.price) || 0,
+                            priceUSD: parseFloat(wp.price) || 0
+                        });
+                    }
+                });
+            }
+        } catch(e) {
+            console.warn('[PO] Could not fetch warehouse products:', e.message);
+        }
+    }
+
+    const productsHtml = window._poAllProducts.length
+        ? window._poAllProducts.map(p => `<div class="flex items-center justify-between py-2 border-b border-slate-100 po-product-row" data-id="${p.id}" data-name="${p.name}" data-price="${p.costPrice || p.priceUSD || 0}">
+            <span class="font-bold text-sm text-slate-700">${p.name}</span>
+            <span class="text-xs text-slate-400">${formatUSD(p.costPrice || p.priceUSD || 0)}</span>
+           </div>`).join('')
+        : '<p class="text-xs text-slate-400 py-2">No hay productos disponibles</p>';
+
+    Swal.fire({
+        title: 'Nuevo Pedido al Almacén',
+        html: `
+            <div class="text-left space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Buscar producto</label>
+                    <input type="text" id="swal-po-search" placeholder="Escribe para buscar..." class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-emerald-500 outline-none" oninput="window.filterPOProducts(this.value)">
+                </div>
+                <div id="swal-po-products" class="max-h-40 overflow-y-auto border border-slate-100 rounded-xl p-2 space-y-0.5">
+                    ${productsHtml}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Items seleccionados</label>
+                    <div id="swal-po-cart" class="max-h-32 overflow-y-auto border border-slate-100 rounded-xl p-2 text-sm text-slate-400">
+                        <span class="italic">Ninguno</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Notas (opcional)</label>
+                    <textarea id="swal-po-notes" rows="2" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:border-emerald-500 outline-none"></textarea>
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Crear Pedido',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#10b981',
+        didOpen: () => {
+            window._poCart = [];
+            document.getElementById('swal-po-products')?.querySelectorAll('.po-product-row').forEach(row => {
+                row.addEventListener('click', function() {
+                    const id = this.dataset.id;
+                    const name = this.dataset.name;
+                    const price = parseFloat(this.dataset.price) || 0;
+                    const existing = window._poCart.find(i => i.product_id === id);
+                    if (existing) {
+                        existing.quantity++;
+                    } else {
+                        window._poCart.push({ product_id: id, product_name: name, quantity: 1, cost_price: price });
+                    }
+                    window.updatePOCartUI();
+                });
+            });
+        },
+        preConfirm: () => {
+            const cart = window._poCart || [];
+            if (cart.length === 0) { Swal.showValidationMessage('Agrega al menos un producto'); return false; }
+            const notes = document.getElementById('swal-po-notes')?.value || '';
+            const totalCost = cart.reduce((sum, i) => sum + (i.quantity * i.cost_price), 0);
+            return { items: cart, notes, total_cost: totalCost };
+        }
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        const d = res.value;
+        let whStoreId = window._poWarehouseStoreId;
+        if (!whStoreId && window.cloudSync?.getWarehouseStoreId) {
+            try { whStoreId = await window.cloudSync.getWarehouseStoreId(); } catch(e) {}
+        }
+        const po = {
+            id: generateId(),
+            order_type: 'purchase',
+            store_id: window._poStoreId,
+            from_store: whStoreId || '',
+            to_store: window._poStoreId,
+            status: 'PENDING',
+            items: d.items,
+            notes: d.notes,
+            total_cost: d.total_cost,
+            date: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+            created_by: window.currentRole || 'admin'
+        };
+        try {
+            await window.db.savePurchaseOrder(po);
+            if (window.cloudSync?.pushPurchaseOrder) {
+                window.cloudSync.pushPurchaseOrder(po).catch(e => console.warn('[PO] Sync error:', e.message));
+            }
+            Swal.fire({ title: 'Pedido Creado', icon: 'success', timer: 1500, showConfirmButton: false });
+            window.renderPurchaseOrders();
+        } catch(e) {
+            Swal.fire('Error', 'No se pudo crear el pedido: ' + e.message, 'error');
+        }
+    });
+};
+
+window.filterPOProducts = function(q) {
+    const rows = document.querySelectorAll('.po-product-row');
+    const val = q.toLowerCase().trim();
+    rows.forEach(row => {
+        const name = (row.dataset.name || '').toLowerCase();
+        row.style.display = (!val || name.includes(val)) ? '' : 'none';
+    });
+};
+
+window.updatePOCartUI = function() {
+    const cart = window._poCart || [];
+    const container = document.getElementById('swal-po-cart');
+    if (!container) return;
+    if (cart.length === 0) {
+        container.innerHTML = '<span class="italic">Ninguno</span>';
+        return;
+    }
+    container.innerHTML = cart.map((item, idx) =>
+        `<div class="flex items-center justify-between py-1 text-xs border-b border-slate-50">
+            <span class="font-bold text-slate-700">${item.product_name}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-slate-500">x${item.quantity}</span>
+                <span class="font-mono text-slate-600">${formatUSD(item.quantity * item.cost_price)}</span>
+                <button onclick="window.removePOItem(${idx})" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
+            </div>
+        </div>`
+    ).join('');
+};
+
+window.removePOItem = function(idx) {
+    if (!window._poCart) return;
+    window._poCart.splice(idx, 1);
+    window.updatePOCartUI();
+};
+
+window.approvePO = async function(id, fromStoreId) {
+    const settings = await window.db.getSettings();
+    const storeType = settings?.storeType || 'kiosko';
+    if (storeType !== 'warehouse') {
+        Swal.fire('Solo Almacén', 'Solo el almacén puede aprobar pedidos.', 'info');
+        return;
+    }
+    Swal.fire({
+        title: '¿Aprobar pedido?',
+        text: 'Se descontará el stock del almacén',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        confirmButtonText: 'Aprobar y descontar stock'
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+            const orders = await window.db.getPurchaseOrders('all');
+            const po = orders.find(o => o.id === id);
+            const items = typeof po?.items === 'string' ? JSON.parse(po.items) : (po?.items || []);
+            const sid = fromStoreId || settings?.storeId || '';
+            if (window.cloudSync?.approvePurchaseOrder) {
+                await window.cloudSync.approvePurchaseOrder(id, items, sid);
+            } else {
+                await window.db.updatePOStatus(id, 'APPROVED');
+            }
+            Swal.fire({ title: 'Pedido Aprobado', text: 'Stock descontado del almacén', icon: 'success', timer: 2000, showConfirmButton: false });
+            window.renderPurchaseOrders();
+        } catch(e) {
+            Swal.fire('Error', 'No se pudo aprobar: ' + e.message, 'error');
+        }
+    });
+};
+
+window.openReceivePOModal = async function(poId) {
+    try {
+        const orders = await window.db.getPurchaseOrders('all');
+        const po = orders.find(o => o.id === poId);
+        if (!po) { Swal.fire('Error', 'Pedido no encontrado', 'error'); return; }
+        const items = typeof po.items === 'string' ? JSON.parse(po.items) : (po.items || []);
+
+        const itemsHtml = items.map((item, idx) => `
+            <div class="flex items-center justify-between py-2 border-b border-slate-100">
+                <div>
+                    <p class="font-bold text-sm text-slate-700">${item.product_name}</p>
+                    <p class="text-xs text-slate-400">Pedido: ${item.quantity}</p>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 mr-2">Recibido</label>
+                    <input type="number" id="swal-receive-qty-${idx}" value="${item.quantity}" min="0" max="${item.quantity}" class="w-20 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-center focus:border-blue-500 outline-none">
+                </div>
+            </div>
+        `).join('');
+
+        Swal.fire({
+            title: 'Recibir Pedido',
+            html: `
+                <p class="text-xs text-slate-500 mb-4">Registra las cantidades recibidas para el pedido <strong class="text-slate-700">#${po.id.slice(-6).toUpperCase()}</strong></p>
+                <div class="text-left space-y-1 max-h-60 overflow-y-auto">${itemsHtml}</div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar Recepción',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#3b82f6',
+            preConfirm: () => {
+                const received = items.map((item, idx) => {
+                    const qty = parseInt(document.getElementById(`swal-receive-qty-${idx}`)?.value) || 0;
+                    return { ...item, received_qty: qty };
+                });
+                return received;
+            }
+        }).then(async (res) => {
+            if (!res.isConfirmed) return;
+            try {
+                const settings = await window.db.getSettings();
+                const sid = settings?.storeId || '';
+                if (window.cloudSync?.receivePurchaseOrder) {
+                    await window.cloudSync.receivePurchaseOrder(poId, res.value, sid);
+                } else {
+                    await window.db.receivePO(poId, res.value);
+                }
+                Swal.fire({ title: 'Pedido Recibido', text: 'El stock ha sido actualizado', icon: 'success', timer: 2000, showConfirmButton: false });
+                window.renderPurchaseOrders();
+            } catch(e) {
+                Swal.fire('Error', 'No se pudo recibir el pedido: ' + e.message, 'error');
+            }
+        });
+    } catch(e) {
+        Swal.fire('Error', 'Error al cargar pedido: ' + e.message, 'error');
+    }
+};
+
+window.deletePO = async function(id) {
+    Swal.fire({
+        title: '¿Eliminar pedido?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Eliminar'
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        try {
+            await window.db.deletePO(id);
+            window.renderPurchaseOrders();
+        } catch(e) {
+            Swal.fire('Error', 'No se pudo eliminar: ' + e.message, 'error');
+        }
+    });
+};
+
+// ==================================================================
+// MATERIA PRIMA / INGREDIENTES — MÓDULO RECONECTADO
+// Habilita el modal de ingredientes (openIngredientsModal) y el
+// formulario de escandallo/recetas (addRecipeRow) dentro del producto.
+// ==================================================================
+
+// Toggle mostrar/ocultar contraseña en el login
+window.toggleLoginPassword = function() {
+    var input = document.getElementById('login-password');
+    var icon = document.getElementById('login-eye-icon');
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        if (icon) icon.className = 'fas fa-eye';
+    }
+};
+
+// Tabs del Panel de Rendimientos (Analytics)
+window.switchAnalyticsTab = function(tab) {
+    var tabs = ['resumen', 'graficos', 'productos', 'empleados'];
+    tabs.forEach(function(t) {
+        var content = document.getElementById('tab-content-' + t);
+        var btn = document.getElementById('tab-btn-' + t);
+        if (content) content.classList.toggle('hidden', t !== tab);
+        if (btn) {
+            var high = (t === tab);
+            btn.classList.toggle('border-brand-600', high);
+            btn.classList.toggle('text-brand-600', high);
+            btn.classList.toggle('border-transparent', !high);
+            btn.classList.toggle('text-slate-400', !high);
+        }
+    });
+    if (typeof renderAnalytics === 'function') renderAnalytics();
+};
+
+// Exportar a Excel (vista Exportar) — exporta los datos según el tipo
+window.exportReport = function(type) {
+    var rows = [];
+    var _d = new Date();
+    var todayStr = [_d.getFullYear(), String(_d.getMonth() + 1).padStart(2, '0'), String(_d.getDate()).padStart(2, '0')].join('-');
+    if (type === 'sales') {
+        var fromEl = document.getElementById('export-sales-from');
+        var toEl = document.getElementById('export-sales-to');
+        var fromVal = fromEl ? fromEl.value : '';
+        var toVal = toEl ? toEl.value : '';
+        var allSales = (typeof sales !== 'undefined' && Array.isArray(sales)) ? sales : [];
+        var salesList = allSales.filter(function(s) {
+            if (!s.date) return false;
+            var d = String(s.date).slice(0, 10);
+            if (fromVal && d < fromVal) return false;
+            if (toVal && d > toVal) return false;
+            if (!fromVal && !toVal) return d === todayStr;
+            return true;
+        });
+        rows = salesList.map(function(s) {
+            return {
+                'Ticket': s.ticketNumber || s.ticket_number || '',
+                'Fecha': s.timestamp || '',
+                'Cliente': (s.clientName || s.client_name || ''),
+                'Total USD': s.totalUSD != null ? s.totalUSD : (s.total || 0),
+                'Total VES': s.totalVES != null ? s.totalVES : (s.total_ves || 0),
+                'Método': s.method || ''
+            };
+        });
+    } else if (type === 'products') {
+        var prods = typeof products !== 'undefined' ? products : [];
+        rows = prods.map(function(p) {
+            return {
+                'ID': p.id || '',
+                'Producto': p.name || '',
+                'Categoría': p.category || '',
+                'Stock': p.stock != null ? p.stock : 0,
+                'Precio USD': p.priceUSD != null ? p.priceUSD : (p.price_usd || 0),
+                'Precio VES': p.priceVES != null ? p.priceVES : (p.price_ves || 0)
+            };
+        });
+    } else if (type === 'clients') {
+        var clientsArr = (typeof clients !== 'undefined' && Array.isArray(clients)) ? clients : [];
+        rows = clientsArr.map(function(c) {
+            return { 'Nombre': c.name || '', 'Documento': c.document || '', 'Teléfono': c.phone || '', 'Crédito': c.credit || 0 };
+        });
+    } else if (type === 'movements') {
+        var movs = (typeof movements !== 'undefined' && Array.isArray(movements)) ? movements : [];
+        rows = movs.map(function(m) {
+            return { 'Producto': m.productName || m.product_id || '', 'Tipo': m.type || '', 'Cantidad': m.qty != null ? m.qty : 0, 'Razón': m.reason || '', 'Fecha': m.timestamp || '' };
+        });
+    }
+    if (!rows.length) {
+        Swal.fire('Sin datos', 'No hay datos para exportar en esta categoría.', 'info');
+        return;
+    }
+    window.exportToCSV('reporte-' + type + '.csv', rows);
+};
+
+window.exportToCSV = function(filename, rows) {
+    if (!rows || !rows.length) return;
+    var headers = Object.keys(rows[0]);
+    var csv = headers.join(',') + '\n';
+    csv += rows.map(function(r) {
+        return headers.map(function(h) {
+            var v = r[h] != null ? r[h] : '';
+            v = String(v).replace(/"/g, '""');
+            if (String(v).indexOf(',') > -1 || String(v).indexOf('"') > -1 || String(v).indexOf('\n') > -1) {
+                v = '"' + v + '"';
+            }
+            return v;
+        }).join(',');
+    }).join('\n');
+    var blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 150);
+};
+
+// ─── Ingredientes (Materia Prima) ────────────────────────────────
+var _ingredients = [];
+var _ingRows = [];
+
+async function loadIngredients(force) {
+    if (typeof window.db === 'undefined' || !window.db.getIngredients) return _ingredients;
+    try {
+        var sid = _getStoreId();
+        _ingredients = await window.db.getIngredients(sid);
+        return _ingredients || [];
+    } catch (e) {
+        console.error('[Ingredientes] Error cargando:', e);
+        return _ingredients;
+    }
+}
+
+window.openIngredientsModal = async function() {
+    await loadIngredients(true);
+    var modal = document.getElementById('ingredients-modal');
+    if (!modal) {
+        Swal.fire('No disponible', 'El módulo de Materia Prima no está disponible en esta versión.', 'warning');
+        return;
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    renderIngredients();
+};
+
+window.renderIngredients = function() {
+    var tbody = document.getElementById('ingredients-tbody');
+    if (!tbody) return;
+    var filter = (document.getElementById('search-ingredient') || {}).value || '';
+    var list = _ingredients.filter(function(i) {
+        return !filter || (i.name || '').toLowerCase().indexOf(filter.toLowerCase()) > -1;
+    });
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 text-xs font-medium">No hay ingredientes registrados.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(function(ing, idx) {
+        var stk = '<span style="color:#dc2626;font-weight:bold;">' + (ing.stock || 0) + '</span>';
+        if (ing.minStock != null && Number(ing.stock || 0) < Number(ing.minStock)) stk += ' ⚠️';
+        return '<tr class="hover:bg-slate-50" style="border-bottom:1px solid #f1f5f9;">' +
+            '<td class="py-2 px-3 text-xs text-slate-500">' + (idx + 1) + '</td>' +
+            '<td class="py-2 px-3 font-semibold text-slate-700">' + (ing.name || 'Sin nombre') + '</td>' +
+            '<td class="py-2 px-3 text-xs text-slate-500">' + (ing.unit || '') + '</td>' +
+            '<td class="py-2 px-3">' + st + '</td>' +
+            '<td class="py-2 px-3 text-right whitespace-nowrap">' +
+                '<button onclick="editIngredient(\'' + (ing.id || '') + '\')" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md mr-1">✏️</button>' +
+                '<button onclick="deleteIngredient(\'' + (ing.id || '') + '\')" class="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-md">🗑️</button>' +
+            '</td></tr>';
+    }).join('');
+};
+
+window.editIngredient = async function(id) {
+    var ing = _ingredients.find(function(i) { return i.id === id; });
+    if (!ing) return;
+    var title = document.getElementById('ingredient-form-title');
+    if (title) title.textContent = 'Editar Ingrediente';
+    document.getElementById('ing-id').value = ing.id || '';
+    document.getElementById('ing-name').value = ing.name || '';
+    document.getElementById('ing-unit').value = ing.unit || '';
+    document.getElementById('ing-stock').value = ing.stock || 0;
+    document.getElementById('ing-minStock').value = ing.minStock != null ? ing.minStock : 0;
+    document.getElementById('ing-cost').value = ing.cost != null ? ing.cost : 0;
+    var cancelBtn = document.getElementById('ing-cancel-btn');
+    if (cancelBtn) cancelBtn.classList.remove('hidden');
+};
+
+window.deleteIngredient = async function(id) {
+    var conf = await Swal.fire({ title: '¿Eliminar ingrediente?', text: 'Se quitará de todos los escandallos.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Sí, eliminar' });
+    if (!conf.isConfirmed) return;
+    try {
+        var sid = _getStoreId();
+        if (window.db && window.db.deleteIngredient) await window.db.deleteIngredient(sid, id);
+        _ingredients = _ingredients.filter(function(i) { return i.id !== id; });
+        renderIngredients();
+    } catch (e) {
+        Swal.fire('Error', 'No se pudo eliminar: ' + e.message, 'error');
+    }
+};
+
+window.saveIngredient = async function(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    var name = (document.getElementById('ing-name') || {}).value || '';
+    if (!name.trim()) { Swal.fire('Campo requerido', 'Escribe el nombre del ingrediente.', 'warning'); return; }
+    var ing = {
+        id: document.getElementById('ing-id').value || generateId(),
+        name: name.trim(),
+        unit: (document.getElementById('ing-unit') || {}).value || 'unidad',
+        stock: parseFloat((document.getElementById('ing-stock') || {}).value) || 0,
+        minStock: parseFloat((document.getElementById('ing-minStock') || {}).value) || 0,
+        cost: parseFloat((document.getElementById('ing-cost') || {}).value) || 0
+    };
+    try {
+        var sid = _getStoreId();
+        if (window.db && window.db.saveIngredient) await window.db.saveIngredient(sid, ing);
+        var idx = _ingredients.findIndex(function(i) { return i.id === ing.id; });
+        if (idx > -1) _ingredients[idx] = ing; else _ingredients.push(ing);
+        resetIngredientForm();
+        renderIngredients();
+        Swal.fire({ icon: 'success', title: 'Ingrediente guardado', timer: 1200, showConfirmButton: false });
+    } catch (e) {
+        Swal.fire('Error', 'No se pudo guardar: ' + e.message, 'error');
+    }
+};
+
+window.resetIngredientForm = function() {
+    var title = document.getElementById('ingredient-form-title');
+    if (title) title.textContent = 'Nuevo Ingrediente';
+    ['ing-id', 'ing-name', 'ing-unit', 'ing-stock', 'ing-minStock', 'ing-cost'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            if (id === 'ing-unit') el.value = '';
+            else if (id === 'ing-stock' || id === 'ing-minStock' || id === 'ing-cost') el.value = 0;
+            else el.value = '';
+        }
+    });
+    var cancelBtn = document.getElementById('ing-cancel-btn');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+};
+
+// =========== Escandallos / Recetas (botón + dentro del modal de producto) ===========
+async function loadIngredientOptions() {
+    await loadIngredients();
+    var sel = document.getElementById('recipe-ing-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Seleccione Ingrediente...</option>' + _ingredients.map(function(i) {
+        return '<option value="' + (i.id || '') + '">' + (i.name || '') + ' (' + (i.unit || '') + ')</option>';
+    }).join('');
+}
+
+async function renderRecipeSelect() {
+    await loadIngredientOptions();
+}
+
+window.addRecipeRow = async function() {
+    await loadIngredients();
+    var select = document.getElementById('recipe-ing-select');
+    var qtyInput = document.getElementById('recipe-ing-qty');
+    var tbody = document.getElementById('recipe-tbody');
+    if (!select || !tbody) return;
+    var ingId = select.value;
+    var ing = _ingredients.find(function(i) { return i.id === ingId; });
+    if (!ing) { Swal.fire('Selecciona', 'Primero elige un ingrediente.', 'warning'); return; }
+    var qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    var existing = _ingRows.find(function(r) { return r.ingredient_id === ingId; });
+    if (existing) existing.quantity = existing.quantity + qty; else _ingRows.push({ ingredient_id: ingId, name: ing.name, unit: ing.unit, quantity: qty });
+    renderIngredientsTableRows();
+    var emptyState = document.getElementById('recipe-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+};
+
+window.removeRecipeRow = function(index) {
+    if (index >= 0 && index < _ingRows.length) _ingRows.splice(index, 1);
+    renderIngredientsTableRows();
+};
+
+function renderIngredientsTableRows() {
+    var tbody = document.getElementById('recipe-tbody');
+    if (!tbody) return;
+    if (!_ingRows.length) {
+        tbody.innerHTML = '';
+        var emptyState = document.getElementById('recipe-empty-state');
+        if (emptyState) emptyState.style.display = '';
+        return;
+    }
+    tbody.innerHTML = _ingRows.map(function(r, idx) {
+        return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+            '<td class="py-2 px-3 text-sm font-semibold">' + (r.name || r.ingredient_id || '') + '</td>' +
+            '<td class="py-2 px-3 text-center text-sm">' + r.quantity + ' ' + (r.unit || '') + '</td>' +
+            '<td class="py-2 px-3 text-center"><button type="button" onclick="removeRecipeRow(' + idx + ')" class="text-rose-500 hover:text-rose-700 text-xs"><i class="fas fa-times"></i></button></td>' +
+        '</tr>';
+    }).join('');
+}
+
+// exportReport helper usado por renderAnalytics
+window._render_recipe = renderIngredientsTableRows;
