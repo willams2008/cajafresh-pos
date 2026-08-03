@@ -11714,7 +11714,7 @@ window._render_recipe = renderIngredientsTableRows;
 
 // --- Sidebar principal ---
 window.toggleSidebar = function() {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar = document.getElementById('main-sidebar');
     if (!sidebar) return;
     sidebar.classList.toggle('sidebar-collapsed');
     const btn = document.getElementById('sidebar-toggle-btn');
