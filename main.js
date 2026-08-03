@@ -261,7 +261,11 @@ ipcMain.handle('db-delete-product', async (e, storeId, id) => {
         productId = id;
     }
     const res = await dbApi.deleteProduct(sid, productId);
-    if (cloudSync) cloudSync.addDeletedProductId(productId);
+    if (cloudSync) {
+        cloudSync.addDeletedProductId(productId);
+        // DELETE real en Supabase para que otros POS no lo reimportan
+        cloudSync.pushDeleteProduct(productId).catch(e => console.warn('[CLOUD-SYNC] pushDeleteProduct error:', e.message));
+    }
     syncCatalogToCloud(sid);
     return res;
 });

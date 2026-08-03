@@ -317,7 +317,23 @@ class CloudSync {
 
             console.log(`[CLOUD-SYNC] ✅ ${imported} productos importados a la BD local.`);
 
-            // Limpiar productos previamente eliminados que la nube re-importó
+            // Eliminar localmente productos que ya NO están en Supabase
+            // (fueron borrados en otro POS y el DELETE llegó a la nube)
+            const remoteIds = new Set(remoteProducts.map(rp => String(rp.product_id)));
+            let ghostsRemoved = 0;
+            for (const [localId] of localMap) {
+                if (!remoteIds.has(localId) && !this.deletedProductIds.has(localId)) {
+                    // Producto existe local pero ya no está en la nube → fue borrado en otro POS
+                    try {
+                        await localDbApi.deleteProductPermanent(this.storeId, localId);
+                        ghostsRemoved++;
+                        console.log(`[CLOUD-SYNC] 👻 Producto fantasma eliminado localmente: ${localId}`);
+                    } catch(e) {}
+                }
+            }
+            if (ghostsRemoved > 0) console.log(`[CLOUD-SYNC] 🗑️ ${ghostsRemoved} productos fantasma eliminados de la BD local.`);
+
+            // Limpiar productos en lista negra local que persistan en SQLite
             if (this.deletedProductIds.size > 0) {
                 let cleaned = 0;
                 for (const pid of this.deletedProductIds) {
@@ -326,7 +342,7 @@ class CloudSync {
                         cleaned++;
                     } catch(e) {}
                 }
-                if (cleaned > 0) console.log(`[CLOUD-SYNC] 🗑️ ${cleaned} productos eliminados permanentemente (deletedProductIds).`);
+                if (cleaned > 0) console.log(`[CLOUD-SYNC] 🗑️ ${cleaned} productos en lista negra eliminados permanentemente.`);
             }
 
             // Notificar al renderer para que recargue la lista
@@ -577,6 +593,25 @@ class CloudSync {
             console.log('[CLOUD-SYNC] ✅ Catálogo sincronizado correctamente');
         } catch (e) {
             console.error('[CLOUD-SYNC] Error enviando catálogo:', e.message);
+        }
+    }
+
+    // ==========================================
+    // ELIMINAR PRODUCTO DE LA NUBE (DELETE real)
+    // ==========================================
+    async pushDeleteProduct(productId) {
+        if (!this.enabled) return;
+        try {
+            const compositeId = `${this.storeId}_${productId}`;
+            console.log(`[CLOUD-SYNC] 🗑️ Eliminando producto ${productId} de Supabase...`);
+            await this._supabaseRequest('store_products', 'DELETE', null, `?id=eq.${compositeId}`);
+            // Marcar localmente para que el pull no lo reimporte
+            this.addDeletedProductId(String(productId));
+            console.log(`[CLOUD-SYNC] ✅ Producto ${productId} eliminado de la nube.`);
+        } catch (e) {
+            // Si falla por red, igual marcarlo localmente para el pull
+            this.addDeletedProductId(String(productId));
+            console.warn(`[CLOUD-SYNC] ⚠️ No se pudo eliminar de Supabase (sin red?): ${e.message}. Marcado en lista negra local.`);
         }
     }
 
