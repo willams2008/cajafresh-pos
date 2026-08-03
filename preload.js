@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld('db', {
     
     getClients: () => ipcRenderer.invoke('db-get-clients'),
     saveClient: (client) => ipcRenderer.invoke('db-save-client', client),
+    saveCredit: (credit) => ipcRenderer.invoke('db-save-credit', credit),
     
     getSales: (limit) => ipcRenderer.invoke('db-get-sales', limit),
     getSalesByDate: (startDate, endDate) => ipcRenderer.invoke('db-get-sales-by-date', startDate, endDate),
@@ -136,7 +137,15 @@ contextBridge.exposeInMainWorld('db', {
     getUser: (username) => ipcRenderer.invoke('db-get-user', username),
     saveUser: (user) => ipcRenderer.invoke('db-save-user', user),
     deleteUser: (userId) => ipcRenderer.invoke('db-delete-user', userId),
-    updateUserLastLogin: (userId) => ipcRenderer.invoke('db-update-user-last-login', userId)
+    updateUserLastLogin: (userId) => ipcRenderer.invoke('db-update-user-last-login', userId),
+
+    // Ingredients / Recipes (Materia Prima / Escandallos)
+    getIngredients: (storeId) => ipcRenderer.invoke('db-get-ingredients', storeId),
+    saveIngredient: (storeId, ingredient) => ipcRenderer.invoke('db-save-ingredient', storeId, ingredient),
+    deleteIngredient: (storeId, id) => ipcRenderer.invoke('db-delete-ingredient', storeId, id),
+    getRecipes: (storeId) => ipcRenderer.invoke('db-get-recipes', storeId),
+    saveRecipe: (storeId, recipe) => ipcRenderer.invoke('db-save-recipe', storeId, recipe),
+    deleteRecipe: (storeId, id) => ipcRenderer.invoke('db-delete-recipe', storeId, id)
 });
 
 // --- CLOUD SYNC (Multi-Sucursal) ---

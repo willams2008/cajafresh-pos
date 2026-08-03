@@ -11707,3 +11707,101 @@ function renderIngredientsTableRows() {
 
 // exportReport helper usado por renderAnalytics
 window._render_recipe = renderIngredientsTableRows;
+
+// ==================================================================
+// FUNCIONES UI FALTANTES — RESTAURADAS / IMPLEMENTADAS
+// ==================================================================
+
+// --- Sidebar principal ---
+window.toggleSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    sidebar.classList.toggle('sidebar-collapsed');
+    const btn = document.getElementById('sidebar-toggle-btn');
+    if (btn) { const i = btn.querySelector('i'); if (i) i.className = sidebar.classList.contains('sidebar-collapsed') ? 'fas fa-bars' : 'fas fa-times'; }
+};
+
+// --- Toggle secciones colapsables del menu ---
+window.toggleSection = function(headerEl) {
+    if (!headerEl) return;
+    const content = headerEl.nextElementSibling;
+    if (!content) return;
+    const hidden = content.style.display === 'none';
+    content.style.display = hidden ? '' : 'none';
+    const icon = headerEl.querySelector('i.fa-chevron-down, i.fa-chevron-right');
+    if (icon) icon.className = hidden ? 'fas fa-chevron-down text-xs' : 'fas fa-chevron-right text-xs';
+};
+
+// --- Carrito lateral ---
+window.toggleCartSidebar = function() {
+    const cart = document.getElementById('cart-sidebar');
+    const floatBtn = document.getElementById('cart-toggle-float');
+    if (!cart) return;
+    const collapsed = cart.classList.toggle('cart-collapsed');
+    if (floatBtn) floatBtn.classList.toggle('hidden', !collapsed);
+};
+
+// --- Panel cuentas por cobrar ---
+window.toggleCuentas = function() {
+    const panel = document.getElementById('cuentas-panel') || document.getElementById('credits-panel');
+    if (panel) { panel.classList.toggle('hidden'); return; }
+    if (typeof window.openCreditsModal === 'function') window.openCreditsModal();
+};
+
+// --- Toggle descuento ---
+window.toggleDescuento = function() {
+    const row = document.getElementById('cart-discount-row') || document.getElementById('discount-input-row') || document.getElementById('discount-panel');
+    if (row) row.classList.toggle('hidden');
+};
+
+// --- Filtro tabla de ventas ---
+window.filterSalesTable = function(query) {
+    const tbody = document.getElementById('reports-table-body');
+    if (!tbody) return;
+    const q = (query || '').toLowerCase().trim();
+    tbody.querySelectorAll('tr').forEach(r => { r.style.display = (!q || r.textContent.toLowerCase().includes(q)) ? '' : 'none'; });
+};
+
+// --- Toggle masivo features admin ---
+window.adminToggleAll = function(val) {
+    document.querySelectorAll('.feat-toggle').forEach(el => {
+        el.checked = val;
+        const id = el.getAttribute('data-id');
+        if (typeof setFeatEnabled === 'function') setFeatEnabled(id, val);
+        if (typeof applySingleFeature === 'function') applySingleFeature(id, val);
+    });
+};
+
+// --- Sync Provisionar → POS ---
+window.syncProvisionarToPOS = async () => {
+    if (!window.Provisionar || !window.Provisionar._getMateriales) { Swal.fire('No disponible', 'El modulo Provisionar no esta cargado.', 'info'); return; }
+    const mats = window.Provisionar._getMateriales();
+    if (!mats || !mats.length) { Swal.fire('Sin materiales', 'No hay materiales para sincronizar.', 'info'); return; }
+    const rate = settings.exchangeRate || 36.5;
+    let creados = 0, actualizados = 0;
+    for (const m of mats) {
+        const costo = m.costoPlancha || (m.areaM2 && m.costoM2 ? m.areaM2 * m.costoM2 : (m.costoM2 || 10));
+        const precioUSD = parseFloat((costo * 1.3).toFixed(2));
+        const existing = products.find(p => p.id === m.id || p.provisionarId === m.id);
+        if (existing) { existing.priceUSD = precioUSD; existing.priceVES = Math.round(precioUSD * rate / 10) * 10; existing.costPrice = parseFloat(costo.toFixed(2)); actualizados++; }
+        else { products.push({ id: m.id, name: m.nombre, priceUSD: precioUSD, priceVES: Math.round(precioUSD * rate / 10) * 10, costPrice: parseFloat(costo.toFixed(2)), stock: m.stock || 0, minStock: 1, category: 'Acrilico', provisionarId: m.id, barcode: '', img_url: '' }); creados++; }
+    }
+    if (typeof saveProducts === 'function') saveProducts();
+    if (typeof renderProducts === 'function') renderProducts();
+    if (typeof renderInventory === 'function') renderInventory();
+    Swal.fire({ toast: true, position: 'top-end', title: `Sincronizado: ${creados} creados, ${actualizados} actualizados`, icon: 'success', showConfirmButton: false, timer: 3000 });
+};
+
+// --- Tipo de sucursal ---
+window.getStoreType = () => settings.storeType || 'kiosko';
+window.setStoreType = (type) => {
+    settings.storeType = type;
+    if (typeof saveSettings === 'function') saveSettings();
+    const active = 'flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 border-emerald-500 bg-emerald-500 text-white flex items-center justify-center gap-1.5';
+    const inactive = 'flex-1 py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 border-slate-200 bg-white text-slate-500 hover:border-emerald-300 flex items-center justify-center gap-1.5';
+    const kb = document.getElementById('store-type-kiosko'); const wb = document.getElementById('store-type-warehouse');
+    if (kb) kb.className = type === 'kiosko' ? active : inactive;
+    if (wb) wb.className = type === 'warehouse' ? active : inactive;
+    if (window.cloudSync && typeof window.cloudSync.configure === 'function') window.cloudSync.configure({ storeType: type });
+    Swal.fire({ toast: true, position: 'top-end', title: `Sucursal: ${type === 'kiosko' ? 'Kiosko' : 'Almacen'}`, icon: 'success', showConfirmButton: false, timer: 2000 });
+};

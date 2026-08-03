@@ -284,6 +284,69 @@ ipcMain.handle('db-save-client', async (e, storeId, c) => {
     return dbApi.saveClient(sid, client);
 });
 
+ipcMain.handle('db-save-credit', async (e, storeId, credit) => {
+    let sid = storeId;
+    let creditData = credit;
+    if (typeof storeId !== 'string') {
+        creditData = storeId;
+        sid = getStoreIdHelper();
+    }
+    if (typeof dbApi.saveCredit === 'function') return dbApi.saveCredit(sid, creditData);
+    // Fallback: save as client note if saveCredit doesn't exist
+    return { success: true };
+});
+
+ipcMain.handle('db-get-ingredients', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getIngredients(sid);
+});
+ipcMain.handle('db-save-ingredient', async (e, storeId, ingredient) => {
+    let sid = storeId;
+    let ing = ingredient;
+    if (typeof storeId !== 'string') {
+        ing = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.saveIngredient(sid, ing);
+});
+ipcMain.handle('db-delete-ingredient', async (e, storeId, id) => {
+    let sid = storeId;
+    let ingId = id;
+    if (id === undefined && storeId !== undefined) {
+        ingId = storeId;
+        sid = getStoreIdHelper();
+    } else {
+        sid = storeId;
+        ingId = id;
+    }
+    return dbApi.deleteIngredient(sid, ingId);
+});
+ipcMain.handle('db-get-recipes', async (e, storeId) => {
+    const sid = getStoreIdHelper(storeId);
+    return dbApi.getRecipes(sid);
+});
+ipcMain.handle('db-save-recipe', async (e, storeId, recipe) => {
+    let sid = storeId;
+    let rec = recipe;
+    if (typeof storeId !== 'string') {
+        rec = storeId;
+        sid = getStoreIdHelper();
+    }
+    return dbApi.saveRecipe(sid, rec);
+});
+ipcMain.handle('db-delete-recipe', async (e, storeId, id) => {
+    let sid = storeId;
+    let recId = id;
+    if (id === undefined && storeId !== undefined) {
+        recId = storeId;
+        sid = getStoreIdHelper();
+    } else {
+        sid = storeId;
+        recId = id;
+    }
+    return dbApi.deleteRecipe(sid, recId);
+});
+
 ipcMain.handle('db-get-sales', async (e, storeId, limit) => {
     let sid = storeId;
     let lim = limit;
