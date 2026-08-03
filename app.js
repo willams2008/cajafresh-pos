@@ -4328,8 +4328,6 @@ function processPayment() {
 // ==========================================
 // REPORTS & CHARTS
 // ==========================================
-let chartCategory = null;
-let chartPayment = null;
 let anaTrendChart = null;
 let anaEfficiencyChart = null;
 
@@ -4492,8 +4490,8 @@ function getSalesForPeriod(period, customDate) {
 
     // Filtrar según período
     return allSales.filter(s => {
-        if (!s || !s.date) return false;
-        const sDate = new Date(s.date);
+        if (!s || (!s.date && !s.timestamp)) return false;
+        const sDate = new Date(s.date || s.timestamp);
         if (isNaN(sDate.getTime())) return false;
         if (s.status === 'pending') return false;
 
@@ -4519,6 +4517,9 @@ function getSalesForPeriod(period, customDate) {
     });
 }
 
+let chartCategory = null;
+let chartPayment = null;
+
 function renderAnalytics() {
     const period = window._analyticsPeriod || 'day';
     const customDate = window._analyticsCustomDate;
@@ -4530,7 +4531,7 @@ function renderAnalytics() {
     const periodSales = getSalesForPeriod(period, customDate);
 
     // ── 1. Inversión en Stock ──────────────────────────────────────────
-    const inventoryValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.costPrice) || 0)), 0);
+    const inventoryValue = (products || []).reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.costPrice) || 0)), 0);
     const valEl = document.getElementById('ana-inventory-value');
     if (valEl) valEl.textContent = formatUSD(inventoryValue);
 
@@ -4539,30 +4540,27 @@ function renderAnalytics() {
     let periodCostUSD = 0;
 
     periodSales.forEach(s => {
-        const saleUSD = Number(s.totalUSD) || 0;
+        const saleUSD = Number(s.totalUSD || s.total) || 0;
         periodSalesUSD += saleUSD;
 
         // Calcular costo: usar totalCostUSD si existe y es razonable,
         // si no, retro-calcular desde inventario actual
         let saleCost = Number(s.totalCostUSD) || 0;
         if (saleCost <= 0 || saleCost > saleUSD * 2) {
-            // Costo corrupto o ausente → retro-calcular
             if (Array.isArray(s.items)) {
                 saleCost = s.items.reduce((acc, item) => {
-                    const prod = products.find(p => p.id === item.id || p.id === item.parentId);
+                    const prod = (products || []).find(p => p.id === item.id || p.id === item.parentId);
                     const cost = Number(prod?.costPrice) || 0;
-                    return acc + (cost * (Number(item.qty) || 0));
+                    return acc + (cost * (Number(item.qty || item.quantity) || 0));
                 }, 0);
             }
-            // Si sigue siendo 0 o negativo, asumir margen del 30%
             if (saleCost <= 0) saleCost = saleUSD * 0.70;
         }
         periodCostUSD += saleCost;
     });
 
-    // Proteger contra costos que superen ventas (datos corruptos)
     if (periodCostUSD > periodSalesUSD && periodSalesUSD > 0) {
-        periodCostUSD = periodSalesUSD * 0.70; // Asumir margen 30%
+        periodCostUSD = periodSalesUSD * 0.70;
     }
 
     const periodProfitUSD = Math.max(0, periodSalesUSD - periodCostUSD);
@@ -4576,33 +4574,34 @@ function renderAnalytics() {
     const margEl = document.getElementById('ana-average-margin');
     if (margEl) {
         margEl.textContent = avgMargin.toFixed(1) + '%';
-        margEl.closest?.('.bg-brand-600, [class*="bg-brand"]')?.classList?.toggle('bg-rose-600', avgMargin < 0);
+        if (avgMargin < 15) {
+            margEl.className = 'py-3.5 px-4 font-black text-rose-700 text-right text-base border-r border-slate-200 bg-rose-50/30';
+        } else {
+            margEl.className = 'py-3.5 px-4 font-black text-indigo-700 text-right text-base border-r border-slate-200 bg-indigo-50/30';
+        }
     }
 
     // ── 3. Proyección del Mes ─────────────────────────────────────────
     const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
     const today = new Date();
-    const dayOfMonth = today.getDate(); // Día actual del mes (1-31)
+    const dayOfMonth = today.getDate();
 
     let recentAvgSales = 0;
-    const daySalesHistory = (Array.isArray(dailyHistory) ? dailyHistory.slice(-7) : []);
+    const daySalesHistory = (Array.isArray(window.dailyHistory) ? window.dailyHistory.slice(-7) : []);
 
     if (daySalesHistory.length > 0) {
-        // Tenemos historial de cierres → usarlo
         recentAvgSales = daySalesHistory.reduce((acc, d) => acc + (Number(d.salesUSD) || 0), 0) / daySalesHistory.length;
     } else if (Array.isArray(sales) && sales.length > 0) {
-        // Sin historial de cierres → calcular promedio diario desde las ventas reales
         const salesByDay = {};
         sales.forEach(s => {
             const dayKey = new Date(s.date || s.timestamp).toDateString();
-            salesByDay[dayKey] = (salesByDay[dayKey] || 0) + (Number(s.totalUSD) || 0);
+            salesByDay[dayKey] = (salesByDay[dayKey] || 0) + (Number(s.totalUSD || s.total) || 0);
         });
         const uniqueDays = Object.keys(salesByDay).length;
         const totalFromSales = Object.values(salesByDay).reduce((a, b) => a + b, 0);
         recentAvgSales = uniqueDays > 0 ? totalFromSales / uniqueDays : 0;
     }
 
-    // Si el promedio es $0 pero hay ventas este período, usar ventas del período / días transcurridos
     if (recentAvgSales === 0 && periodSalesUSD > 0 && dayOfMonth > 0) {
         recentAvgSales = periodSalesUSD / dayOfMonth;
     }
@@ -4611,57 +4610,66 @@ function renderAnalytics() {
     const projEl = document.getElementById('ana-projection-value');
     if (projEl) projEl.textContent = formatUSD(projectedSales);
 
-
     // ── 4. Ranking de Productos más Rentables ─────────────────────────
     const prodStats = {};
     periodSales.forEach(s => {
         if (!Array.isArray(s.items)) return;
         s.items.forEach(i => {
-            if (!prodStats[i.id]) prodStats[i.id] = { name: i.name, qty: 0, profit: 0, cost: 0 };
-            const prod = products.find(p => p.id === i.id || p.id === i?.parentId);
+            const pid = i.id || i.productId;
+            if (!pid) return;
+            if (!prodStats[pid]) prodStats[pid] = { name: i.name || 'Producto', qty: 0, profit: 0, cost: 0, revenue: 0 };
+            const prod = (products || []).find(p => p.id === pid || p.id === i?.parentId);
             const cost = Number(prod?.costPrice) || 0;
-            const itemPrice = Number(i.unitPriceUSD || i.price) || 0;
-            const itemQty = Number(i.qty) || 0;
-            prodStats[i.id].qty += itemQty;
-            prodStats[i.id].profit += (itemPrice - cost) * itemQty;
-            prodStats[i.id].cost = cost;
+            const itemPrice = Number(i.unitPriceUSD || i.priceUSD || i.price) || 0;
+            const itemQty = Number(i.qty || i.quantity) || 0;
+            prodStats[pid].qty += itemQty;
+            prodStats[pid].revenue += itemPrice * itemQty;
+            prodStats[pid].profit += (itemPrice - cost) * itemQty;
+            prodStats[pid].cost = cost;
         });
     });
 
-    const ranking = Object.values(prodStats).sort((a, b) => b.profit - a.profit).slice(0, 5);
+    const ranking = Object.values(prodStats).sort((a, b) => b.profit - a.profit);
     const rankingBody = document.getElementById('ana-top-products-body');
     if (rankingBody) {
-        rankingBody.innerHTML = ranking.length ? ranking.map(p => {
-            const unitProfit = p.qty > 0 ? p.profit / p.qty : 0;
-            const margin = (unitProfit + p.cost) > 0 ? (unitProfit / (unitProfit + p.cost)) * 100 : 0;
-            return `
-                <tr>
-                    <td class="py-4 px-8 font-bold text-slate-700">${p.name}</td>
-                    <td class="py-4 px-8 text-center font-medium text-slate-500">${p.qty}</td>
-                    <td class="py-4 px-8 text-center"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded font-bold">${isNaN(margin) ? 0 : margin.toFixed(0)}%</span></td>
-                    <td class="py-4 px-8 text-right font-black text-slate-800">${formatUSD(p.profit || 0)}</td>
-                </tr>
-            `;
-        }).join('') : '<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">No hay ventas en este período</td></tr>';
+        if (ranking.length === 0) {
+            rankingBody.innerHTML = '<tr><td colspan="4" class="py-10 text-center text-slate-400 italic">No hay ventas registradas en este período</td></tr>';
+        } else {
+            rankingBody.innerHTML = ranking.slice(0, 10).map((p, idx) => {
+                const unitProfit = p.qty > 0 ? p.profit / p.qty : 0;
+                const margin = (unitProfit + p.cost) > 0 ? (unitProfit / (unitProfit + p.cost)) * 100 : 0;
+                let rankBadge = `<span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs inline-flex items-center justify-center mr-2">${idx + 1}</span>`;
+                if (idx === 0) rankBadge = `<span class="w-6 h-6 rounded-full bg-amber-400 text-amber-950 font-black text-xs inline-flex items-center justify-center mr-2 shadow-sm">🥇</span>`;
+                else if (idx === 1) rankBadge = `<span class="w-6 h-6 rounded-full bg-slate-300 text-slate-800 font-black text-xs inline-flex items-center justify-center mr-2 shadow-sm">🥈</span>`;
+                else if (idx === 2) rankBadge = `<span class="w-6 h-6 rounded-full bg-amber-600 text-white font-black text-xs inline-flex items-center justify-center mr-2 shadow-sm">🥉</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-4 px-8 font-bold text-slate-700 flex items-center">${rankBadge} ${p.name}</td>
+                        <td class="py-4 px-8 text-center font-mono font-bold text-slate-600">${p.qty}</td>
+                        <td class="py-4 px-8 text-center"><span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg font-mono font-bold text-xs border border-emerald-100">${isNaN(margin) ? 0 : margin.toFixed(0)}%</span></td>
+                        <td class="py-4 px-8 text-right font-mono font-black text-emerald-700 text-base">${formatUSD(p.profit || 0)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
     }
 
     // ── 5. Gráficos ───────────────────────────────────────────────────
-    renderAnalyticsCharts(periodProfitUSD, periodSales);
-
-    if (window._lastCatTotals && window._lastMethodTotals) {
-        renderInternalCharts(window._lastCatTotals, window._lastMethodTotals);
-    } else {
-        let catTotals = {};
-        let methodTotals = { 'cash-usd': 0, 'cash-ves': 0, 'card-ves': 0 };
-        periodSales.forEach(sale => {
-            methodTotals[sale.method] = (methodTotals[sale.method] || 0) + (Number(sale.totalVES) || 0);
-            if (!Array.isArray(sale.items)) return;
-            sale.items.forEach(item => {
-                catTotals[item.category] = (catTotals[item.category] || 0) + ((Number(item.unitPriceVES) || 0) * (Number(item.qty) || 0));
-            });
+    let catTotals = {};
+    let methodTotals = { 'cash-usd': 0, 'cash-ves': 0, 'card-ves': 0, 'pago_movil': 0, 'transfer': 0 };
+    periodSales.forEach(sale => {
+        const m = sale.method || 'cash-usd';
+        methodTotals[m] = (methodTotals[m] || 0) + (Number(sale.totalUSD || sale.total) || 0);
+        if (!Array.isArray(sale.items)) return;
+        sale.items.forEach(item => {
+            const cat = item.category || 'General';
+            catTotals[cat] = (catTotals[cat] || 0) + ((Number(item.unitPriceUSD || item.priceUSD || item.price) || 0) * (Number(item.qty || item.quantity) || 0));
         });
-        renderInternalCharts(catTotals, methodTotals);
-    }
+    });
+
+    renderAnalyticsCharts(periodProfitUSD, periodSales);
+    renderInternalCharts(catTotals, methodTotals);
 
     // ── 6. Punto de Equilibrio ────────────────────────────────────────
     const expensesList = typeof expenses !== 'undefined' && Array.isArray(expenses) ? expenses : [];
@@ -4677,69 +4685,89 @@ function renderAnalytics() {
     if (beStatusEl) {
         if (safeTotalExpensesUSD === 0) {
             beStatusEl.textContent = 'Registra gastos para calcular el punto de equilibrio';
+            beStatusEl.className = 'text-lg font-bold text-slate-500 tracking-tight';
         } else if (periodSalesUSD >= breakEvenSales) {
-            beStatusEl.textContent = '¡Meta Alcanzada! (Ganancia neta)';
-            beStatusEl.classList.add('text-emerald-600');
+            beStatusEl.textContent = '¡Meta Alcanzada! (Ganancia Neta)';
+            beStatusEl.className = 'text-2xl font-black text-emerald-600 tracking-tight';
         } else {
             beStatusEl.textContent = `Faltan ${formatUSD(breakEvenSales - periodSalesUSD)} para ser rentable`;
-            beStatusEl.classList.remove('text-emerald-600');
+            beStatusEl.className = 'text-xl font-bold text-amber-600 tracking-tight';
         }
     }
     if (bePercentEl) bePercentEl.textContent = (isNaN(bePercent) ? 0 : bePercent).toFixed(0) + '%';
     if (beBarEl) beBarEl.style.width = (isNaN(bePercent) ? 0 : bePercent) + '%';
 
-    // ── 7. Insights ───────────────────────────────────────────────────
+    // ── 7. Inteligencia de Negocio (Insights Dinámicos) ───────────────
     const insightsContainer = document.getElementById('ana-insights-container');
     if (insightsContainer) {
         let insightsHTML = '';
-        const slowMovers = products.filter(p => p.stock > 0 && !prodStats[p.id]).sort((a, b) => (b.stock * b.costPrice) - (a.stock * a.costPrice)).slice(0, 2);
-        const totalDeadValue = slowMovers.reduce((acc, p) => acc + (p.stock * p.costPrice), 0);
+
+        // 1. Capital muerto
+        const slowMovers = (products || []).filter(p => Number(p.stock) > 0 && !prodStats[p.id]).sort((a, b) => ((Number(b.stock) || 0) * (Number(b.costPrice) || 0)) - ((Number(a.stock) || 0) * (Number(a.costPrice) || 0))).slice(0, 2);
+        const totalDeadValue = slowMovers.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.costPrice) || 0)), 0);
         if (slowMovers.length > 0 && totalDeadValue > 0) {
-            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-rose-500/20 rounded-xl flex items-center justify-center text-rose-400"><i class="fas fa-exclamation-triangle"></i></div><div><p class="text-xs font-bold text-rose-300 mb-1">Capital Muerto Detectado</p><p class="text-[10px] text-slate-400 leading-relaxed">Tienes <b>${formatUSD(totalDeadValue)}</b> en stock que no se mueve. ${slowMovers.map(p => `<b>${p.name}</b> (x${p.stock})`).join(' y ')}.</p></div></div>`;
+            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-rose-500/20 rounded-xl flex items-center justify-center text-rose-400 font-bold"><i class="fas fa-exclamation-triangle"></i></div><div><p class="text-xs font-bold text-rose-300 mb-1">Capital Muerto Detectado</p><p class="text-[11px] text-slate-300 leading-relaxed">Tienes <b>${formatUSD(totalDeadValue)}</b> atascados en mercancía sin rotación (${slowMovers.map(p => `<b>${p.name}</b> x${p.stock}`).join(', ')}). Considera combos u ofertas para liberar liquidez.</p></div></div>`;
         }
-        if (periodSalesUSD > recentAvgSales * 1.05) {
-            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400"><i class="fas fa-rocket"></i></div><div><p class="text-xs font-bold text-emerald-300 mb-1">Crecimiento Detectado</p><p class="text-[10px] text-slate-400 leading-relaxed">Estás vendiendo <b>${formatUSD(periodSalesUSD - recentAvgSales)}</b> más que tu promedio habitual.</p></div></div>`;
+
+        // 2. Tendencia de Ventas
+        if (recentAvgSales > 0 && periodSalesUSD > recentAvgSales * 1.05) {
+            const growthPct = (((periodSalesUSD - recentAvgSales) / recentAvgSales) * 100).toFixed(0);
+            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 font-bold"><i class="fas fa-rocket"></i></div><div><p class="text-xs font-bold text-emerald-300 mb-1">Ritmo Acelerado (+${growthPct}%)</p><p class="text-[11px] text-slate-300 leading-relaxed">Estás vendiendo <b>${formatUSD(periodSalesUSD - recentAvgSales)}</b> por encima del promedio histórico.</p></div></div>`;
         }
-        insightsContainer.innerHTML = insightsHTML || '<p class="text-xs text-slate-500 italic text-center">No hay alertas críticas en este período.</p>';
+
+        // 3. Método Dominante
+        const topMethodEntry = Object.entries(methodTotals).sort((a, b) => b[1] - a[1])[0];
+        if (topMethodEntry && topMethodEntry[1] > 0 && periodSalesUSD > 0) {
+            const methodNames = { 'cash-usd': 'Efectivo $', 'cash-ves': 'Efectivo Bs', 'card-ves': 'Punto de Venta', 'pago_movil': 'Pago Móvil', 'transfer': 'Transferencia' };
+            const mName = methodNames[topMethodEntry[0]] || topMethodEntry[0];
+            const mPct = ((topMethodEntry[1] / periodSalesUSD) * 100).toFixed(0);
+            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-300 font-bold"><i class="fas fa-wallet"></i></div><div><p class="text-xs font-bold text-indigo-300 mb-1">Método Preferido (${mName})</p><p class="text-[11px] text-slate-300 leading-relaxed">El <b>${mPct}%</b> de tus ingresos ingresaron vía ${mName}. Asegúrate de mantener la caja cuadrada.</p></div></div>`;
+        }
+
+        // 4. Margen de Ganancia
+        if (avgMargin > 0 && avgMargin < 20) {
+            insightsHTML += `<div class="flex gap-4 animate-fadeIn"><div class="w-10 h-10 shrink-0 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-300 font-bold"><i class="fas fa-percentage"></i></div><div><p class="text-xs font-bold text-amber-300 mb-1">Margen Ajustado (${avgMargin.toFixed(1)}%)</p><p class="text-[11px] text-slate-300 leading-relaxed">Tu margen de ganancia está bajo. Revisa precios de compra o ajusta la estructura de costos.</p></div></div>`;
+        }
+
+        insightsContainer.innerHTML = insightsHTML || '<p class="text-xs text-slate-400 italic text-center py-4">Operación estable. No hay alertas críticas en este período.</p>';
     }
 
     // ── 8. Capacidad de Reposición ─────────────────────────────────────
     const replenishEl = document.getElementById('ana-replenish-advice');
-    if (replenishEl) replenishEl.textContent = `Puedes reinvertir hasta ${formatUSD(periodProfitUSD * 0.7)} en mercancía manteniendo el flujo de caja estable.`;
+    if (replenishEl) {
+        const safeRestock = Math.max(0, periodProfitUSD * 0.70);
+        replenishEl.textContent = `Puedes reinvertir hasta ${formatUSD(safeRestock)} en reposición de stock sin comprometer el flujo de caja operativo del negocio.`;
+    }
 
     // ── 9. Runway de Inventario ────────────────────────────────────────
-    const avgDailyItemsCost = periodSalesUSD * 0.7 || 1;
+    const avgDailyItemsCost = (periodSalesUSD * 0.7) / (period === 'day' ? 1 : period === 'week' ? 7 : 30) || 1;
     const runwayDays = inventoryValue / avgDailyItemsCost;
     const runwayEl = document.getElementById('ana-inventory-runway');
     if (runwayEl) {
-        runwayEl.textContent = `${Math.round(runwayDays)} días de stock`;
-        runwayEl.className = runwayDays < 5
-            ? 'px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-black rounded-lg border border-rose-100 animate-pulse'
-            : 'px-2 py-0.5 bg-brand-50 text-brand-700 text-[10px] font-black rounded-lg border border-brand-100';
+        const rd = Math.round(runwayDays);
+        runwayEl.textContent = `${rd} días de stock disponible`;
+        runwayEl.className = rd < 7
+            ? 'px-2.5 py-1 bg-rose-50 text-rose-700 text-[11px] font-black rounded-lg border border-rose-200 animate-pulse'
+            : 'px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-black rounded-lg border border-emerald-200';
     }
 
-    // ── 10. Deuda Pendiente de Proveedores (Cuentas por Pagar) ──────────
+    // ── 10. Deuda Pendiente de Proveedores ─────────────────────────────
     const payablesList = typeof payables !== 'undefined' && Array.isArray(payables) ? payables : [];
     const pendingPayables = payablesList.filter(p => p.status === 'pending');
     const totalPendingDebt = pendingPayables.reduce((acc, p) => acc + (Number(p.amountUSD) || 0), 0);
-    
+
     const pendingDebtEl = document.getElementById('ana-payables-pending');
     const pendingCountEl = document.getElementById('ana-payables-count');
-    
-    if (pendingDebtEl) {
-        pendingDebtEl.textContent = formatUSD(totalPendingDebt);
-        if (totalPendingDebt > 0) {
-            pendingDebtEl.closest?.('div[class*="bg-rose"]')?.classList?.add('animate-pulse');
-            setTimeout(() => pendingDebtEl.closest?.('div[class*="bg-rose"]')?.classList?.remove('animate-pulse'), 2000);
-        }
-    }
+
+    if (pendingDebtEl) pendingDebtEl.textContent = formatUSD(totalPendingDebt);
     if (pendingCountEl) {
-        const overdueCount = pendingPayables.filter(p => new Date(p.dueDate) < new Date()).length;
+        const overdueCount = pendingPayables.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length;
         if (overdueCount > 0) {
-            pendingCountEl.textContent = `${pendingPayables.length} facturas (${overdueCount} vencida${overdueCount > 1 ? 's' : ''})`;
-            pendingCountEl.classList.add('bg-rose-700', 'border-rose-300');
+            pendingCountEl.textContent = `${pendingPayables.length} facturas (${overdueCount} vencidas)`;
+            pendingCountEl.className = 'py-3.5 px-4 text-xs text-rose-600 font-bold bg-rose-50/20';
         } else {
-            pendingCountEl.textContent = `${pendingPayables.length} factura${pendingPayables.length !== 1 ? 's' : ''} pendiente${pendingPayables.length !== 1 ? 's' : ''}`;
+            pendingCountEl.textContent = `${pendingPayables.length} facturas pendientes`;
+            pendingCountEl.className = 'py-3.5 px-4 text-xs text-slate-500 font-bold';
         }
     }
 
@@ -4753,11 +4781,12 @@ function renderAnalytics() {
     if (avgTicketEl) avgTicketEl.textContent = formatUSD(avgTicketUSD);
 
     const avgTicketVesEl = document.getElementById('ana-avg-ticket-ves');
-    if (avgTicketVesEl) avgTicketVesEl.textContent = `Equivalente a Bs ${avgTicketVES.toFixed(2)} (${txCount} ventas)`;
+    if (avgTicketVesEl) avgTicketVesEl.textContent = `Bs ${avgTicketVES.toFixed(2)} (${txCount} ventas)`;
 
     // Hora pico
     const hourCounts = {};
     periodSales.forEach(s => {
+        if (!s.timestamp && !s.date) return;
         const h = new Date(s.timestamp || s.date).getHours();
         hourCounts[h] = (hourCounts[h] || 0) + 1;
     });
@@ -4775,6 +4804,59 @@ function renderAnalytics() {
 
     const peakHourEl = document.getElementById('ana-peak-hour');
     if (peakHourEl) peakHourEl.textContent = peakHour;
+
+    // ── 12. Rendimiento por Empleado (Tab Empleados) ─────────────────
+    const employeeStats = {};
+    periodSales.forEach(s => {
+        const empName = s.cashier_name || s.cashier || s.created_by || s.seller || 'Cajero Principal';
+        if (!employeeStats[empName]) {
+            employeeStats[empName] = { name: empName, salesCount: 0, totalUSD: 0 };
+        }
+        employeeStats[empName].salesCount += 1;
+        employeeStats[empName].totalUSD += Number(s.totalUSD || s.total) || 0;
+    });
+
+    const empList = Object.values(employeeStats).sort((a, b) => b.totalUSD - a.totalUSD);
+    const empCountEl = document.getElementById('ana-employee-count');
+    const empTotalEl = document.getElementById('ana-employee-total');
+    const empAvgTicketEl = document.getElementById('ana-employee-avg-ticket');
+    const empBodyEl = document.getElementById('ana-employee-body');
+
+    if (empCountEl) empCountEl.textContent = empList.length;
+    if (empTotalEl) empTotalEl.textContent = formatUSD(periodSalesUSD);
+    if (empAvgTicketEl) empAvgTicketEl.textContent = formatUSD(avgTicketUSD);
+
+    if (empBodyEl) {
+        if (empList.length === 0) {
+            empBodyEl.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 italic">No hay ventas registradas en este período</td></tr>';
+        } else {
+            empBodyEl.innerHTML = empList.map((emp, idx) => {
+                const avgTicket = emp.salesCount > 0 ? emp.totalUSD / emp.salesCount : 0;
+                const percent = periodSalesUSD > 0 ? ((emp.totalUSD / periodSalesUSD) * 100).toFixed(1) : '0.0';
+                let badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Activo</span>';
+                if (idx === 0) badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">🏆 Líder en Ventas</span>';
+                else if (idx === 1) badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">⚡ Alto Desempeño</span>';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-4 px-6 font-bold text-slate-800 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-brand-50 text-brand-600 font-black text-xs flex items-center justify-center border border-brand-100 shrink-0">
+                                ${emp.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <span class="block font-bold text-slate-800">${emp.name}</span>
+                                ${badge}
+                            </div>
+                        </td>
+                        <td class="py-4 px-6 text-center font-mono font-bold text-slate-700">${emp.salesCount}</td>
+                        <td class="py-4 px-6 text-right font-mono font-bold text-emerald-700">${formatUSD(emp.totalUSD)}</td>
+                        <td class="py-4 px-6 text-right font-mono text-slate-700">${formatUSD(avgTicket)}</td>
+                        <td class="py-4 px-6 text-right font-mono font-bold text-brand-600">${percent}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
 
     // Guardar resumen global para exportación y IA
     window._lastAnalyticsSummary = {
@@ -4794,70 +4876,69 @@ function renderAnalytics() {
 // 🤖 DIAGNÓSTICO DE NEGOCIO CON INTELIGENCIA ARTIFICIAL
 window.runAIDiagnostic = function() {
     const summary = window._lastAnalyticsSummary || {};
-    const bName = settings.businessName || 'Caja Fresh POS';
+    const bName = settings.companyName || settings.businessName || 'Caja Fresh POS';
     const er = settings.exchangeRate || 1;
 
-    const marginScore = Math.min(100, Math.max(0, summary.avgMargin || 0));
     const profitRatio = summary.periodSalesUSD > 0 ? (summary.periodProfitUSD / summary.periodSalesUSD) : 0;
     let healthStatus = 'Excelente 🟢';
     let healthColor = 'text-emerald-500';
-    
-    if (profitRatio < 0.15) {
+
+    if (profitRatio < 0.15 && profitRatio > 0.05) {
         healthStatus = 'Atención Requerida ⚠️';
         healthColor = 'text-amber-500';
-    } else if (profitRatio < 0.05) {
+    } else if (profitRatio <= 0.05 && summary.periodSalesUSD > 0) {
         healthStatus = 'Crítico 🔴';
         healthColor = 'text-rose-500';
     }
 
     const tips = [];
     if (summary.avgMargin < 25) {
-        tips.push('💡 <b>Aumentar Margen:</b> Tu margen promedio está por debajo del 25%. Considera revisar precios de costo con tus proveedores.');
+        tips.push('💡 <b>Aumentar Margen:</b> Tu margen promedio es ' + (summary.avgMargin || 0).toFixed(1) + '%. Revisa la estructura de costos o negociaciones con proveedores.');
     } else {
-        tips.push('✨ <b>Excelente Salud de Margen:</b> Mantienes un margen promedio del ' + (summary.avgMargin || 0).toFixed(1) + '%.');
+        tips.push('✨ <b>Excelente Margen:</b> Mantienes un margen promedio de ' + (summary.avgMargin || 0).toFixed(1) + '%.');
     }
 
     if (summary.avgTicketUSD < 5) {
-        tips.push('🛍️ <b>Elevar Ticket Promedio:</b> El gasto promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '. Crea combos o promociones para incentivar ventas cruzadas.');
+        tips.push('🛍️ <b>Elevar Ticket Promedio:</b> El promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '. Promueve combos o artículos de impulso.');
     } else {
-        tips.push('🛍️ <b>Buen Ticket Promedio:</b> El promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '.');
+        tips.push('🛍️ <b>Sólido Ticket Promedio:</b> El gasto promedio por cliente es $' + (summary.avgTicketUSD || 0).toFixed(2) + '.');
     }
 
     if (summary.peakHour && summary.peakHour !== '--:--') {
-        tips.push('⏰ <b>Horario Estratégico:</b> Tu hora pico es <b>' + summary.peakHour + '</b>. Asegúrate de tener suficiente personal y productos listos a esa hora.');
+        tips.push('⏰ <b>Horario Clave:</b> Tu hora pico de mayor afluencia es <b>' + summary.peakHour + '</b>. Planifica personal adicional en ese horario.');
     }
 
     if (summary.totalPendingDebt > 0) {
-        tips.push('⚠️ <b>Control de Deudas:</b> Tienes $' + summary.totalPendingDebt.toFixed(2) + ' pendientes con proveedores. Prioriza la liquidez para saldar facturas.');
+        tips.push('⚠️ <b>Deudas Pendientes:</b> Tienes $' + summary.totalPendingDebt.toFixed(2) + ' pendientes en facturas de proveedores. Asegura el flujo de caja.');
     }
 
     const html = `
         <div class="text-left font-sans space-y-4">
-            <div class="bg-slate-900 text-white p-5 rounded-2xl border border-indigo-500/30">
+            <div class="bg-slate-900 text-white p-5 rounded-2xl border border-indigo-500/30 shadow-md">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-xs uppercase tracking-widest font-black text-indigo-400">Salud Financiera del Negocio</span>
                     <span class="text-xs font-bold px-3 py-1 bg-indigo-950 text-indigo-300 rounded-full border border-indigo-700/50">${bName}</span>
                 </div>
                 <div class="text-2xl font-black ${healthColor} mb-1">${healthStatus}</div>
-                <p class="text-xs text-slate-400">Evaluación automática generada por la IA de Rendimiento Caja Fresh.</p>
+                <p class="text-xs text-slate-400">Diagnóstico computado en tiempo real con inteligencia de ventas.</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3 text-xs">
-                <div class="bg-slate-100 p-3 rounded-xl">
-                    <div class="text-slate-500 font-bold uppercase text-[10px]">Ventas del Período</div>
+                <div class="bg-slate-100 p-3 rounded-xl border border-slate-200">
+                    <div class="text-slate-500 font-bold uppercase text-[10px]">Ventas Totales</div>
                     <div class="text-base font-black text-slate-800 mt-1">$${(summary.periodSalesUSD || 0).toFixed(2)}</div>
-                    <div class="text-[10px] text-slate-400">Bs ${((summary.periodSalesUSD || 0) * er).toFixed(2)}</div>
+                    <div class="text-[10px] text-slate-500">Bs ${((summary.periodSalesUSD || 0) * er).toFixed(2)}</div>
                 </div>
                 <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
                     <div class="text-emerald-700 font-bold uppercase text-[10px]">Utilidad Ganada</div>
                     <div class="text-base font-black text-emerald-700 mt-1">$${(summary.periodProfitUSD || 0).toFixed(2)}</div>
-                    <div class="text-[10px] text-emerald-600">Margen: ${(summary.avgMargin || 0).toFixed(1)}%</div>
+                    <div class="text-[10px] text-emerald-600 font-bold">Margen: ${(summary.avgMargin || 0).toFixed(1)}%</div>
                 </div>
             </div>
 
             <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-2 text-xs text-slate-700">
                 <div class="font-bold text-indigo-900 uppercase text-[11px] mb-2 flex items-center gap-1.5">
-                    <i class="fas fa-lightbulb text-amber-500"></i> Recomendaciones de la IA:
+                    <i class="fas fa-brain text-amber-500"></i> Recomendaciones Estratégicas:
                 </div>
                 ${tips.map(t => `<div class="leading-relaxed bg-white p-2.5 rounded-lg border border-indigo-50 shadow-sm">${t}</div>`).join('')}
             </div>
@@ -4876,7 +4957,7 @@ window.runAIDiagnostic = function() {
 // 📲 COMPARTIR RENDIMIENTO POR WHATSAPP AL JEFE
 window.sendAnalyticsToWhatsApp = function() {
     const summary = window._lastAnalyticsSummary || {};
-    const bName = settings.businessName || 'Caja Fresh POS';
+    const bName = settings.companyName || settings.businessName || 'Caja Fresh POS';
     const bossPhone = settings.bossPhone || settings.businessPhoneFooter || '';
     const dateStr = new Date().toLocaleDateString();
     const er = settings.exchangeRate || 1;
@@ -4905,7 +4986,7 @@ window.sendAnalyticsToWhatsApp = function() {
 // 📄 EXPORTAR EXPEDIENTE FINANCIERO A PDF / IMPRIMIR
 window.downloadAnalyticsPDF = function() {
     const summary = window._lastAnalyticsSummary || {};
-    const bName = settings.businessName || 'Caja Fresh POS';
+    const bName = settings.companyName || settings.businessName || 'Caja Fresh POS';
     const dateStr = new Date().toLocaleString();
     const er = settings.exchangeRate || 1;
 
