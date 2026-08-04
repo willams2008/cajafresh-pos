@@ -1590,6 +1590,9 @@
                         <p class="text-sm text-slate-500 mt-1 italic font-medium">Análisis de rentabilidad y estabilidad del negocio</p>
                     </div>
                     <div class="flex flex-wrap gap-2 items-center">
+                        <button onclick="openPriceSimulatorModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer">
+                            <i class="fas fa-sliders text-amber-300"></i> Simulador Precios
+                        </button>
                         <button onclick="runAIDiagnostic()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer">
                             <i class="fas fa-brain text-amber-300"></i> Diagnóstico IA
                         </button>
@@ -1602,17 +1605,23 @@
                     </div>
                 </div>
                 <!-- Analytics Tabs Navigation -->
-                <div class="flex gap-6 mt-2">
-                    <button onclick="switchAnalyticsTab('resumen')" id="tab-btn-resumen" class="px-2 py-3 text-sm font-black border-b-[3px] border-brand-600 text-brand-600 transition-colors uppercase tracking-wider">
+                <div class="flex gap-6 mt-2 overflow-x-auto">
+                    <button onclick="switchAnalyticsTab('resumen')" id="tab-btn-resumen" class="px-2 py-3 text-sm font-black border-b-[3px] border-brand-600 text-brand-600 transition-colors uppercase tracking-wider shrink-0">
                         <i class="fas fa-layer-group mr-2"></i>Resumen
                     </button>
-                    <button onclick="switchAnalyticsTab('graficos')" id="tab-btn-graficos" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                    <button onclick="switchAnalyticsTab('bi-pro')" id="tab-btn-bi-pro" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider shrink-0">
+                        <i class="fas fa-microchip mr-2 text-indigo-500"></i>BI Pro (Predictor & BCG)
+                    </button>
+                    <button onclick="switchAnalyticsTab('antifraude')" id="tab-btn-antifraude" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider shrink-0">
+                        <i class="fas fa-shield-halved mr-2 text-rose-500"></i>Radar Antifraude
+                    </button>
+                    <button onclick="switchAnalyticsTab('graficos')" id="tab-btn-graficos" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider shrink-0">
                         <i class="fas fa-chart-pie mr-2"></i>Gráficos
                     </button>
-                    <button onclick="switchAnalyticsTab('productos')" id="tab-btn-productos" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                    <button onclick="switchAnalyticsTab('productos')" id="tab-btn-productos" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider shrink-0">
                         <i class="fas fa-box-open mr-2"></i>Productos
                     </button>
-                    <button onclick="switchAnalyticsTab('empleados')" id="tab-btn-empleados" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider">
+                    <button onclick="switchAnalyticsTab('empleados')" id="tab-btn-empleados" class="px-2 py-3 text-sm font-black border-b-[3px] border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors uppercase tracking-wider shrink-0">
                         <i class="fas fa-user-gear mr-2"></i>Empleados
                     </button>
                 </div>
@@ -1870,8 +1879,178 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- ================= TAB: BI PRO (PREDICTOR & BCG) ================= -->
+                <div id="tab-content-bi-pro" class="space-y-8 hidden animate-fadeIn">
+                    
+                    <!-- 1. PREDICCIÓN DE AGOTAMIENTO DE STOCK -->
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h4 class="font-black text-slate-800 uppercase tracking-tight text-lg flex items-center gap-2">
+                                    <i class="fas fa-wand-magic-sparkles text-purple-600"></i> Predicción de Agotamiento de Stock (Stockout Predictor)
+                                </h4>
+                                <p class="text-xs text-slate-500 mt-1">Calcula el tiempo estimado de vida útil del inventario según el ritmo real de venta diario.</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="bi-stockout-container">
+                            <!-- JS inserts stockout predictions here -->
+                        </div>
+                    </div>
+
+                    <!-- 2. MATRIZ BCG / CLASIFICACIÓN ESTRATÉGICA -->
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+                        <div class="mb-6">
+                            <h4 class="font-black text-slate-800 uppercase tracking-tight text-lg flex items-center gap-2">
+                                <i class="fas fa-chess-king text-amber-500"></i> Matriz BCG / Clasificación Estratégica de Productos
+                            </h4>
+                            <p class="text-xs text-slate-500 mt-1">Identifica qué productos impulsan el negocio y cuáles están reteniendo capital de trabajo.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- ESTRELLAS -->
+                            <div class="bg-amber-50/60 p-6 rounded-2xl border border-amber-200">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="font-black text-amber-900 text-sm uppercase flex items-center gap-1.5">
+                                        ⭐ Productos Estrella (Alta Venta + Alto Margen)
+                                    </span>
+                                    <span class="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full" id="bcg-stars-count">0</span>
+                                </div>
+                                <p class="text-[11px] text-amber-800 mb-3">Tus motores de rentabilidad. Garantiza disponibilidad de stock permanente.</p>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1" id="bi-bcg-stars"></div>
+                            </div>
+
+                            <!-- VACAS LECHERAS -->
+                            <div class="bg-emerald-50/60 p-6 rounded-2xl border border-emerald-200">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="font-black text-emerald-900 text-sm uppercase flex items-center gap-1.5">
+                                        🐄 Vacas Lecheras (Alta Venta + Bajo Margen)
+                                    </span>
+                                    <span class="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full" id="bcg-cashcows-count">0</span>
+                                </div>
+                                <p class="text-[11px] text-emerald-800 mb-3">Sostienen el flujo de caja diario del negocio. Mantén volumen estable.</p>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1" id="bi-bcg-cashcows"></div>
+                            </div>
+
+                            <!-- INCÓGNITAS -->
+                            <div class="bg-indigo-50/60 p-6 rounded-2xl border border-indigo-200">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="font-black text-indigo-900 text-sm uppercase flex items-center gap-1.5">
+                                        ❓ Productos Incógnita (Baja Venta + Alto Margen)
+                                    </span>
+                                    <span class="text-[10px] font-bold bg-indigo-200 text-indigo-900 px-2 py-0.5 rounded-full" id="bcg-question-count">0</span>
+                                </div>
+                                <p class="text-[11px] text-indigo-800 mb-3">Alto margen pero pocas ventas. Promociónalos en ofertas o en punto de caja.</p>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1" id="bi-bcg-question"></div>
+                            </div>
+
+                            <!-- PERROS -->
+                            <div class="bg-rose-50/60 p-6 rounded-2xl border border-rose-200">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="font-black text-rose-900 text-sm uppercase flex items-center gap-1.5">
+                                        🐕 Productos Perro (Baja Venta + Bajo Margen)
+                                    </span>
+                                    <span class="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full" id="bcg-dogs-count">0</span>
+                                </div>
+                                <p class="text-[11px] text-rose-800 mb-3">Ocupan espacio e inmovilizan inventario. Evalúa descontinuar o liquidar.</p>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1" id="bi-bcg-dogs"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. SUGERIDOR DE COMBOS DE ALTA CO-OCURRENCIA -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+                            <h4 class="font-black text-slate-800 uppercase tracking-tight text-lg flex items-center gap-2 mb-2">
+                                <i class="fas fa-cubes text-cyan-600"></i> Sugeridor Inteligente de Combos
+                            </h4>
+                            <p class="text-xs text-slate-500 mb-6">Analiza qué artículos se compran juntos en el mismo ticket para sugerir paquetes promocionales.</p>
+                            <div class="space-y-3" id="bi-combos-container">
+                                <!-- JS inserts suggested combos here -->
+                            </div>
+                        </div>
+
+                        <!-- 4. MONITOR DE BRECHA CAMBIARIA -->
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-black text-slate-800 uppercase tracking-tight text-lg flex items-center gap-2 mb-2">
+                                    <i class="fas fa-scale-balanced text-emerald-600"></i> Monitor de Brecha Cambiaria & Margen Real
+                                </h4>
+                                <p class="text-xs text-slate-500 mb-6">Evalúa el impacto de variaciones cambiarias sobre los costos de reposición en dólares.</p>
+                                <div id="bi-margin-protection-container" class="space-y-4">
+                                    <!-- JS inserts margin protection advice -->
+                                </div>
+                            </div>
+                            <button onclick="openPriceSimulatorModal()" class="w-full mt-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md">
+                                <i class="fas fa-sliders"></i> Abrir Simulador de Precios
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ================= TAB: RADAR ANTIFRAUDE ================= -->
+                <div id="tab-content-antifraude" class="space-y-8 hidden animate-fadeIn">
+                    
+                    <div id="fraud-risk-banner" class="bg-slate-900 text-white p-8 rounded-3xl border border-slate-800 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <span class="text-xs font-black uppercase tracking-widest text-rose-400 flex items-center gap-2 mb-2">
+                                <i class="fas fa-shield-halved"></i> Control de Fugas & Auditoría Operativa
+                            </span>
+                            <h3 class="text-2xl font-black" id="fraud-risk-title">Evaluando Índice de Riesgo...</h3>
+                            <p class="text-xs text-slate-400 mt-1" id="fraud-risk-desc">Monitoreo en tiempo real de anulaciones, descuentos inusuales y aperturas de caja.</p>
+                        </div>
+                        <div class="text-center md:text-right shrink-0">
+                            <span class="text-4xl font-black font-mono text-emerald-400" id="fraud-risk-score">0%</span>
+                            <span class="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Nivel de Anormalidad</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-rose-50 p-5 rounded-2xl border border-rose-100">
+                            <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-1">Ventas Anuladas</p>
+                            <p class="text-2xl font-black text-rose-900" id="fraud-voids-count">0</p>
+                        </div>
+                        <div class="bg-amber-50 p-5 rounded-2xl border border-amber-100">
+                            <p class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Descuentos Excesivos</p>
+                            <p class="text-2xl font-black text-amber-900" id="fraud-discounts-total">$0.00</p>
+                        </div>
+                        <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                            <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">Aperturas de Cajón</p>
+                            <p class="text-2xl font-black text-indigo-900" id="fraud-drawer-opens">0</p>
+                        </div>
+                        <div class="bg-slate-100 p-5 rounded-2xl border border-slate-200">
+                            <p class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Horarios Atípicos</p>
+                            <p class="text-2xl font-black text-slate-900" id="fraud-off-hours-count">0</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+                        <h4 class="font-black text-slate-800 uppercase tracking-tight text-lg flex items-center gap-2 mb-6">
+                            <i class="fas fa-list-check text-rose-600"></i> Registro de Eventos Auditados
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th class="py-4 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Hora / Fecha</th>
+                                        <th class="py-4 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Cajero / Usuario</th>
+                                        <th class="py-4 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo de Evento</th>
+                                        <th class="py-4 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">Detalle</th>
+                                        <th class="py-4 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Riesgo</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-50 text-sm" id="fraud-events-table-body">
+                                    <!-- JS inserts audit events here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
         </section>
+
 
         <!-- === VISTA COMPRAS (SURTIDOR) === -->
         <section id="view-purchases"

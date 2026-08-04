@@ -4858,6 +4858,10 @@ function renderAnalytics() {
         }
     }
 
+    // ── 13. BI Pro Suite (Predictor & BCG) y Radar Antifraude ────────
+    renderBIProSuite(periodSales);
+    renderFraudRadar(periodSales);
+
     // Guardar resumen global para exportación y IA
     window._lastAnalyticsSummary = {
         periodSalesUSD,
@@ -4872,6 +4876,430 @@ function renderAnalytics() {
         totalPendingDebt
     };
 }
+
+// 🔮 SUITE BI PRO: PREDICTOR DE STOCK, MATRIZ BCG, COMBOS & MARGEN
+function renderBIProSuite(periodSales = []) {
+    const period = window._analyticsPeriod || 'day';
+    const periodDays = period === 'day' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : 365;
+    const allProducts = Array.isArray(products) ? products : [];
+
+    // --- 1. Predicción de Agotamiento de Stock ---
+    const salesQtyMap = {};
+    periodSales.forEach(s => {
+        if (!Array.isArray(s.items)) return;
+        s.items.forEach(i => {
+            const pid = i.id || i.productId;
+            if (!pid) return;
+            salesQtyMap[pid] = (salesQtyMap[pid] || 0) + (Number(i.qty || i.quantity) || 0);
+        });
+    });
+
+    const predictions = [];
+    allProducts.forEach(p => {
+        const stock = Number(p.stock) || 0;
+        const soldQty = salesQtyMap[p.id] || 0;
+        const dailyVel = soldQty / periodDays;
+        
+        if (dailyVel > 0) {
+            const daysLeft = stock / dailyVel;
+            const runoutDate = new Date(Date.now() + Math.max(0, daysLeft) * 86400000);
+            predictions.push({
+                product: p,
+                stock,
+                dailyVel,
+                daysLeft: Math.round(daysLeft),
+                runoutDateStr: runoutDate.toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'short' })
+            });
+        }
+    });
+
+    predictions.sort((a, b) => a.daysLeft - b.daysLeft);
+    const stockoutContainer = document.getElementById('bi-stockout-container');
+    if (stockoutContainer) {
+        if (predictions.length === 0) {
+            stockoutContainer.innerHTML = '<p class="text-xs text-slate-400 italic col-span-full py-4 text-center">No hay datos suficientes de rotación para predecir agotamiento</p>';
+        } else {
+            stockoutContainer.innerHTML = predictions.slice(0, 6).map(item => {
+                let badge = '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-700">🟢 Estable</span>';
+                if (item.daysLeft <= 3) badge = '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">🔴 Crítico</span>';
+                else if (item.daysLeft <= 7) badge = '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">⚠️ Agotamiento Próximo</span>';
+
+                return `
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h5 class="font-bold text-sm text-slate-800 line-clamp-1">${item.product.name}</h5>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Stock actual: <strong class="text-slate-700 font-mono">${item.stock} u.</strong> (${item.dailyVel.toFixed(1)}/día)</p>
+                            </div>
+                            ${badge}
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-100 text-xs">
+                            <span class="text-slate-400 block text-[10px] font-bold uppercase">Fecha de Agotamiento Estimada:</span>
+                            <span class="font-black text-slate-800 text-sm">${item.runoutDateStr} (${item.daysLeft} días)</span>
+                        </div>
+                        <button onclick="window.quickOrderStock('${item.product.id}')" class="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm">
+                            <i class="fas fa-cart-plus"></i> Pedir al Almacén
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // --- 2. Matriz BCG / Clasificación Estratégica ---
+    const productMetrics = allProducts.map(p => {
+        const soldQty = salesQtyMap[p.id] || 0;
+        const cost = Number(p.costPrice) || 0;
+        const price = Number(p.priceUSD || p.price) || 0;
+        const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
+        return { product: p, soldQty, margin };
+    });
+
+    const medianQty = productMetrics.length ? productMetrics.map(m => m.soldQty).sort((a,b)=>a-b)[Math.floor(productMetrics.length/2)] || 1 : 1;
+    const medianMargin = 25; // 25% como umbral base de margen
+
+    const stars = [], cashcows = [], questions = [], dogs = [];
+    productMetrics.forEach(m => {
+        if (m.soldQty >= medianQty && m.margin >= medianMargin) stars.push(m);
+        else if (m.soldQty >= medianQty && m.margin < medianMargin) cashcows.push(m);
+        else if (m.soldQty < medianQty && m.margin >= medianMargin) questions.push(m);
+        else dogs.push(m);
+    });
+
+    const renderBcgList = (list, containerId, countId, badgeColor) => {
+        const cEl = document.getElementById(containerId);
+        const cntEl = document.getElementById(countId);
+        if (cntEl) cntEl.textContent = list.length;
+        if (cEl) {
+            cEl.innerHTML = list.length ? list.slice(0, 5).map(i => `
+                <div class="flex justify-between items-center bg-white p-2 rounded-xl border border-slate-100 text-xs">
+                    <span class="font-bold text-slate-700 truncate max-w-[160px]">${i.product.name}</span>
+                    <span class="font-mono ${badgeColor} font-bold text-[11px]">${i.margin.toFixed(0)}% mrg | ${i.soldQty}u</span>
+                </div>
+            `).join('') : '<p class="text-[11px] text-slate-400 italic">Sin productos en esta categoría</p>';
+        }
+    };
+
+    renderBcgList(stars, 'bi-bcg-stars', 'bcg-stars-count', 'text-amber-600');
+    renderBcgList(cashcows, 'bi-bcg-cashcows', 'bcg-cashcows-count', 'text-emerald-600');
+    renderBcgList(questions, 'bi-bcg-question', 'bcg-question-count', 'text-indigo-600');
+    renderBcgList(dogs, 'bi-bcg-dogs', 'bcg-dogs-count', 'text-rose-600');
+
+    // --- 3. Sugeridor de Combos (Co-ocurrencia) ---
+    const pairCounts = {};
+    periodSales.forEach(s => {
+        if (!Array.isArray(s.items) || s.items.length < 2) return;
+        for (let i = 0; i < s.items.length; i++) {
+            for (let j = i + 1; j < s.items.length; j++) {
+                const idA = s.items[i].id || s.items[i].productId;
+                const idB = s.items[j].id || s.items[j].productId;
+                if (!idA || !idB || idA === idB) continue;
+                const pairKey = [idA, idB].sort().join('|||');
+                pairCounts[pairKey] = (pairCounts[pairKey] || 0) + 1;
+            }
+        }
+    });
+
+    const topPairs = Object.entries(pairCounts)
+        .map(([key, count]) => {
+            const [idA, idB] = key.split('|||');
+            const pA = allProducts.find(p => p.id === idA);
+            const pB = allProducts.find(p => p.id === idB);
+            return { pA, pB, count };
+        })
+        .filter(item => item.pA && item.pB && item.count >= 2)
+        .sort((a, b) => b.count - a.count);
+
+    const comboContainer = document.getElementById('bi-combos-container');
+    if (comboContainer) {
+        if (topPairs.length === 0) {
+            comboContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Registra más ventas múltiples para sugerir combos automáticos</p>';
+        } else {
+            comboContainer.innerHTML = topPairs.slice(0, 3).map(pair => `
+                <div class="bg-cyan-50/60 p-4 rounded-2xl border border-cyan-100 flex items-center justify-between gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold text-cyan-700 uppercase block mb-1">Comprados juntos ${pair.count} veces</span>
+                        <p class="font-black text-xs text-slate-800">${pair.pA.name} <span class="text-cyan-600">+</span> ${pair.pB.name}</p>
+                    </div>
+                    <button onclick="window.createSuggestedCombo('${pair.pA.id}', '${pair.pB.id}')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl text-xs shrink-0 shadow-sm transition-all">
+                        ✨ Crear Combo
+                    </button>
+                </div>
+            `).join('');
+        }
+    }
+
+    // --- 4. Monitor de Brecha Cambiaria & Protección de Margen ---
+    const marginContainer = document.getElementById('bi-margin-protection-container');
+    if (marginContainer) {
+        const er = settings.exchangeRate || 1;
+        marginContainer.innerHTML = `
+            <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-emerald-800 uppercase">Tasa de Referencia POS</span>
+                    <span class="font-mono font-black text-emerald-700 text-sm">Bs ${er.toFixed(2)}/$</span>
+                </div>
+                <p class="text-[11px] text-emerald-700 leading-relaxed">Tus precios en VES están indexados automáticamente. Para proteger la rentabilidad contra la inflación, usa el simulador de precios antes de ajustar tu lista general.</p>
+            </div>
+        `;
+    }
+}
+
+// 🚨 RADAR ANTIFRAUDE Y CONTROL DE FUGAS DE CAJA
+function renderFraudRadar(periodSales = []) {
+    const allSalesList = Array.isArray(sales) ? sales : [];
+    const voidedSales = allSalesList.filter(s => s.status === 'voided' || s.voided === true);
+    const highDiscountSales = periodSales.filter(s => Number(s.discount) > 10 || Number(s.discountPercent) > 10);
+    
+    // Contar aperturas sospechosas
+    const offHourSales = periodSales.filter(s => {
+        if (!s.timestamp && !s.date) return false;
+        const h = new Date(s.timestamp || s.date).getHours();
+        return h < 6 || h > 22; // Ventas entre 10 PM y 6 AM
+    });
+
+    const voidCount = voidedSales.length;
+    const totalDiscountAmt = highDiscountSales.reduce((acc, s) => acc + (Number(s.discount) || 0), 0);
+    const offHoursCount = offHourSales.length;
+
+    // Calcular score de riesgo (0-100%)
+    let riskScore = Math.min(100, (voidCount * 20) + (highDiscountSales.length * 15) + (offHoursCount * 15));
+    if (isNaN(riskScore)) riskScore = 0;
+
+    const bannerEl = document.getElementById('fraud-risk-banner');
+    const titleEl = document.getElementById('fraud-risk-title');
+    const descEl = document.getElementById('fraud-risk-desc');
+    const scoreEl = document.getElementById('fraud-risk-score');
+
+    if (scoreEl) scoreEl.textContent = `${riskScore}%`;
+
+    if (bannerEl && titleEl && descEl) {
+        if (riskScore === 0) {
+            titleEl.textContent = '🟢 Operación Limpia & Segura';
+            descEl.textContent = 'Sin eventos anómalos ni cancelaciones sospechosas en el período actual.';
+            scoreEl.className = 'text-4xl font-black font-mono text-emerald-400';
+        } else if (riskScore < 40) {
+            titleEl.textContent = '⚠️ Actividad Inusual Detectada';
+            descEl.textContent = 'Se han registrado algunas anulaciones o descuentos que requieren revisión.';
+            scoreEl.className = 'text-4xl font-black font-mono text-amber-400';
+        } else {
+            titleEl.textContent = '🔴 Alerta Crítica de Auditoría';
+            descEl.textContent = 'Múltiples eventos sospechosos detectados. Revisa el registro de eventos detallado.';
+            scoreEl.className = 'text-4xl font-black font-mono text-rose-500 animate-pulse';
+        }
+    }
+
+    const voidEl = document.getElementById('fraud-voids-count');
+    const discEl = document.getElementById('fraud-discounts-total');
+    const offEl = document.getElementById('fraud-off-hours-count');
+    if (voidEl) voidEl.textContent = voidCount;
+    if (discEl) discEl.textContent = formatUSD(totalDiscountAmt);
+    if (offEl) offEl.textContent = offHoursCount;
+
+    // Tabla de eventos auditados
+    const eventsTableBody = document.getElementById('fraud-events-table-body');
+    if (eventsTableBody) {
+        const eventsList = [];
+        voidedSales.forEach(s => {
+            eventsList.push({
+                time: s.date ? new Date(s.date).toLocaleString('es-VE') : '---',
+                user: s.cashier_name || s.cashier || 'Admin',
+                type: 'Anulación de Venta',
+                detail: `Ticket #${s.ticket || s.id} por ${formatUSD(s.totalUSD || s.total || 0)}`,
+                risk: '<span class="px-2.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">Alto</span>'
+            });
+        });
+
+        highDiscountSales.forEach(s => {
+            eventsList.push({
+                time: s.date ? new Date(s.date).toLocaleString('es-VE') : '---',
+                user: s.cashier_name || s.cashier || 'Admin',
+                type: 'Descuento Excesivo',
+                detail: `Descuento otorgado: ${s.discount || s.discountPercent}% en Venta #${s.ticket || s.id}`,
+                risk: '<span class="px-2.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800">Medio</span>'
+            });
+        });
+
+        offHourSales.forEach(s => {
+            eventsList.push({
+                time: s.date ? new Date(s.date).toLocaleString('es-VE') : '---',
+                user: s.cashier_name || s.cashier || 'Admin',
+                type: 'Venta Fuera de Horario',
+                detail: `Transacción registrada en horario no laboral`,
+                risk: '<span class="px-2.5 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-700">Información</span>'
+            });
+        });
+
+        if (eventsList.length === 0) {
+            eventsTableBody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 italic">No hay anomalías registradas en este período</td></tr>';
+        } else {
+            eventsTableBody.innerHTML = eventsList.slice(0, 10).map(ev => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="py-3 px-6 font-mono text-xs text-slate-600">${ev.time}</td>
+                    <td class="py-3 px-6 font-bold text-slate-800">${ev.user}</td>
+                    <td class="py-3 px-6 font-semibold text-slate-700">${ev.type}</td>
+                    <td class="py-3 px-6 text-xs text-slate-500">${ev.detail}</td>
+                    <td class="py-3 px-6 text-right">${ev.risk}</td>
+                </tr>
+            `).join('');
+        }
+    }
+}
+
+// 🧮 SIMULADOR DE PRECIOS E IMPACTO EN GANANCIA NETA
+window.openPriceSimulatorModal = function() {
+    const cats = [...new Set((products || []).map(p => p.category || 'General'))];
+    const catOptions = ['Todas las Categorías', ...cats].map(c => `<option value="${c}">${c}</option>`).join('');
+
+    Swal.fire({
+        title: '🧮 Simulador de Ajuste de Precios',
+        html: `
+            <div class="text-left space-y-4 font-sans text-xs">
+                <p class="text-slate-500">Simula el impacto en tu utilidad mensual antes de cambiar los precios reales del catálogo.</p>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Categoría a Ajustar</label>
+                    <select id="sim-cat-select" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500">
+                        ${catOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Porcentaje de Incremento (%)</label>
+                    <input type="number" id="sim-pct-input" value="5" step="0.5" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-indigo-600 focus:border-indigo-500" oninput="window.updatePriceSimPreview()">
+                </div>
+                <div class="bg-indigo-50/70 p-4 rounded-2xl border border-indigo-100 space-y-2" id="sim-preview-box">
+                    <div class="flex justify-between font-bold text-slate-700">
+                        <span>Ingreso Mensual Actual:</span>
+                        <span id="sim-curr-rev" class="font-mono">$0.00</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-emerald-700">
+                        <span>Ingreso Mensual Simulado:</span>
+                        <span id="sim-new-rev" class="font-mono">$0.00</span>
+                    </div>
+                    <div class="border-t border-indigo-100 pt-2 flex justify-between font-black text-indigo-900 text-sm">
+                        <span>Ganancia Neta Adicional Estimada:</span>
+                        <span id="sim-add-profit" class="font-mono text-emerald-600">+$0.00 / mes</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: '⚡ Aplicar Ajuste Real a Productos',
+        cancelButtonText: 'Cerrar Simulador',
+        confirmButtonColor: '#4f46e5',
+        didOpen: () => {
+            window.updatePriceSimPreview();
+        }
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        const pct = parseFloat(document.getElementById('sim-pct-input')?.value) || 0;
+        const cat = document.getElementById('sim-cat-select')?.value;
+        if (pct === 0) return;
+
+        let affected = 0;
+        (products || []).forEach(p => {
+            if (cat === 'Todas las Categorías' || p.category === cat) {
+                const pUSD = Number(p.priceUSD || p.price) || 0;
+                p.priceUSD = parseFloat((pUSD * (1 + pct / 100)).toFixed(2));
+                const er = settings.exchangeRate || 1;
+                p.priceVES = Math.round(p.priceUSD * er / 10) * 10;
+                affected++;
+            }
+        });
+
+        if (typeof saveProducts === 'function') saveProducts();
+        if (typeof renderProducts === 'function') renderProducts();
+        if (typeof renderAnalytics === 'function') renderAnalytics();
+
+        Swal.fire({
+            title: '¡Precios Actualizados!',
+            text: `Se aplicó un incremento del ${pct}% a ${affected} productos.`,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    });
+};
+
+window.updatePriceSimPreview = function() {
+    const pct = parseFloat(document.getElementById('sim-pct-input')?.value) || 0;
+    const cat = document.getElementById('sim-cat-select')?.value || 'Todas las Categorías';
+    const summary = window._lastAnalyticsSummary || {};
+    const currRev = summary.periodSalesUSD || 100;
+    const newRev = currRev * (1 + pct / 100);
+    const addProfit = newRev - currRev;
+
+    const currEl = document.getElementById('sim-curr-rev');
+    const newEl = document.getElementById('sim-new-rev');
+    const addEl = document.getElementById('sim-add-profit');
+
+    if (currEl) currEl.textContent = formatUSD(currRev);
+    if (newEl) newEl.textContent = formatUSD(newRev);
+    if (addEl) addEl.textContent = `+${formatUSD(addProfit)} / mes`;
+};
+
+// ACCIÓN RÁPIDA: PEDIR STOCK DESDE EL PREDICTOR
+window.quickOrderStock = function(productId) {
+    if (typeof window.openPOModal === 'function') {
+        window.openPOModal();
+    } else if (typeof window.openTransferModal === 'function') {
+        window.openTransferModal();
+    } else {
+        Swal.fire('Información', 'Abre el módulo de Pedidos o Transferencias para realizar la solicitud.', 'info');
+    }
+};
+
+// ACCIÓN RÁPIDA: CREAR COMBO DESDE EL SUGERIDOR
+window.createSuggestedCombo = function(idA, idB) {
+    const pA = (products || []).find(p => p.id === idA);
+    const pB = (products || []).find(p => p.id === idB);
+    if (!pA || !pB) return;
+
+    const comboPrice = parseFloat(((Number(pA.priceUSD || pA.price || 0) + Number(pB.priceUSD || pB.price || 0)) * 0.90).toFixed(2));
+    const comboName = `Combo: ${pA.name} + ${pB.name}`;
+
+    Swal.fire({
+        title: '✨ Crear Combo Promocional',
+        html: `
+            <div class="text-left space-y-3 font-sans text-xs">
+                <p class="text-slate-500">Se creará un nuevo producto combo con un 10% de descuento sugerido.</p>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nombre del Combo</label>
+                    <input type="text" id="swal-combo-name" value="${comboName}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Precio Combo ($ USD)</label>
+                    <input type="number" id="swal-combo-price" value="${comboPrice}" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-emerald-600">
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Crear Producto Combo',
+        confirmButtonColor: '#06b6d4'
+    }).then(async (res) => {
+        if (!res.isConfirmed) return;
+        const name = document.getElementById('swal-combo-name')?.value || comboName;
+        const price = parseFloat(document.getElementById('swal-combo-price')?.value) || comboPrice;
+        const er = settings.exchangeRate || 1;
+
+        const comboProd = {
+            id: generateId(),
+            name,
+            priceUSD: price,
+            priceVES: Math.round(price * er / 10) * 10,
+            costPrice: (Number(pA.costPrice) || 0) + (Number(pB.costPrice) || 0),
+            stock: Math.min(Number(pA.stock) || 0, Number(pB.stock) || 0),
+            minStock: 1,
+            category: 'Combos',
+            description: `Combo incluye: ${pA.name} y ${pB.name}`
+        };
+
+        products.push(comboProd);
+        if (typeof saveProducts === 'function') saveProducts();
+        if (typeof renderProducts === 'function') renderProducts();
+
+        Swal.fire({ title: '¡Combo Creado!', text: `Se agregó "${name}" al catálogo.`, icon: 'success', timer: 2000, showConfirmButton: false });
+    });
+};
 
 // 🤖 DIAGNÓSTICO DE NEGOCIO CON INTELIGENCIA ARTIFICIAL
 window.runAIDiagnostic = function() {

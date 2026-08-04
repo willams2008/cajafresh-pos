@@ -1,7 +1,7 @@
 {
     "name": "puntopila-pos",
-    "version": "1.7.3",
-    "description": "Sistema POS Punto Pila - Gestión Inteligente",
+    "version": "1.8.0",
+    "description": "Sistema POS Punto Pila - BI Pro & Gestión Inteligente",
     "main": "main.js",
     "scripts": {
         "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
@@ -27,7 +27,12 @@
             "installerHeaderIcon": "icon.ico"
         },
         "publish": [
-            { "provider": "github", "owner": "willams2008", "repo": "cajafresh-pos", "releaseType": "release" }
+            {
+                "provider": "github",
+                "owner": "willams2008",
+                "repo": "cajafresh-pos",
+                "releaseType": "release"
+            }
         ],
         "files": [
             "**/*",
@@ -51,7 +56,10 @@
         "asar": "^3.2.0",
         "electron": "32.0.0",
         "electron-builder": "^26.8.1",
-        "esprima": "^4.0.1"
+        "esprima": "^4.0.1",
+        "jest": "^30.4.2",
+        "jest-environment-jsdom": "^30.4.1",
+        "jest-esbuild": "^0.4.0"
     },
     "dependencies": {
         "adbkit": "^2.11.1",
