@@ -1386,20 +1386,57 @@ let currentCategory = 'Todos';
 
 
 const INITIAL_DATA_PRODUCTS = [
-    { id: 'p_1', name: 'Coca-Cola Clásica Lata', category: 'Gaseosas', price: 1.50, costPrice: 0.80, stock: 45, img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_2', name: 'Agua Mineral Evian', category: 'Aguas', price: 2.00, costPrice: 1.10, stock: 30, img: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4c?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_3', name: 'Jugo de Naranja Natural', category: 'Jugos', price: 2.50, costPrice: 1.50, stock: 15, img: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_4', name: 'Papas Fritas Lays 150g', category: 'Snacks', price: 1.80, costPrice: 0.90, stock: 50, img: 'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_5', name: 'Galletas Oreo Original', category: 'Snacks', price: 1.20, costPrice: 0.60, stock: 80, img: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_6', name: 'Cerveza Corona Extra', category: 'Licores', price: 2.50, costPrice: 1.20, stock: 60, img: 'https://images.unsplash.com/photo-1614316049964-67258db54637?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_7', name: 'Café Expreso Doble', category: 'Cafetería', price: 2.00, costPrice: 0.50, stock: 99, img: 'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_8', name: 'Croissant de Mantequilla', category: 'Panadería', price: 1.50, costPrice: 0.40, stock: 25, img: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_9', name: 'Helado de Vainilla y Fresa', category: 'Postres', price: 3.00, costPrice: 1.20, stock: 20, img: 'https://images.unsplash.com/photo-1570197571499-166b36435e9f?auto=format&fit=crop&q=80&w=400' },
-    { id: 'p_10', name: 'Sándwich de Jamón y Queso', category: 'Comida Rápida', price: 4.50, costPrice: 2.00, stock: 12, img: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&q=80&w=400' }
+    { id: 'mat_acr_trans_ent', name: 'Acrílico Transparente Entera (1220x610mm 3mm)', category: 'Acrílico Transparente', priceUSD: 55.00, price: 55.00, costPrice: 40.00, stock: 10, minStock: 2 },
+    { id: 'mat_acr_trans_18',  name: 'Acrílico Transparente 1/8 (600x400mm 3mm)', category: 'Acrílico Transparente', priceUSD: 12.00, price: 12.00, costPrice: 8.00, stock: 25, minStock: 5 },
+    { id: 'mat_acr_trans_14',  name: 'Acrílico Transparente 1/4 (600x400mm 6mm)', category: 'Acrílico Transparente', priceUSD: 22.00, price: 22.00, costPrice: 15.00, stock: 15, minStock: 3 },
+    { id: 'mat_acr_trans_12',  name: 'Acrílico Transparente 1/2 (600x400mm 12mm)', category: 'Acrílico Transparente', priceUSD: 35.00, price: 35.00, costPrice: 25.00, stock: 10, minStock: 2 },
+    { id: 'mat_acr_col_ent',   name: 'Acrílico Color Entera', category: 'Acrílico Color', priceUSD: 85.00, price: 85.00, costPrice: 60.00, stock: 8, minStock: 2 },
+    { id: 'mat_acr_col_18',    name: 'Acrílico Color 1/8', category: 'Acrílico Color', priceUSD: 15.00, price: 15.00, costPrice: 10.00, stock: 20, minStock: 4 },
+    { id: 'mat_acr_col_14',    name: 'Acrílico Color 1/4', category: 'Acrílico Color', priceUSD: 25.00, price: 25.00, costPrice: 18.00, stock: 12, minStock: 3 },
+    { id: 'mat_acr_col_12',    name: 'Acrílico Color 1/2', category: 'Acrílico Color', priceUSD: 45.00, price: 45.00, costPrice: 32.00, stock: 6, minStock: 2 },
+    { id: 'mat_acr_esp_ent',   name: 'Acrílico Espejo Entera', category: 'Acrílico Espejo', priceUSD: 100.00, price: 100.00, costPrice: 75.00, stock: 5, minStock: 1 },
+    { id: 'mat_acr_esp_18',    name: 'Acrílico Espejo 1/8', category: 'Acrílico Espejo', priceUSD: 20.00, price: 20.00, costPrice: 14.00, stock: 18, minStock: 3 },
+    { id: 'mat_acr_esp_14',    name: 'Acrílico Espejo 1/4', category: 'Acrílico Espejo', priceUSD: 35.00, price: 35.00, costPrice: 24.00, stock: 10, minStock: 2 },
+    { id: 'mat_acr_esp_med',   name: 'Acrílico Espejo Media (600x610mm 12mm)', category: 'Acrílico Espejo', priceUSD: 55.00, price: 55.00, costPrice: 38.00, stock: 8, minStock: 2 }
 ];
+
+window.purgeDemoProducts = async function(silent = false) {
+    const demoIds = ['p_1', 'p_2', 'p_3', 'p_4', 'p_5', 'p_6', 'p_7', 'p_8', 'p_9', 'p_10'];
+    const demoCategories = ['Gaseosas', 'Panadería', 'Licores', 'Snacks', 'Comida Rápida', 'Postres', 'Cafetería', 'Aguas', 'Jugos'];
+    const toRemove = (products || []).filter(p => demoIds.includes(p.id) || demoCategories.includes(p.category));
+
+    if (toRemove.length === 0) {
+        if (!silent && typeof Swal !== 'undefined') Swal.fire('Sin productos demo', 'No se encontraron productos de prueba en el catálogo.', 'info');
+        return 0;
+    }
+
+    let purgedCount = 0;
+    for (const p of toRemove) {
+        products = products.filter(item => item.id !== p.id);
+        if (window.db && window.db.deleteProduct) {
+            await window.db.deleteProduct(p.id).catch(() => {});
+        }
+        if (window.cloudSync && window.cloudSync.pushDeleteProduct) {
+            await window.cloudSync.pushDeleteProduct(p.id).catch(() => {});
+        }
+        purgedCount++;
+    }
+
+    if (typeof saveProducts === 'function') saveProducts();
+    if (typeof renderProducts === 'function') renderProducts();
+    if (typeof renderInventory === 'function') renderInventory();
+    if (typeof renderAnalytics === 'function') renderAnalytics();
+
+    if (!silent && typeof Swal !== 'undefined') {
+        Swal.fire('Catálogo Purga Completada 🧹', `Se eliminaron ${purgedCount} productos demo sin sentido (Coca-Cola, Oreo, Corona, etc.).`, 'success');
+    }
+    return purgedCount;
+};
+
 const INITIAL_DATA_CLIENTS = [
     { id: 'c_1', document: 'V-12345678', name: 'Cliente Frecuente', phone: '0414-1234567' }
 ];
+
 
 // Formatting Utils
 const formatUSD = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount);
@@ -2254,8 +2291,9 @@ function migrateUserProducts() {
     });
 
     // Limpiar productos de prueba iniciales
-    const demoIds = ['p_1', 'p_2', 'p_3'];
-    products = products.filter(p => !demoIds.includes(p.id));
+    if (typeof window.purgeDemoProducts === 'function') {
+        window.purgeDemoProducts(true);
+    }
 
     saveProducts();
     console.log(`Auto-Migración v38.2: ${updatedCount} actualizados, ${addedCount} nuevos.`);
@@ -12331,4 +12369,36 @@ window.switchAnalyticsTab = function(tab) {
     });
     if (typeof renderAnalytics === 'function') renderAnalytics();
 };
+
+window.clearAllProducts = async function() {
+    const { isConfirmed } = await Swal.fire({
+        title: '¿Vaciar Inventario Local?',
+        text: 'Esta acción eliminará TODOS los productos del inventario local en este equipo.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Sí, vaciar catálogo',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!isConfirmed) return;
+
+    const toDelete = [...products];
+    for (const p of toDelete) {
+        if (window.db && window.db.deleteProduct) {
+            await window.db.deleteProduct(p.id).catch(() => {});
+        }
+        if (window.cloudSync && window.cloudSync.pushDeleteProduct) {
+            await window.cloudSync.pushDeleteProduct(p.id).catch(() => {});
+        }
+    }
+    products = [];
+    saveProducts();
+    if (typeof renderProducts === 'function') renderProducts();
+    if (typeof renderInventory === 'function') renderInventory();
+    if (typeof renderAnalytics === 'function') renderAnalytics();
+
+    Swal.fire('Inventario Vaciado', 'Se han eliminado los productos locales.', 'success');
+};
+
 

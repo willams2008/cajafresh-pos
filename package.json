@@ -1,6 +1,6 @@
 {
     "name": "puntopila-pos",
-    "version": "1.8.0",
+    "version": "1.8.1",
     "description": "Sistema POS Punto Pila - BI Pro & Gestión Inteligente",
     "main": "main.js",
     "scripts": {
