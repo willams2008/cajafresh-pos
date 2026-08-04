@@ -12314,3 +12314,21 @@ window.setStoreType = (type) => {
     if (window.cloudSync && typeof window.cloudSync.configure === 'function') window.cloudSync.configure({ storeType: type });
     Swal.fire({ toast: true, position: 'top-end', title: `Sucursal: ${type === 'kiosko' ? 'Kiosko' : 'Almacen'}`, icon: 'success', showConfirmButton: false, timer: 2000 });
 };
+
+// Tabs del Panel de Rendimientos (Analytics)
+window.switchAnalyticsTab = function(tab) {
+    var tabs = ['resumen', 'bi-pro', 'antifraude', 'graficos', 'productos', 'empleados'];
+    tabs.forEach(function(t) {
+        var content = document.getElementById('tab-content-' + t);
+        var btn = document.getElementById('tab-btn-' + t);
+        if (content) content.classList.toggle('hidden', t !== tab);
+        if (btn) {
+            var high = (t === tab);
+            btn.className = high
+                ? 'px-3.5 py-2.5 text-xs font-bold border-b-2 border-brand-600 text-brand-600 transition-all flex items-center gap-1.5 shrink-0'
+                : 'px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all flex items-center gap-1.5 shrink-0';
+        }
+    });
+    if (typeof renderAnalytics === 'function') renderAnalytics();
+};
+
