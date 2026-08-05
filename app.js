@@ -1,3 +1,36 @@
+function _getEURtoUSDRate() {
+    const er = (typeof settings !== 'undefined' && settings.exchangeRate && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    let eur = (typeof settings !== 'undefined' && settings.euroRate && settings.euroRate > 0) ? settings.euroRate : (er * 1.08);
+
+    let ratio = 1.08;
+    if (eur >= er) {
+        ratio = eur / er;
+    } else if (eur > 0.8 && eur < 2.0) {
+        ratio = eur;
+    } else {
+        ratio = 1.08;
+    }
+
+    return Math.max(1.05, ratio);
+}
+window._getEURtoUSDRate = _getEURtoUSDRate;
+
+
+// Global Swal Polyfill Safeguard
+if (typeof window.Swal === 'undefined') {
+    if (typeof window.Sweetalert2 !== 'undefined') {
+        window.Swal = window.Sweetalert2;
+    } else {
+        window.Swal = {
+            fire: function(title, text, icon) {
+                const msg = typeof title === 'object' ? (title.title || title.text || '') : (title + (text ? '\n' + text : ''));
+                if (msg) alert(msg);
+                return Promise.resolve({ isConfirmed: true, isDenied: false, isDismissed: false });
+            }
+        };
+    }
+}
+
 // State variables
 window.onerror = function (msg, url, lineNo, columnNo, error) {
     if (typeof Swal !== 'undefined') {
@@ -39,7 +72,26 @@ function tenantGet(baseKey) {
     return localStorage.getItem(baseKey); // fallback a llave legacy
 }
 function tenantSet(baseKey, value) {
-    localStorage.setItem(tenantKey(baseKey), value);
+    try {
+        localStorage.setItem(tenantKey(baseKey), value);
+    } catch (e) {
+        if (e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)) {
+            console.warn('[Storage] Cuota de localStorage excedida para:', baseKey, '- Solo persiste en DB SQLite.');
+            // Intentar comprimir eliminando campos pesados si es products
+            if (baseKey.includes('products')) {
+                try {
+                    const parsed = JSON.parse(value);
+                    const slim = parsed.map(p => { const c = {...p}; delete c.image; delete c.imageData; delete c.imageUrl; return c; });
+                    localStorage.setItem(tenantKey(baseKey), JSON.stringify(slim));
+                    console.log('[Storage] Guardado comprimido (sin imágenes) para:', baseKey);
+                } catch (e2) {
+                    console.warn('[Storage] No se pudo comprimir tampoco:', e2.message);
+                }
+            }
+        } else {
+            console.error('[Storage] Error escribiendo en localStorage:', e);
+        }
+    }
 }
 function tenantRemove(baseKey) {
     localStorage.removeItem(tenantKey(baseKey));
@@ -2299,8 +2351,27 @@ function migrateUserProducts() {
     console.log(`Auto-Migración v38.2: ${updatedCount} actualizados, ${addedCount} nuevos.`);
 }
 
-function saveProducts() { 
-    tenantSet('freshpos_products', JSON.stringify(products));
+function saveProducts() {
+    // Intentar guardar en localStorage solo si el catálogo es pequeño
+    // Si es grande, confiar en SQLite DB (ya tiene los productos completos)
+    try {
+        const slim = products.map(p => {
+            const c = { ...p };
+            delete c.image;
+            delete c.imageData;
+            delete c.imageUrl;
+            return c;
+        });
+        const slimJson = JSON.stringify(slim);
+        // Solo escribir en localStorage si cabe (< 2.5 MB)
+        if (slimJson.length < 2500000) {
+            tenantSet('freshpos_products', slimJson);
+        } else {
+            console.warn('[saveProducts] Catálogo demasiado grande para localStorage (' + Math.round(slimJson.length/1024) + ' KB) - Solo en DB SQLite.');
+        }
+    } catch (e) {
+        console.warn('[saveProducts] Error preparando catálogo para localStorage:', e.message);
+    }
     if (window.db && window.db.saveProductsBulk) {
         window.db.saveProductsBulk(products).catch(e => console.error(e));
     }
@@ -2947,8 +3018,26 @@ function renderProducts() {
         return matchesCat && matchesSearch;
     });
 
+    let categoryHeaderHTML = '';
+    if (currentCategory !== 'Todos') {
+        categoryHeaderHTML = `<div class="col-span-full mb-4 flex items-center justify-between bg-slate-100 dark:bg-slate-700/60 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-600">
+            <div class="flex items-center gap-3">
+                <button onclick="selectCategory('Todos')" class="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 hover:bg-brand-500 hover:text-white flex items-center justify-center transition-all font-bold shadow-sm" title="Volver a Categorías">
+                    <i class="fas fa-arrow-left text-sm"></i>
+                </button>
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Categoría seleccionada</span>
+                    <span class="text-base font-black text-slate-800 dark:text-white">${currentCategory}</span>
+                </div>
+            </div>
+            <button onclick="selectCategory('Todos')" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-brand-50 hover:text-brand-600 text-xs font-bold text-slate-600 dark:text-slate-200 rounded-xl transition-all border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shadow-sm">
+                <i class="fas fa-layer-group text-brand-500"></i> Ver todas las categorías
+            </button>
+        </div>`;
+    }
+
     if (filtered.length === 0) {
-        grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-400">No hay productos.</div>`;
+        grid.innerHTML = categoryHeaderHTML + `<div class="col-span-full py-16 text-center text-slate-400 font-bold">No hay productos en esta categoría.</div>`;
         return;
     }
 
@@ -2985,7 +3074,7 @@ function renderProducts() {
         fragment.appendChild(card);
     });
 
-    grid.innerHTML = '';
+    grid.innerHTML = categoryHeaderHTML || '';
     grid.appendChild(fragment);
 }
 
@@ -4019,8 +4108,8 @@ function updateCartUI() {
     // CÁLCULO DE EUR POR PROPORCIÓN DIRECTA CON USD
     // Esto evita que tasas de Bolívares mal configuradas arruinen el monto de Euros.
     // Si la tasa de Euro es 510 y la de Dólar 480, el Euro es USD * 0.94
-    const conversionFactor = (settings.euroRate && settings.exchangeRate) ? (settings.exchangeRate / settings.euroRate) : 0.94;
-    const totalEur = totalUSD * conversionFactor;
+    const eurToUsd = _getEURtoUSDRate();
+    const totalEur = totalUSD / eurToUsd;
 
     totUSD.textContent = formatUSD(totalUSD);
     totVES.textContent = formatVES(totalBs);
@@ -4044,31 +4133,40 @@ let currentTotalVES = 0;
 
 function initCheckout() {
     const modal = document.getElementById('checkout-modal');
+    if (!modal) return;
 
-    document.getElementById('show-checkout-btn').addEventListener('click', () => {
-        if (cart.length === 0) return;
-        currentTotalUSD = parseFloat(document.getElementById('show-checkout-btn').dataset.totalUsd);
-        currentTotalVES = parseFloat(document.getElementById('show-checkout-btn').dataset.totalVes);
-        const totalEur = parseFloat(document.getElementById('show-checkout-btn').dataset.totalEur);
+    const showCheckoutBtn = document.getElementById('show-checkout-btn');
+    if (showCheckoutBtn) {
+        showCheckoutBtn.addEventListener('click', () => {
+            if (cart.length === 0) return;
+            currentTotalUSD = parseFloat(showCheckoutBtn.dataset.totalUsd || 0);
+            currentTotalVES = parseFloat(showCheckoutBtn.dataset.totalVes || 0);
+            const totalEur = parseFloat(showCheckoutBtn.dataset.totalEur || 0);
 
-        document.getElementById('checkout-total-display').textContent = formatUSD(currentTotalUSD);
-        document.getElementById('checkout-total-ves-display').textContent = formatVES(currentTotalVES);
-        const eurDisplay = document.getElementById('checkout-total-eur-display');
-        if (eurDisplay) eurDisplay.textContent = formatEUR(totalEur);
+            const totalDisp = document.getElementById('checkout-total-display');
+            if (totalDisp) totalDisp.textContent = formatUSD(currentTotalUSD);
 
-        document.getElementById('checkout-observations').value = '';
+            const totalVesDisp = document.getElementById('checkout-total-ves-display');
+            if (totalVesDisp) totalVesDisp.textContent = formatVES(currentTotalVES);
 
-        // Reset to default method with safeguard
-        const defaultMethodBtn = document.querySelector('[data-method="cash-usd"]');
-        if (defaultMethodBtn) defaultMethodBtn.click();
+            const eurDisplay = document.getElementById('checkout-total-eur-display');
+            if (eurDisplay) eurDisplay.textContent = formatEUR(totalEur);
 
-        const modalContent = document.getElementById('checkout-modal-content');
-        modal.classList.add('modal-open');
-        setTimeout(() => { 
-            modal.classList.add('modal-fade-in'); 
-            if (modalContent) modalContent.classList.add('modal-scale-in'); 
-        }, 10);
-    });
+            const obsEl = document.getElementById('checkout-observations');
+            if (obsEl) obsEl.value = '';
+
+            // Reset to default method with safeguard
+            const defaultMethodBtn = document.querySelector('[data-method="cash-usd"]');
+            if (defaultMethodBtn) defaultMethodBtn.click();
+
+            const modalContent = document.getElementById('checkout-modal-content');
+            modal.classList.add('modal-open');
+            setTimeout(() => { 
+                modal.classList.add('modal-fade-in'); 
+                if (modalContent) modalContent.classList.add('modal-scale-in'); 
+            }, 10);
+        });
+    }
 
     // Payment Tabs
     document.querySelectorAll('.payment-tab').forEach(tab => {
@@ -4078,66 +4176,91 @@ function initCheckout() {
 
             // Update tab UI
             document.querySelectorAll('.payment-tab').forEach(t => {
-                t.classList.remove('active', 'border-brand-500', 'bg-brand-50', 'dark:bg-brand-900/20', 'text-brand-600', 'dark:text-brand-400', 'shadow-lg', 'shadow-brand-500/20', 'shadow-inner');
-                t.classList.add('border-slate-100', 'dark:border-slate-700', 'bg-white', 'dark:bg-slate-800', 'text-slate-400');
+                t.classList.remove('active', 'border-brand-500', 'bg-brand-50', 'text-brand-600');
+                t.classList.add('border-slate-200', 'bg-slate-50/50', 'text-slate-600');
             });
-            
-            btn.classList.add('active', 'border-brand-500', 'bg-brand-50', 'dark:bg-brand-900/20', 'text-brand-600', 'dark:text-brand-400', 'shadow-lg', 'shadow-brand-500/20', 'shadow-inner');
-            btn.classList.remove('border-slate-100', 'dark:border-slate-700', 'bg-white', 'dark:bg-slate-800', 'text-slate-400');
+            btn.classList.add('active', 'border-brand-500', 'bg-brand-50', 'text-brand-600');
+            btn.classList.remove('border-slate-200', 'bg-slate-50/50', 'text-slate-600');
 
-            // Reveal and Animate Container
             const detailsContainer = document.getElementById('payment-details-container');
-            if (detailsContainer) {
-                detailsContainer.classList.remove('hidden');
-                setTimeout(() => detailsContainer.classList.add('reveal-active'), 10);
-            }
+            if (detailsContainer) detailsContainer.classList.remove('hidden');
 
             const cashSec = document.getElementById('cash-section');
-            const cardSec = document.getElementById('card-section');
             const pmSec = document.getElementById('pm-extra-fields');
             const input = document.getElementById('amount-received');
 
-            if (checkoutMethod === 'card-ves') {
-                if (cashSec) cashSec.classList.add('hidden'); 
-                if (cardSec) cardSec.classList.remove('hidden');
+            if (cashSec) cashSec.classList.remove('hidden');
+            if (input) input.value = '';
+
+            let symbol = 'Bs';
+            let label = 'Monto Recibido (VES)';
+
+            if (checkoutMethod === 'cash-usd') { 
+                symbol = '$'; 
+                label = 'Monto Recibido (USD)'; 
                 if (pmSec) pmSec.classList.add('hidden');
-                document.getElementById('tpv-amount-bs').textContent = formatVES(currentTotalVES);
+            } else if (checkoutMethod === 'cash-eur') { 
+                symbol = '€'; 
+                label = 'Monto Recibido (EUR)'; 
+                if (pmSec) pmSec.classList.add('hidden');
+            } else if (checkoutMethod === 'pago-movil') {
+                symbol = 'Bs';
+                label = 'Pago Móvil Recibido (VES)';
+                if (pmSec) pmSec.classList.remove('hidden');
+            } else if (checkoutMethod === 'card-ves') {
+                symbol = 'Bs';
+                label = 'Monto a pasar por Punto Tarjeta (VES)';
+                if (pmSec) pmSec.classList.add('hidden');
             } else {
-                if (cardSec) cardSec.classList.add('hidden'); 
-                if (cashSec) cashSec.classList.remove('hidden');
-                
-                input.value = '';
-                let symbol = 'Bs';
-                let label = 'Monto Recibido (VES)';
-                
-                if (checkoutMethod === 'cash-usd') { 
-                    symbol = '$'; 
-                    label = 'Monto Recibido (USD)'; 
-                    if (pmSec) pmSec.classList.add('hidden');
-                }
-                else if (checkoutMethod === 'cash-eur') { 
-                    symbol = '€'; 
-                    label = 'Monto Recibido (EUR)'; 
-                    if (pmSec) pmSec.classList.add('hidden');
-                }
-                else if (checkoutMethod === 'pago-movil') {
-                    symbol = 'Bs';
-                    label = 'Pago Móvil Recibido (VES)';
-                    if (pmSec) pmSec.classList.remove('hidden');
-                } else {
-                    if (pmSec) pmSec.classList.add('hidden');
-                }
-                
-                document.getElementById('currency-input-symbol').textContent = symbol;
-                document.getElementById('label-amount-received').textContent = label;
-                setTimeout(() => input.focus(), 150);
+                if (pmSec) pmSec.classList.add('hidden');
             }
+
+            const symEl = document.getElementById('currency-input-symbol');
+            const lblEl = document.getElementById('label-amount-received');
+            if (symEl) symEl.textContent = symbol;
+            if (lblEl) lblEl.textContent = label;
+            if (input) setTimeout(() => input.focus(), 150);
+
             validatePayment();
         });
     });
 
-    document.getElementById('amount-received').addEventListener('input', validatePayment);
-    document.getElementById('confirm-payment-btn').addEventListener('click', processPayment);
+    const amtInput = document.getElementById('amount-received');
+    if (amtInput) {
+        amtInput.addEventListener('input', validatePayment);
+        amtInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.addPaymentToList();
+            }
+        });
+    }
+
+    const exactBtn = document.getElementById('exact-change-btn');
+    if (exactBtn) {
+        exactBtn.onclick = function() {
+            window.exactPayment();
+        };
+    }
+
+    const fiaoBtn = document.getElementById('fiao-payment-btn');
+    if (fiaoBtn) {
+        fiaoBtn.onclick = function() {
+            window.fiaoPayment();
+        };
+    }
+
+    const addPmtBtn = document.getElementById('add-payment-btn');
+    if (addPmtBtn) {
+        addPmtBtn.onclick = function() {
+            window.addPaymentToList();
+        };
+    }
+
+    const confirmBtn = document.getElementById('confirm-payment-btn');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', processPayment);
+    }
 
     const sendToMgmtBtn = document.getElementById('send-to-management-btn');
     if (sendToMgmtBtn) {
@@ -4145,57 +4268,204 @@ function initCheckout() {
     }
 
     document.querySelectorAll('.close-checkout-modal').forEach(btn => btn.addEventListener('click', () => {
-        modal.classList.remove('modal-fade-in'); document.getElementById('checkout-modal-content').classList.remove('modal-scale-in');
+        modal.classList.remove('modal-fade-in'); 
+        const modalContent = document.getElementById('checkout-modal-content');
+        if (modalContent) modalContent.classList.remove('modal-scale-in');
         setTimeout(() => modal.classList.remove('modal-open'), 300);
     }));
 
-    // Listeners para validación en tiempo real de campos Pago Móvil
+    // Real-time validation listeners for Pago Móvil
     ['pm-id', 'pm-phone', 'pm-ref'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', validatePayment);
     });
 }
 
+
+// ==========================================
+// MIXED PAYMENTS HELPERS
+// ==========================================
+if (!window.mixedPayments) window.mixedPayments = [];
+
+window.addPaymentToList = function addPaymentToList() {
+    const input = document.getElementById('amount-received');
+    if (!input) return;
+
+    const rawAmt = parseFloat(input.value) || 0;
+    if (rawAmt <= 0) {
+        input.focus();
+        return;
+    }
+
+    const exchangeRate = (settings.exchangeRate && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    const eurToUsd = _getEURtoUSDRate();
+
+    let usdAmount = 0;
+    let label = '';
+    let originalAmt = rawAmt;
+    let currency = checkoutMethod;
+
+    if (checkoutMethod === 'cash-usd') {
+        usdAmount = rawAmt;
+        label = '$' + rawAmt.toFixed(2);
+    } else if (checkoutMethod === 'cash-ves' || checkoutMethod === 'pago-movil') {
+        usdAmount = rawAmt / exchangeRate;
+        label = formatVES(rawAmt) + ' ($' + usdAmount.toFixed(2) + ')';
+    } else if (checkoutMethod === 'cash-eur') {
+        usdAmount = rawAmt * eurToUsd;
+        label = rawAmt.toFixed(2) + ' € ($' + usdAmount.toFixed(2) + ')';
+    } else if (checkoutMethod === 'card-ves') {
+        usdAmount = rawAmt / exchangeRate;
+        label = 'Punto ' + formatVES(rawAmt) + ' ($' + usdAmount.toFixed(2) + ')';
+    }
+
+    // Cap payment at remaining balance
+    const paidSoFar = window.mixedPayments.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0);
+    const remaining = currentTotalUSD - paidSoFar;
+    if (usdAmount > remaining + 0.01) {
+        usdAmount = Math.max(0, remaining);
+        if (checkoutMethod === 'cash-usd') originalAmt = usdAmount;
+    }
+
+    if (usdAmount <= 0) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title: '¡Ya está cubierto!', text: 'El total ya fue pagado.', icon: 'info', timer: 1500, showConfirmButton: false });
+        }
+        return;
+    }
+
+    window.mixedPayments.push({ method: currency, usdAmount, originalAmt, label });
+    input.value = '';
+
+    // Render payment list
+    const listEl = document.getElementById('mixed-payments-list');
+    if (listEl) {
+        listEl.innerHTML = '';
+        window.mixedPayments.forEach((p, i) => {
+            const li = document.createElement('div');
+            li.className = 'flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700';
+            li.innerHTML = '<span>' + p.label + '</span><button onclick="window.removePaymentItem(' + i + ')" class="text-red-400 hover:text-red-600 ml-2 font-bold">✕</button>';
+            listEl.appendChild(li);
+        });
+    }
+
+    validatePayment();
+};
+
+window.removePaymentItem = function removePaymentItem(index) {
+    if (!window.mixedPayments) return;
+    window.mixedPayments.splice(index, 1);
+    window.addPaymentToList && (() => {
+        // Re-render
+        const listEl = document.getElementById('mixed-payments-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+            window.mixedPayments.forEach((p, i) => {
+                const li = document.createElement('div');
+                li.className = 'flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700';
+                li.innerHTML = '<span>' + p.label + '</span><button onclick="window.removePaymentItem(' + i + ')" class="text-red-400 hover:text-red-600 ml-2 font-bold">✕</button>';
+                listEl.appendChild(li);
+            });
+        }
+        validatePayment();
+    })();
+};
+
+window.exactPayment = function exactPayment() {
+    const exchangeRate = (settings.exchangeRate && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    const paidSoFar = window.mixedPayments ? window.mixedPayments.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0) : 0;
+    const remaining = Math.max(0, currentTotalUSD - paidSoFar);
+
+    const input = document.getElementById('amount-received');
+    if (!input) return;
+
+    if (checkoutMethod === 'cash-usd') {
+        input.value = remaining.toFixed(2);
+    } else if (checkoutMethod === 'cash-ves' || checkoutMethod === 'pago-movil') {
+        input.value = Math.ceil(remaining * exchangeRate).toFixed(2);
+    } else if (checkoutMethod === 'cash-eur') {
+        const eurToUsd = _getEURtoUSDRate();
+        input.value = (remaining / eurToUsd).toFixed(2);
+    } else if (checkoutMethod === 'card-ves') {
+        input.value = Math.ceil(remaining * exchangeRate).toFixed(2);
+    }
+    validatePayment();
+};
+
+window.fiaoPayment = function fiaoPayment() {
+    window.pendingStatus = 'pending';
+    processPayment();
+};
+
+
 function validatePayment() {
+
     const confirmBtn = document.getElementById('confirm-payment-btn');
     const changeEl = document.getElementById('checkout-change');
     const changeSecEl = document.getElementById('checkout-change-secundary');
     const container = document.getElementById('change-container');
 
-    if (checkoutMethod === 'card-ves') {
-        confirmBtn.disabled = false;
-        return;
-    }
+    if (!confirmBtn) return;
 
-    const received = parseFloat(document.getElementById('amount-received').value) || 0;
-    let change = 0;
-    let changeSec = 0;
-    let isValid = false;
+    const exchangeRate = (settings.exchangeRate && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    const eurToUsd = _getEURtoUSDRate();
 
+    const paidUSD = window.mixedPayments ? window.mixedPayments.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0) : 0;
+    
+    const receivedInput = document.getElementById('amount-received');
+    const receivedRaw = receivedInput ? (parseFloat(receivedInput.value) || 0) : 0;
+
+    let inputUSD = 0;
     if (checkoutMethod === 'cash-usd') {
-        change = received - currentTotalUSD;
-        changeSec = change * settings.exchangeRate;
-        isValid = received >= currentTotalUSD && received > 0;
-        changeEl.textContent = formatUSD(Math.max(0, change));
-        changeSecEl.textContent = isValid ? `Eq: ${formatVES(changeSec)}` : '';
+        inputUSD = receivedRaw;
     } else if (checkoutMethod === 'cash-ves' || checkoutMethod === 'pago-movil') {
-        change = received - currentTotalVES;
-        changeSec = change / settings.exchangeRate;
-        isValid = received >= currentTotalVES && received > 0;
-        changeEl.textContent = formatVES(Math.max(0, change));
-        changeSecEl.textContent = isValid ? `Eq: ${formatUSD(changeSec)}` : '';
+        inputUSD = receivedRaw / exchangeRate;
     } else if (checkoutMethod === 'cash-eur') {
-        const totalEUR = currentTotalVES / (settings.euroRate || 40);
-        change = received - totalEUR;
-        changeSec = change * (settings.euroRate || 40);
-        isValid = received >= totalEUR && received > 0;
-        changeEl.textContent = formatEUR(Math.max(0, change));
-        changeSecEl.textContent = isValid ? `Eq: ${formatVES(changeSec)}` : '';
+        inputUSD = receivedRaw * eurToUsd;
     }
 
-    // Validación extra para Pago Móvil (Referencia obligatoria)
+    const totalCoveredUSD = paidUSD + inputUSD;
+    const remainingUSD = Math.max(0, currentTotalUSD - totalCoveredUSD);
+    const surplusUSD = Math.max(0, totalCoveredUSD - currentTotalUSD);
+
+    // Actualizar Panel Izquierdo (Abonado y Restante en Vivo)
+    const leftPaidEl = document.getElementById('checkout-left-paid');
+    const leftRemEl = document.getElementById('checkout-left-remaining');
+    const leftRemVesEl = document.getElementById('checkout-left-remaining-ves');
+    
+    if (leftPaidEl) leftPaidEl.textContent = formatUSD(paidUSD);
+    if (leftRemEl) leftRemEl.textContent = formatUSD(remainingUSD);
+    if (leftRemVesEl) leftRemVesEl.textContent = formatVES(remainingUSD * exchangeRate);
+
+    // Calcular Cambio / Vuelto
+    if (surplusUSD > 0) {
+        if (checkoutMethod === 'cash-usd') {
+            if (changeEl) changeEl.textContent = formatUSD(surplusUSD);
+            if (changeSecEl) changeSecEl.textContent = 'Eq: ' + formatVES(surplusUSD * exchangeRate);
+        } else if (checkoutMethod === 'cash-ves' || checkoutMethod === 'pago-movil') {
+            const surplusVES = surplusUSD * exchangeRate;
+            if (changeEl) changeEl.textContent = formatVES(surplusVES);
+            if (changeSecEl) changeSecEl.textContent = 'Eq: ' + formatUSD(surplusUSD);
+        } else if (checkoutMethod === 'cash-eur') {
+            const surplusEUR = surplusUSD / eurToUsd;
+            if (changeEl) changeEl.textContent = formatEUR(surplusEUR);
+            if (changeSecEl) changeSecEl.textContent = 'Eq: ' + formatVES(surplusUSD * exchangeRate);
+        }
+    } else {
+        if (changeEl) changeEl.textContent = checkoutMethod === 'cash-usd' ? '$0.00' : (checkoutMethod === 'cash-eur' ? '0,00 €' : 'Bs 0,00');
+        if (changeSecEl) changeSecEl.textContent = '';
+    }
+
+    let isValid = false;
+    if (checkoutMethod === 'card-ves') {
+        isValid = true;
+    } else if (totalCoveredUSD >= currentTotalUSD - 0.01 || remainingUSD <= 0) {
+        isValid = true;
+    }
+
+    // Validación extra para Pago Móvil (solo si todavía queda saldo por cubrir)
     let pmRefMsg = '';
-    if (checkoutMethod === 'pago-movil') {
+    if (checkoutMethod === 'pago-movil' && remainingUSD > 0) {
         const ref = document.getElementById('pm-ref')?.value.trim() || '';
         const phone = document.getElementById('pm-phone')?.value.trim() || '';
         const ci = document.getElementById('pm-id')?.value.trim() || '';
@@ -4210,12 +4480,16 @@ function validatePayment() {
     }
 
     if (isValid) {
-        container.classList.remove('bg-red-50', 'border-red-200');
-        container.classList.add('bg-emerald-50', 'border-emerald-100');
+        if (container) {
+            container.classList.remove('bg-red-50', 'border-red-200');
+            container.classList.add('bg-emerald-50', 'border-emerald-100');
+        }
         confirmBtn.disabled = false;
     } else {
-        container.classList.add('bg-red-50', 'border-red-200');
-        container.classList.remove('bg-emerald-50', 'border-emerald-100');
+        if (container) {
+            container.classList.add('bg-red-50', 'border-red-200');
+            container.classList.remove('bg-emerald-50', 'border-emerald-100');
+        }
         confirmBtn.disabled = true;
     }
 }
@@ -4266,6 +4540,10 @@ function processPayment() {
         });
         saveProducts();
 
+        const paidUSD = window.mixedPayments ? window.mixedPayments.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0) : 0;
+        const remainingUSD = Math.max(0, currentTotalUSD - paidUSD);
+        const isPartialCredit = checkoutMethod === 'Fiado' || checkoutMethod === 'Crédito' || window.pendingStatus === 'pending' || (remainingUSD > 0 && paidUSD > 0);
+
         const saleRecord = {
             ticket: padTicketNumber(currentTicketNumber),
             date: new Date().toISOString(),
@@ -4282,26 +4560,28 @@ function processPayment() {
                     costPrice: products.find(p => p.id === item.id || p.id === item.parentId)?.costPrice || 0
                 };
             }),
-            method: (window.pendingStatus === 'pending') ? 'Crédito' : checkoutMethod,
+            method: (window.mixedPayments && window.mixedPayments.length > 0) ? 'mixto' : (isPartialCredit ? 'Crédito' : checkoutMethod),
+            payments: (window.mixedPayments && window.mixedPayments.length > 0) ? JSON.stringify(window.mixedPayments) : null,
             pmDetails: checkoutMethod === 'pago-movil' ? {
                 id: document.getElementById('pm-id')?.value.trim(),
                 phone: document.getElementById('pm-phone')?.value.trim(),
                 ref: document.getElementById('pm-ref')?.value.trim()
             } : null,
-            observations: document.getElementById('checkout-observations').value.trim(),
+            observations: document.getElementById('checkout-observations')?.value?.trim() || '',
             totalUSD: currentTotalUSD,
             totalVES: currentTotalVES,
-            totalEUR: currentTotalUSD * ((settings.euroRate && settings.exchangeRate) ? (settings.exchangeRate / settings.euroRate) : 0.94),
+            totalEUR: currentTotalUSD / _getEURtoUSDRate(),
             exchangeRate: settings.exchangeRate,
             totalCostUSD: cart.reduce((acc, item) => {
                 const prod = products.find(p => p.id === item.id || p.id === item.parentId);
                 return acc + ((prod?.costPrice || 0) * item.qty);
             }, 0),
             timestamp: Date.now(),
-            status: window.pendingStatus || 'paid',
+            status: isPartialCredit ? 'pending' : (window.pendingStatus || 'paid'),
             id: padTicketNumber(currentTicketNumber),
             clientId: client?.id || null
         };
+        window.mixedPayments = [];
 
         sales.push(saleRecord);
         if (window.db) window.db.saveSale(saleRecord).catch(e => console.error('Error DB:', e));
@@ -4356,7 +4636,11 @@ function processPayment() {
 
     } catch (err) {
         console.error('❌ Error crítico en processPayment:', err);
-        Swal.fire('Error de Sistema', 'No se pudo completar el cobro: ' + err.message, 'error');
+        if (typeof Swal !== 'undefined') {
+            Swal.fire('Error de Sistema', 'No se pudo completar el cobro: ' + err.message, 'error');
+        } else {
+            alert('Error de Sistema: No se pudo completar el cobro: ' + err.message);
+        }
     }
 }
 
@@ -7375,7 +7659,7 @@ function sendToAppManagement() {
     const clientName = document.getElementById('pos-client-name')?.value.trim() || 'CLIENTE POS';
     const clientPhone = document.getElementById('pos-client-phone')?.value.trim() || '';
     const clientCI = document.getElementById('pos-client-document')?.value.trim() || '';
-    const obs = document.getElementById('checkout-observations').value.trim();
+    const obs = document.getElementById('checkout-observations')?.value?.trim() || '';
 
     // Mapping POS methods to App methods
     const methodMap = {
@@ -10261,50 +10545,75 @@ function _setDenomTotalVES(denomId, totalId, multiplier) {
 }
 function _calcDenomUSD() {
     let t = 0;
-    t += _setDenomTotal('denom-usd-100', 'denom-usd-100-total', 100);
-    t += _setDenomTotal('denom-usd-50', 'denom-usd-50-total', 50);
-    t += _setDenomTotal('denom-usd-20', 'denom-usd-20-total', 20);
-    t += _setDenomTotal('denom-usd-10', 'denom-usd-10-total', 10);
-    t += _setDenomTotal('denom-usd-5', 'denom-usd-5-total', 5);
-    t += _setDenomTotal('denom-usd-1', 'denom-usd-1-total', 1);
-    t += _getDenomVal('denom-usd-coins');
-    const el = document.getElementById('denom-usd-coins-total');
-    if (el) el.textContent = '$' + _getDenomVal('denom-usd-coins').toFixed(2);
+    document.querySelectorAll('#denom-usd-rows .denom-row').forEach(row => {
+        const denom = parseFloat(row.querySelector('.denom-val')?.value) || 0;
+        const qty = parseFloat(row.querySelector('.denom-qty')?.value) || 0;
+        const subtotal = denom * qty;
+        const label = row.querySelector('.denom-subtotal');
+        if (label) label.textContent = formatUSD(subtotal);
+        t += subtotal;
+    });
     const totalEl = document.getElementById('cierre-usd-total-counted');
     if (totalEl) totalEl.textContent = formatUSD(t);
     return t;
 }
 function _calcDenomVES() {
     let t = 0;
-    t += _setDenomTotalVES('denom-ves-100', 'denom-ves-100-total', 100);
-    t += _setDenomTotalVES('denom-ves-50', 'denom-ves-50-total', 50);
-    t += _setDenomTotalVES('denom-ves-20', 'denom-ves-20-total', 20);
-    t += _setDenomTotalVES('denom-ves-10', 'denom-ves-10-total', 10);
-    t += _setDenomTotalVES('denom-ves-5', 'denom-ves-5-total', 5);
-    t += _setDenomTotalVES('denom-ves-2', 'denom-ves-2-total', 2);
-    t += _setDenomTotalVES('denom-ves-1', 'denom-ves-1-total', 1);
-    t += _getDenomVal('denom-ves-coins');
-    const el = document.getElementById('denom-ves-coins-total');
-    if (el) el.textContent = 'Bs ' + _getDenomVal('denom-ves-coins').toFixed(2);
+    document.querySelectorAll('#denom-ves-rows .denom-row').forEach(row => {
+        const denom = parseFloat(row.querySelector('.denom-val')?.value) || 0;
+        const qty = parseFloat(row.querySelector('.denom-qty')?.value) || 0;
+        const subtotal = denom * qty;
+        const label = row.querySelector('.denom-subtotal');
+        if (label) label.textContent = formatVES(subtotal);
+        t += subtotal;
+    });
     const totalEl = document.getElementById('cierre-ves-total-counted');
     if (totalEl) totalEl.textContent = formatVES(t);
     return t;
 }
 
-window.toggleCollapse = (id) => {
-    const el = document.getElementById(id);
-    const chevron = document.getElementById(id + '-chevron');
-    if (!el) return;
-    const isHidden = el.classList.contains('hidden');
-    el.classList.toggle('hidden');
-    if (chevron) chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-};
-
 function _calcCierreTotals() {
     let usd = 0, ves = 0, eur = 0, card = 0, pm = 0, transfer = 0;
     let txCount = 0;
+    let creditTotalUSD = 0;
+
     sales.forEach(s => {
-        if (s.status === 'pending') return;
+        // Parse payments array if present (Mixed payment or partial credit)
+        if (s.payments) {
+            try {
+                const payments = typeof s.payments === 'string' ? JSON.parse(s.payments) : s.payments;
+                if (Array.isArray(payments) && payments.length > 0) {
+                    txCount++;
+                    payments.forEach(p => {
+                        const m = p.method;
+                        const pUSD = Number(p.usdAmount) || 0;
+                        const pVES = Number(p.vesAmount) || (pUSD * (settings.exchangeRate || 36.5));
+                        const pEUR = Number(p.eurAmount) || 0;
+
+                        if (m === 'cash-usd') usd += pUSD;
+                        else if (m === 'cash-ves') ves += pVES;
+                        else if (m === 'cash-eur') eur += pEUR;
+                        else if (m === 'card-ves' || m === 'card') card += pVES;
+                        else if (m === 'pago-movil') pm += pVES;
+                        else if (m === 'transfer') transfer += pVES;
+                    });
+
+                    if (s.status === 'pending') {
+                        const totalPaidUSD = payments.reduce((acc, p) => acc + (Number(p.usdAmount) || 0), 0);
+                        const remainingUSD = Math.max(0, (Number(s.totalUSD) || 0) - totalPaidUSD);
+                        creditTotalUSD += remainingUSD;
+                    }
+                    return;
+                }
+            } catch(e) {}
+        }
+
+        // Regular single-method sales
+        if (s.status === 'pending' || s.method === 'Crédito' || s.method === 'Fiado') {
+            creditTotalUSD += Number(s.totalUSD) || 0;
+            return;
+        }
+
         txCount++;
         const m = s.method;
         if (m === 'cash-usd') usd += Number(s.totalUSD) || 0;
@@ -10314,10 +10623,11 @@ function _calcCierreTotals() {
         else if (m === 'pago-movil') pm += Number(s.totalVES) || 0;
         else if (m === 'transfer') transfer += Number(s.totalVES) || 0;
     });
-    const er = settings.exchangeRate || 50;
+
+    const er = settings.exchangeRate || 36.5;
     const totalUSD = usd + (ves / er) + (card / er) + (pm / er) + (transfer / er) + eur;
     const totalVES = ves + card + pm + transfer + (eur * (settings.euroRate || er));
-    return { usd, ves, eur, card, pm, transfer, totalUSD, totalVES, txCount };
+    return { usd, ves, eur, card, pm, transfer, creditTotalUSD, totalUSD, totalVES, txCount };
 }
 
 window.closeCierreModal = () => {
@@ -10445,6 +10755,7 @@ window.openCierreModal = async () => {
     set('cierre-card-amount', formatVES(totals.card));
     set('cierre-pm-amount', formatVES(totals.pm));
     set('cierre-transfer-amount', formatVES(totals.transfer));
+    set('cierre-credit-amount', formatUSD(totals.creditTotalUSD || 0));
     set('cierre-total-general', formatUSD(totals.totalUSD));
     set('cierre-total-general-ves', formatVES(totals.totalVES));
     set('cierre-tx-count', `${totals.txCount} transacciones`);
@@ -12402,3 +12713,379 @@ window.clearAllProducts = async function() {
 };
 
 
+
+
+
+// ==========================================
+// BUSCADOR Y FILTRO DE CLIENTES EN REPORTES
+// ==========================================
+window.activeReportClientId = null;
+
+window.onReportClientSearchInput = function(query) {
+    const resultsContainer = document.getElementById('report-client-search-results');
+    const clearBtn = document.getElementById('report-client-search-clear');
+    if (!resultsContainer) return;
+    
+    const q = (query || '').toLowerCase().trim();
+    if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+
+    // Filter unique clients from clients array + sales
+    const matchedClientsMap = new Map();
+
+    if (Array.isArray(clients)) {
+        clients.forEach(c => {
+            const name = c.name || '';
+            const doc = c.document || '';
+            const phone = c.phone || '';
+            if (!q || name.toLowerCase().includes(q) || doc.toLowerCase().includes(q) || phone.toLowerCase().includes(q)) {
+                matchedClientsMap.set(c.id || name, { id: c.id, name: name, document: doc, phone: phone });
+            }
+        });
+    }
+
+    // Also include clients found in sales records
+    if (Array.isArray(sales)) {
+        sales.forEach(s => {
+            if (s.client && s.client.name) {
+                const name = s.client.name;
+                const doc = s.client.document || '';
+                const phone = s.client.phone || '';
+                const key = s.client.id || name;
+                if (!matchedClientsMap.has(key)) {
+                    if (!q || name.toLowerCase().includes(q) || doc.toLowerCase().includes(q) || phone.toLowerCase().includes(q)) {
+                        matchedClientsMap.set(key, { id: s.client.id || key, name: name, document: doc, phone: phone });
+                    }
+                }
+            }
+        });
+    }
+
+    const matches = Array.from(matchedClientsMap.values()).slice(0, 10);
+
+    if (matches.length === 0) {
+        resultsContainer.innerHTML = '<div class="p-4 text-xs font-bold text-slate-400 text-center">No se encontraron clientes</div>';
+        resultsContainer.classList.remove('hidden');
+        return;
+    }
+
+    resultsContainer.innerHTML = matches.map(c => `
+        <div onclick="selectReportClient('${c.id || ''}', '${(c.name || '').replace(/'/g, "\\'")}')"
+            class="p-3.5 hover:bg-slate-800 cursor-pointer flex items-center justify-between transition-colors">
+            <div>
+                <p class="text-sm font-bold text-white">${c.name}</p>
+                <p class="text-xs text-slate-400">${c.document ? `Doc: ${c.document}` : ''} ${c.phone ? `| Tel: ${c.phone}` : ''}</p>
+            </div>
+            <span class="text-xs font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
+                Ver Historial <i class="fas fa-chevron-right ml-1 text-[10px]"></i>
+            </span>
+        </div>
+    `).join('');
+
+    resultsContainer.classList.remove('hidden');
+};
+
+// Close search dropdown on click outside
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('report-client-search-results');
+    const input = document.getElementById('report-client-search');
+    if (container && input && !container.contains(e.target) && !input.contains(e.target)) {
+        container.classList.add('hidden');
+    }
+});
+
+window.selectReportClient = function(clientId, clientName) {
+    window.activeReportClientId = clientId || clientName;
+    
+    const input = document.getElementById('report-client-search');
+    const resultsContainer = document.getElementById('report-client-search-results');
+    const badge = document.getElementById('selected-client-badge');
+    const nameDisplay = document.getElementById('selected-client-name-display');
+    const summaryCard = document.getElementById('report-client-summary-card');
+    const clearBtn = document.getElementById('report-client-search-clear');
+
+    if (input) input.value = clientName || clientId;
+    if (resultsContainer) resultsContainer.classList.add('hidden');
+    if (badge) badge.classList.remove('hidden');
+    if (nameDisplay) nameDisplay.textContent = clientName || clientId;
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    // Calculate metrics for this client
+    const clientSales = (sales || []).filter(s => {
+        const matchesId = clientId && (s.clientId === clientId || s.client?.id === clientId);
+        const matchesName = clientName && s.client?.name && s.client.name.toLowerCase() === clientName.toLowerCase();
+        return matchesId || matchesName;
+    });
+
+    const totalCount = clientSales.length;
+    const totalUSD = clientSales.reduce((acc, s) => acc + (parseFloat(s.totalUSD) || 0), 0);
+    const totalVES = clientSales.reduce((acc, s) => acc + (parseFloat(s.totalVES) || (parseFloat(s.totalUSD) || 0) * (settings.exchangeRate || 36.5)), 0);
+    
+    const sorted = [...clientSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastDate = sorted.length > 0 && sorted[0].date ? new Date(sorted[0].date).toLocaleDateString('es-VE') : 'N/A';
+
+    if (summaryCard) {
+        document.getElementById('rep-cli-total-count').textContent = totalCount;
+        document.getElementById('rep-cli-total-usd').textContent = formatUSD(totalUSD);
+        document.getElementById('rep-cli-total-ves').textContent = formatVES(totalVES);
+        document.getElementById('rep-cli-last-date').textContent = lastDate;
+        summaryCard.classList.remove('hidden');
+    }
+
+    // Filter main sales table
+    renderFilteredSalesTable(clientSales);
+};
+
+window.filterByClientName = function(clientName) {
+    if (!clientName || clientName === 'Cliente Final') return;
+    const found = (clients || []).find(c => c.name.toLowerCase() === clientName.toLowerCase());
+    window.selectReportClient(found ? found.id : null, clientName);
+};
+
+window.clearReportClientFilter = function() {
+    window.activeReportClientId = null;
+    const input = document.getElementById('report-client-search');
+    const badge = document.getElementById('selected-client-badge');
+    const summaryCard = document.getElementById('report-client-summary-card');
+    const resultsContainer = document.getElementById('report-client-search-results');
+    const clearBtn = document.getElementById('report-client-search-clear');
+
+    if (input) input.value = '';
+    if (badge) badge.classList.add('hidden');
+    if (summaryCard) summaryCard.classList.add('hidden');
+    if (resultsContainer) resultsContainer.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+
+    if (typeof renderReports === 'function') renderReports();
+};
+
+function renderFilteredSalesTable(filteredSales) {
+    const tbody = document.getElementById('reports-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const methodNames = {
+        'cash-usd': '<span class="text-green-600 bg-green-50 px-2 rounded font-bold"><i class="fas fa-dollar-sign"></i> Efec $</span>',
+        'cash-ves': '<span class="text-blue-600 bg-blue-50 px-2 rounded font-bold"><i class="fas fa-money-bill"></i> Efec BS</span>',
+        'card-ves': '<span class="text-brand-600 bg-brand-50 px-2 rounded font-bold"><i class="fas fa-credit-card"></i> Punto BS</span>',
+        'pago-movil': '<span class="text-purple-600 bg-purple-50 px-2 rounded font-bold"><i class="fas fa-mobile-alt"></i> Pago Móvil</span>',
+        'cash-eur': '<span class="text-blue-700 bg-blue-100 px-2 rounded font-bold"><i class="fas fa-euro-sign"></i> Euros</span>',
+        'mixto': '<span class="text-indigo-600 bg-indigo-50 px-2 rounded font-bold"><i class="fas fa-layer-group"></i> Mixto</span>'
+    };
+
+    if (filteredSales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-12 text-center text-slate-400 font-bold">No hay compras registradas para este cliente</td></tr>';
+        return;
+    }
+
+    const sorted = [...filteredSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    sorted.forEach(sale => {
+        const saleTotalVES = Number(sale.totalVES) || (Number(sale.totalUSD) || 0) * (settings.exchangeRate || 36.5);
+        const saleMethod = sale.method || 'cash-usd';
+        const timeStr = sale.date ? new Date(sale.date).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+        const dateStr = sale.date ? new Date(sale.date).toLocaleDateString('es-VE') : '';
+        const displayTicket = sale.ticket || sale.id || '0000';
+        const cName = sale.client?.name || 'Cliente Final';
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 border-b border-slate-100 transition-colors";
+        tr.innerHTML = `
+            <td class="py-4 px-6 font-bold text-slate-800">#${displayTicket}</td>
+            <td class="py-4 px-6 text-slate-500 text-xs">${dateStr} ${timeStr}</td>
+            <td class="py-4 px-6 font-semibold">
+                <button onclick="filterByClientName('${cName.replace(/'/g, "\\'")}')" class="text-cyan-600 hover:text-cyan-800 hover:underline flex items-center gap-1.5 font-bold">
+                    <i class="fas fa-user-circle text-xs"></i> ${cName}
+                </button>
+            </td>
+            <td class="py-4 px-6 text-xs">
+                ${methodNames[saleMethod] || saleMethod}
+                ${saleMethod === 'pago-movil' && sale.pmDetails ? `
+                    <div class="mt-1 text-[9px] text-slate-400 font-medium">
+                        Ref: <span class="font-bold text-purple-600">*${sale.pmDetails.ref || '----'}</span>
+                    </div>
+                ` : ''}
+            </td>
+            <td class="py-4 px-6 text-right font-black text-slate-800">
+                ${formatVES(saleTotalVES)}<br>
+                <span class="text-[10px] text-slate-400 font-normal">Ref: ${formatUSD(Number(sale.totalUSD) || 0)}</span>
+            </td>
+            <td class="py-4 px-6 text-center whitespace-nowrap">
+                <button onclick="continueInvoice('${displayTicket}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg transition-all">
+                    <i class="fas fa-eye mr-1"></i> Ver
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+};
+
+
+window.setReceivedBill = function(val) { const input = document.getElementById('amount-received'); if (input) { input.value = val; if (typeof validatePayment === 'function') validatePayment(); } };
+
+// --- BOTONES RÁPIDOS EXACTO Y FIADO ---
+window.exactPayment = function() {
+    const input = document.getElementById('amount-received');
+    if (!input) return;
+    
+    const paidUSD = window.mixedPayments ? window.mixedPayments.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0) : 0;
+    const remainingUSD = Math.max(0, currentTotalUSD - paidUSD);
+
+    if (checkoutMethod === 'cash-usd') {
+        input.value = remainingUSD.toFixed(2);
+    } else if (checkoutMethod === 'cash-ves' || checkoutMethod === 'pago-movil') {
+        const remainingVES = remainingUSD * settings.exchangeRate;
+        input.value = remainingVES.toFixed(2);
+    } else if (checkoutMethod === 'cash-eur') {
+        const totalEUR = (remainingUSD * settings.exchangeRate) / (settings.euroRate || 40);
+        input.value = totalEUR.toFixed(2);
+    } else {
+        input.value = remainingUSD.toFixed(2);
+    }
+
+    if (typeof validatePayment === 'function') validatePayment();
+};
+
+window.fiaoPayment = function() {
+    const clientId = document.getElementById('pos-client-id')?.value;
+    const clientName = document.getElementById('pos-client-name')?.value?.trim() || document.getElementById('pos-client-search')?.value?.trim();
+    
+    if (!clientId && !clientName) {
+        alert('Para fiar o dejar saldo a crédito, por favor selecciona o ingresa un cliente.');
+        return;
+    }
+
+    if (confirm('¿Confirmar venta a Crédito/Fiado?')) {
+        checkoutMethod = 'Fiado';
+        if (typeof processPayment === 'function') {
+            processPayment();
+        }
+    }
+};
+
+// ── Dynamic Denomination Row ──
+window.addDenomRow = function(currency) {
+    const containerId = currency === 'usd' ? 'denom-usd-rows' : 'denom-ves-rows';
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const isUSD = currency === 'usd';
+    const symbol = isUSD ? '$' : 'Bs';
+    const colorClass = isUSD ? 'text-emerald-600 border-emerald-200 focus:border-emerald-500' : 'text-blue-600 border-blue-200 focus:border-blue-500';
+
+    const row = document.createElement('div');
+    row.className = 'denom-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-4 py-2.5 items-center';
+    row.innerHTML = `
+        <div class="relative">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black ${isUSD ? 'text-emerald-500' : 'text-blue-500'}">${symbol}</span>
+            <input type="number" min="0" step="${isUSD ? '1' : '1'}" placeholder="Denom."
+                class="denom-val w-full pl-7 pr-2 py-2 bg-slate-50 border rounded-xl text-xs font-black text-slate-800 outline-none transition-all text-center ${colorClass}"
+                oninput="calcularCuadre()">
+        </div>
+        <div class="flex items-center gap-1">
+            <span class="text-xs text-slate-400 font-semibold">×</span>
+            <input type="number" min="0" step="1" placeholder="Cant."
+                class="denom-qty w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-800 outline-none focus:border-brand-500 transition-all text-center"
+                oninput="calcularCuadre()">
+        </div>
+        <span class="denom-subtotal text-xs font-black ${isUSD ? 'text-emerald-600' : 'text-blue-600'} text-right">=${isUSD ? '$0.00' : 'Bs 0'}</span>
+        <button type="button" onclick="this.closest('.denom-row').remove(); calcularCuadre();"
+            class="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-400 hover:text-rose-600 flex items-center justify-center transition-all shrink-0 text-xs">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(row);
+    row.querySelector('.denom-val')?.focus();
+};
+
+// ── addPaymentToList (Pagos Mixtos en checkout) ──
+window.addPaymentToList = function() {
+    const method = checkoutMethod;
+    if (!method) {
+        alert('Selecciona un método de pago antes de agregar.');
+        return;
+    }
+
+    const input = document.getElementById('amount-received');
+    const received = parseFloat(input?.value) || 0;
+    if (received <= 0) {
+        alert('Ingresa un monto mayor a cero para agregar el pago.');
+        return;
+    }
+
+    if (!window.mixedPayments) window.mixedPayments = [];
+
+    const exchangeRate = (settings.exchangeRate && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    const eurToUsd = _getEURtoUSDRate();
+
+    let usdAmount = received;
+    let currencySymbol = '$';
+    let formattedEntered = formatUSD(received);
+
+    if (method === 'cash-ves' || method === 'pago-movil' || method === 'card-ves' || method === 'transferencia') {
+        usdAmount = received / exchangeRate;
+        currencySymbol = 'Bs';
+        formattedEntered = formatVES(received);
+    } else if (method === 'cash-eur') {
+        usdAmount = received * eurToUsd;
+        currencySymbol = '€';
+        formattedEntered = formatEUR(received);
+    }
+
+    const methodNames = {
+        'cash-usd': 'Efectivo USD',
+        'cash-ves': 'Efectivo Bs',
+        'cash-eur': 'Efectivo EUR',
+        'pago-movil': 'Pago Móvil',
+        'transferencia': 'Transferencia',
+        'card-ves': 'Punto de Venta'
+    };
+
+    window.mixedPayments.push({
+        method: method,
+        label: methodNames[method] || method,
+        rawAmount: received,
+        formattedEntered: formattedEntered,
+        currencySymbol: currencySymbol,
+        usdAmount: usdAmount,
+        pmRef: method === 'pago-movil' ? (document.getElementById('pm-ref')?.value || '') : ''
+    });
+
+    renderMixedPaymentsList();
+    if (input) input.value = '';
+    validatePayment();
+};
+
+window.renderMixedPaymentsList = function() {
+    const list = document.getElementById('mixed-payments-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!window.mixedPayments || window.mixedPayments.length === 0) return;
+
+    window.mixedPayments.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between px-3.5 py-2.5 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm';
+        item.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-slate-800">${p.label}</span>
+                ${p.pmRef ? `<span class="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">#${p.pmRef}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="text-right">
+                    <span class="text-xs font-black text-slate-800 block">${p.formattedEntered}</span>
+                    ${p.currencySymbol !== '$' ? `<span class="text-[10px] font-bold text-emerald-600 block">(${formatUSD(p.usdAmount)})</span>` : ''}
+                </div>
+                <button type="button" onclick="removeMixedPayment(${idx})" class="w-6 h-6 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center text-xs transition-all shrink-0">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+};
+
+window.removeMixedPayment = function(idx) {
+    if (!window.mixedPayments) return;
+    window.mixedPayments.splice(idx, 1);
+    renderMixedPaymentsList();
+    validatePayment();
+};

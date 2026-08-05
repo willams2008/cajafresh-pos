@@ -60,6 +60,8 @@ function initDatabase(userDataPath) {
             }
 
             console.log('[DATABASE] Conexión establecida.');
+            db.run('PRAGMA busy_timeout = 10000;');
+            db.run('PRAGMA journal_mode = WAL;');
             createTables().then(resolve).catch(reject);
         });
     });
@@ -776,11 +778,23 @@ const api = {
             ]
         );
 
-        if (sale.method === 'Crédito' || sale.method === 'Fiado') {
+        if (sale.status === 'pending' || sale.method === 'Crédito' || sale.method === 'Fiado') {
+            let amountPaid = 0;
+            if (sale.payments) {
+                try {
+                    const arr = typeof sale.payments === 'string' ? JSON.parse(sale.payments) : sale.payments;
+                    if (Array.isArray(arr)) {
+                        amountPaid = arr.reduce((acc, p) => acc + (parseFloat(p.usdAmount) || 0), 0);
+                    }
+                } catch(e){}
+            }
+            const totalSale = parseFloat(sale.totalUSD || sale.total || 0);
+            const amountOwed = Math.max(0, totalSale - amountPaid);
+
             const creditId = 'cred_' + Date.now();
             await runQuery(
                 `INSERT INTO credits (id, store_id, sale_id, client_id, amount_owed, amount_paid, date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [creditId, sid, sale.id, sale.clientId, sale.totalUSD || sale.total, 0, new Date().toISOString(), 'PENDING']
+                [creditId, sid, sale.id, sale.clientId || null, amountOwed, amountPaid, new Date().toISOString(), 'PENDING']
             );
         }
         return sale;

@@ -20,6 +20,23 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
     <!-- Domain Auto-Detection -->
+    <script src="vendor/sweetalert2.js"></script>
+    <script>
+        if (typeof window.Swal === 'undefined') {
+            if (typeof window.Sweetalert2 !== 'undefined') {
+                window.Swal = window.Sweetalert2;
+            } else {
+                // Polyfill fallback dialog to prevent any runtime crash
+                window.Swal = {
+                    fire: function(title, text, icon) {
+                        const msg = typeof title === 'object' ? (title.title || title.text || '') : (title + (text ? '\n' + text : ''));
+                        if (msg) alert(msg);
+                        return Promise.resolve({ isConfirmed: true, isDenied: false, isDismissed: false });
+                    }
+                };
+            }
+        }
+    </script>
     <script src="domain-detector.js"></script>
     <script>
         // Heartbeat diag: log every 5s to detect renderer freeze
@@ -1493,6 +1510,65 @@
                         <div class="relative z-10">
                             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Artículos</p>
                             <h3 class="text-xl font-black text-slate-800" id="report-total-items">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buscador Inteligente de Cliente e Historial -->
+                <div class="mb-8 bg-gradient-to-r from-cyan-900 via-slate-900 to-indigo-950 rounded-3xl p-6 text-white shadow-xl relative overflow-visible">
+                    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+                        <div>
+                            <span class="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-xs font-bold uppercase tracking-widest border border-cyan-500/30">
+                                <i class="fas fa-user-check"></i> Consulta de Clientes
+                            </span>
+                            <h3 class="text-xl font-black mt-2 text-white">Historial de Compras por Cliente</h3>
+                            <p class="text-xs text-slate-300 mt-0.5">Busca cualquier cliente por nombre, cédula o teléfono para ver su desglose completo de compras.</p>
+                        </div>
+                        <div id="selected-client-badge" class="hidden items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
+                            <div>
+                                <p class="text-[10px] uppercase font-bold text-cyan-300">Cliente Filtrado</p>
+                                <p class="text-sm font-black text-white" id="selected-client-name-display">-</p>
+                            </div>
+                            <button onclick="clearReportClientFilter()" class="w-7 h-7 rounded-full bg-rose-500/30 hover:bg-rose-500 text-rose-200 hover:text-white flex items-center justify-center transition-all" title="Quitar Filtro">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Buscador Input + Autocomplete -->
+                    <div class="relative w-full max-w-2xl">
+                        <div class="relative flex items-center">
+                            <i class="fas fa-search absolute left-4 text-slate-400 text-sm"></i>
+                            <input type="text" id="report-client-search" placeholder="Escribe para buscar cliente (Nombre, V-12345678, Teléfono)..." autocomplete="off"
+                                oninput="onReportClientSearchInput(this.value)"
+                                onfocus="onReportClientSearchInput(this.value)"
+                                class="w-full pl-11 pr-10 py-3.5 bg-white/10 backdrop-blur-md border-2 border-white/20 rounded-2xl text-sm font-bold text-white placeholder-slate-400 focus:bg-slate-900 focus:border-cyan-400 outline-none transition-all shadow-inner">
+                            <button id="report-client-search-clear" onclick="clearReportClientFilter()" class="hidden absolute right-3 text-slate-400 hover:text-white p-1.5">
+                                <i class="fas fa-times-circle"></i>
+                            </button>
+                        </div>
+                        <!-- Result List -->
+                        <div id="report-client-search-results" class="hidden absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar divide-y divide-slate-800">
+                        </div>
+                    </div>
+
+                    <!-- Selected Client Summary Dashboard -->
+                    <div id="report-client-summary-card" class="hidden mt-6 pt-6 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Compras</p>
+                            <p class="text-xl font-black text-cyan-400 mt-1" id="rep-cli-total-count">0</p>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Gastado (USD)</p>
+                            <p class="text-xl font-black text-emerald-400 mt-1" id="rep-cli-total-usd">$0.00</p>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Gastado (Bs)</p>
+                            <p class="text-xl font-black text-blue-400 mt-1" id="rep-cli-total-ves">Bs 0</p>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Última Compra</p>
+                            <p class="text-sm font-bold text-slate-200 mt-1" id="rep-cli-last-date">N/A</p>
                         </div>
                     </div>
                 </div>
@@ -3820,909 +3896,171 @@
     <!-- === MODALS === -->
 
     <!-- Checkout Modal -->
+    <!-- Checkout Modal (Dual Column POS Suite) -->
     <div id="checkout-modal"
-        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col max-h-[92vh] overflow-hidden transform transition-all duration-300"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 items-center justify-center p-3 md:p-6 hidden transition-all duration-300">
+        <div class="bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row max-h-[95vh] overflow-hidden transform transition-all duration-300 border border-slate-800"
             id="checkout-modal-content">
 
-            <!-- === TOP: Total + Close === -->
-            <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-6 pt-6 pb-7 shrink-0 relative overflow-hidden">
-                <div class="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/5 blur-3xl"></div>
-                <div class="absolute -left-4 bottom-0 w-24 h-24 rounded-full bg-white/[0.03] blur-2xl"></div>
-                <button class="close-checkout-modal absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white/70 hover:text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-sm z-10">
-                    <i class="fas fa-times text-xs pointer-events-none"></i>
-                </button>
+            <!-- === LEFT COLUMN: Dark Summary Panel === -->
+            <div class="w-full md:w-5/12 bg-slate-900 text-white p-6 md:p-8 flex flex-col justify-between relative overflow-hidden shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
+                <div class="absolute -left-12 -top-12 w-48 h-48 rounded-full bg-brand-500/10 blur-3xl pointer-events-none"></div>
+                <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none"></div>
+
                 <div class="relative z-10">
-                    <div class="flex items-center gap-2 mb-1">
-                        <div class="w-6 h-6 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm">
-                            <i class="fas fa-receipt text-white text-[10px]"></i>
+                    <!-- Header Branding -->
+                    <div class="flex items-center gap-2.5 mb-6">
+                        <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center border border-brand-500/30">
+                            <i class="fas fa-cash-register text-sm"></i>
                         </div>
-                        <span class="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">PuntoPila POS</span>
+                        <span class="text-xs font-black text-slate-300 uppercase tracking-widest">COBRO POS</span>
                     </div>
-                    <p class="text-[10px] font-bold text-white/50 uppercase tracking-[0.2em] mt-3">Total a Pagar</p>
-                    <div class="text-5xl font-black text-white mt-0.5 tracking-tight drop-shadow-sm" id="checkout-total-display">$0.00</div>
-                    <div class="flex items-center gap-3 mt-2.5">
-                        <span class="text-sm font-semibold text-white/80" id="checkout-total-ves-display">Bs 0</span>
-                        <span class="w-1 h-1 rounded-full bg-white/30"></span>
-                        <span class="text-sm font-semibold text-white/80" id="checkout-total-eur-display">€0</span>
-                        <span class="w-1 h-1 rounded-full bg-white/30"></span>
-                        <span class="text-sm font-semibold text-amber-300" id="checkout-points-display"></span>
+
+                    <!-- Total Amount Display -->
+                    <div class="mb-6">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">TOTAL A PAGAR</p>
+                        <div class="text-4xl md:text-5xl font-black text-white tracking-tight font-mono" id="checkout-total-display">$0.00</div>
+                        <div class="flex items-center gap-2 mt-3 flex-wrap">
+                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-300" id="checkout-total-ves-display">Bs 0,00</span>
+                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-300" id="checkout-total-eur-display">0,00 €</span>
+                            <span class="text-xs font-bold text-amber-400" id="checkout-points-display"></span>
+                        </div>
+
+                        <!-- 📊 DESGLOSE EN VIVO (ABONADO Y RESTANTE) -->
+                        <div class="mt-5 p-4 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abonado / Cubierto</span>
+                                <span class="text-sm font-black text-emerald-400 font-mono" id="checkout-left-paid">$0.00</span>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-slate-700/60 pt-2.5">
+                                <div>
+                                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">RESTANTE POR PAGAR</span>
+                                    <span class="text-[10px] font-bold text-slate-400 font-mono" id="checkout-left-remaining-ves">Bs 0,00</span>
+                                </div>
+                                <span class="text-2xl font-black text-amber-400 font-mono" id="checkout-left-remaining">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions (Exacto / Fiado) -->
+                <div class="relative z-10 pt-6 border-t border-slate-800/80">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3">OPCIONES RÁPIDAS</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="exact-change-btn" class="py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all border border-slate-700 hover:border-amber-400 hover:text-amber-300 flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-bolt text-amber-400 text-sm"></i> Exacto
+                        </button>
+                        <button id="fiao-payment-btn" class="py-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold text-xs transition-all border border-amber-500/30 hover:border-amber-400 flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-hand-holding-dollar text-sm"></i> Fiado
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- === FORM === -->
-            <div class="bg-white px-5 py-5 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+            <!-- === RIGHT COLUMN: Form & Methods Panel === -->
+            <div class="w-full md:w-7/12 bg-white p-6 flex flex-col justify-between overflow-y-auto custom-scrollbar">
 
-                <!-- Método de Pago -->
-                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Método de Pago</label>
-                    <div class="grid grid-cols-5 gap-2">
-                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-usd">
-                            <i class="fas fa-dollar-sign text-lg"></i>
-                            <span>USD</span>
-                        </button>
-                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-ves">
-                            <i class="fas fa-money-bill-wave text-lg"></i>
-                            <span>VES</span>
-                        </button>
-                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="cash-eur">
-                            <i class="fas fa-euro-sign text-lg"></i>
-                            <span>EUR</span>
-                        </button>
-                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="card-ves">
-                            <i class="fas fa-credit-card text-lg"></i>
-                            <span>Punto</span>
-                        </button>
-                        <button class="payment-tab flex flex-col items-center justify-center gap-1 h-16 rounded-xl border-2 border-slate-200 bg-white text-slate-400 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition-all duration-200 text-xs font-bold" data-method="pago-movil">
-                            <i class="fas fa-mobile-alt text-lg"></i>
-                            <span>P.Móvil</span>
+                <div>
+                    <!-- Header + Close Button -->
+                    <div class="flex items-center justify-between mb-5">
+                        <h3 class="text-lg font-black text-slate-800">Selecciona Método de Pago</h3>
+                        <button class="close-checkout-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all">
+                            <i class="fas fa-times text-xs"></i>
                         </button>
                     </div>
-                </div>
 
-                <!-- Monto + Cambio -->
-                <div id="payment-details-container" class="hidden space-y-3">
-                    <div id="cash-section">
-                        <div class="flex gap-3 items-end">
-                            <div class="flex-1">
-                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5" id="label-amount-received">Monto Recibido</label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <span class="text-brand-600 font-black text-lg" id="currency-input-symbol">$</span>
+                    <!-- Grid of 5 Payment Methods -->
+                    <div class="grid grid-cols-3 gap-2.5 mb-5">
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:bg-emerald-50 hover:border-emerald-400 text-slate-600 transition-all font-bold text-xs" data-method="cash-usd">
+                            <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-black">$</div>
+                            <span>USD ($)</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:bg-blue-50 hover:border-blue-400 text-slate-600 transition-all font-bold text-xs" data-method="cash-ves">
+                            <div class="w-7 h-7 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-black"><i class="fas fa-money-bill-wave text-xs"></i></div>
+                            <span>VES (Bs)</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:bg-amber-50 hover:border-amber-400 text-slate-600 transition-all font-bold text-xs" data-method="cash-eur">
+                            <div class="w-7 h-7 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-black">€</div>
+                            <span>EUR (€)</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:bg-purple-50 hover:border-purple-400 text-slate-600 transition-all font-bold text-xs" data-method="card-ves">
+                            <div class="w-7 h-7 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-sm"><i class="fas fa-credit-card text-xs"></i></div>
+                            <span>Punto Tarjeta</span>
+                        </button>
+                        <button class="payment-tab flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 hover:bg-pink-50 hover:border-pink-400 text-slate-600 transition-all font-bold text-xs col-span-2" data-method="pago-movil">
+                            <div class="w-7 h-7 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center text-sm"><i class="fas fa-mobile-alt text-xs"></i></div>
+                            <span>Pago Móvil</span>
+                        </button>
+                    </div>
+
+                    <!-- Payment Inputs Container -->
+                    <div id="payment-details-container" class="hidden space-y-3 mb-4">
+                        <div id="cash-section">
+                            <p id="label-amount-received" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MONTO ENTREGADO</p>
+
+
+                            <div class="flex gap-2 items-center">
+                                <div class="relative flex-1">
+                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                        <span class="text-brand-600 font-black text-base" id="currency-input-symbol">$</span>
                                     </div>
-                                    <input type="number" step="0.01" id="amount-received" class="block w-full pl-10 pr-4 py-3.5 bg-white border-2 border-slate-200 focus:border-brand-500 rounded-2xl text-2xl font-black text-slate-800 placeholder-slate-300 outline-none transition-all" placeholder="0.00">
+                                    <input type="number" step="0.01" id="amount-received" class="block w-full pl-9 pr-4 py-3 bg-blue-50/50 border-2 border-blue-500 focus:border-brand-600 rounded-2xl text-xl font-black text-slate-800 outline-none transition-all placeholder-slate-300" placeholder="0.00">
+                                </div>
+                                <button id="add-payment-btn" class="h-12 px-4 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-brand-500/20 shrink-0">
+                                    <i class="fas fa-plus"></i> Añadir
+                                </button>
+                            </div>
+
+                            <!-- Change Container -->
+                            <div id="change-container" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-rose-50 border border-rose-200 transition-all mt-2.5">
+                                <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">CAMBIO / VUELTO</span>
+                                <div class="text-right">
+                                    <div class="text-lg font-black text-emerald-600" id="checkout-change">$0.00</div>
+                                    <div class="text-[10px] font-bold text-emerald-600/70" id="checkout-change-secundary"></div>
                                 </div>
                             </div>
-                            <button id="add-payment-btn" class="h-14 w-14 flex items-center justify-center bg-brand-50 hover:bg-brand-500 text-brand-600 hover:text-white rounded-2xl transition-all duration-200 shrink-0 border-2 border-brand-100 hover:border-brand-500" title="Pago Parcial">
-                                <i class="fas fa-plus text-xl"></i>
-                            </button>
                         </div>
-                        <div id="change-container" class="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-100 transition-all duration-300 mt-2">
-                            <span class="text-xs font-bold text-emerald-700 uppercase tracking-widest">Cambio</span>
-                            <div class="text-right">
-                                <div class="text-xl font-black text-emerald-600" id="checkout-change">$0.00</div>
-                                <div class="text-xs font-bold text-emerald-600/60" id="checkout-change-secundary"></div>
+
+                        
+
+                        <!-- PM Verification -->
+                        <div id="pm-extra-fields" class="hidden bg-pink-50/70 rounded-2xl border border-pink-200 p-3.5 space-y-2.5">
+                            <p class="text-xs font-bold uppercase tracking-widest text-pink-700">Verificación Pago Móvil</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="pm-id" placeholder="Cédula" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-pink-500">
+                                <input type="text" id="pm-phone" placeholder="Teléfono" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-pink-500">
                             </div>
+                            <input type="text" id="pm-ref" placeholder="Ref. últimos 4" maxlength="4" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black tracking-[0.4em] text-center text-slate-800 outline-none focus:border-pink-500">
+                            <p id="pm-validation-hint" class="hidden text-xs font-bold text-red-500 text-center mt-1"></p>
                         </div>
                     </div>
-                    <div id="card-section" class="hidden bg-brand-50 rounded-2xl border-2 border-brand-100 p-4 text-center">
-                        <p class="text-brand-600 text-xs font-bold uppercase tracking-widest mb-1">Monto en Punto</p>
-                        <div class="text-xl font-black text-brand-700" id="tpv-amount-bs">Bs 0.00</div>
-                        <p class="text-[10px] text-brand-400 mt-1">Procese en el terminal bancario.</p>
-                    </div>
-                    <div id="pm-extra-fields" class="hidden bg-purple-50 rounded-2xl border-2 border-purple-100 p-4 space-y-3">
-                        <p class="text-xs font-bold uppercase tracking-widest text-purple-600">Verificación</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <input type="text" id="pm-id" placeholder="Cédula" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold focus:border-purple-500 outline-none transition-all text-slate-700">
-                            <input type="text" id="pm-phone" placeholder="Teléfono" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold focus:border-purple-500 outline-none transition-all text-slate-700">
-                        </div>
-                        <input type="text" id="pm-ref" placeholder="Ref. últimos 4" maxlength="4" class="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-base font-black tracking-[0.5em] text-center focus:border-purple-500 outline-none transition-all text-slate-700">
-                        <p id="pm-validation-hint" class="hidden text-xs font-bold text-red-500 text-center mt-1"></p>
+
+                    <!-- Mixed Payments Items List -->
+                    <div id="mixed-payments-list" class="space-y-2 mb-3 empty:hidden"></div>
+
+                    <!-- SALDO RESTANTE Box -->
+                    <div id="mixed-remaining-container" class="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-amber-50/80 border-2 border-amber-200 mb-4 hidden">
+                        <span class="text-xs font-black text-amber-900 uppercase tracking-wider">SALDO RESTANTE</span>
+                        <span class="text-xl font-black text-amber-600 font-mono" id="checkout-remaining-usd">$0.00</span>
                     </div>
                 </div>
 
-                <!-- Mixed Payments -->
-                <div id="mixed-payments-list" class="space-y-1.5 empty:hidden"></div>
-                <div id="mixed-remaining-container" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-amber-50 border-2 border-amber-200 hidden">
-                    <span class="text-xs font-bold text-amber-700">Saldo Restante</span>
-                    <span class="text-base font-black text-amber-600" id="checkout-remaining-usd">$0.00</span>
-                </div>
-
-                <!-- Cobrar -->
-                <button id="confirm-payment-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 active:scale-[0.98] text-white font-black text-base transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-brand-600/20" disabled>
-                    <i class="fas fa-check-circle text-lg"></i>
-                    Cobrar
-                </button>
-
-                <!-- Exacto + Fiado -->
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="exact-change-btn" class="py-3.5 rounded-2xl bg-transparent hover:bg-slate-50 text-slate-500 font-bold text-sm transition-all border-2 border-dashed border-slate-200 hover:border-amber-300 hover:text-amber-600 flex items-center justify-center gap-2">
-                        <i class="fas fa-bolt text-amber-400 text-sm"></i>
-                        Exacto
-                    </button>
-                    <button id="fiao-payment-btn" class="py-3.5 rounded-2xl bg-transparent hover:bg-amber-50 text-amber-700 font-bold text-sm transition-all border-2 border-dashed border-amber-200 hover:border-amber-400 flex items-center justify-center gap-2">
-                        <i class="fas fa-hand-holding-dollar text-sm"></i>
-                        Fiado
+                <!-- Completar Cobro Action Button -->
+                <div class="pt-2">
+                    <button id="confirm-payment-btn" class="w-full py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-500 active:scale-[0.98] text-white font-black text-base transition-all flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20" disabled>
+                        <i class="fas fa-check-circle text-lg"></i>
+                        Completar Cobro
                     </button>
                 </div>
 
-                <!-- Extras row -->
-                <div class="grid grid-cols-4 gap-2">
-                    <button class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-brand-50 text-slate-500 hover:text-brand-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-brand-200" onclick="toggleCuentas()">
-                        <i class="fas fa-layer-group text-brand-500 text-base"></i>
-                        Cuentas
-                        <span id="cuentas-count-badge" class="bg-brand-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black leading-none hidden -mt-1">0</span>
-                    </button>
-                    <button class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-rose-200" onclick="toggleDescuento()">
-                        <i class="fas fa-tag text-rose-400 text-base"></i>
-                        Descuento
-                    </button>
-                    <button id="save-cuenta-btn" class="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-brand-50 text-slate-500 hover:text-brand-600 transition-all text-[10px] font-bold border border-slate-100 hover:border-brand-200" onclick="event.stopPropagation(); saveCurrentAsCuenta();">
-                        <i class="fas fa-plus text-brand-500 text-base"></i>
-                        Guardar
-                    </button>
-                    <button class="close-checkout-modal flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-500 transition-all text-[10px] font-bold border border-slate-100 hover:border-red-200">
-                        <i class="fas fa-times text-slate-400 text-base"></i>
-                        Cancelar
-                    </button>
-                </div>
-
-                <!-- Cuentas content -->
-                <div id="cuentas-list" class="hidden bg-slate-50 rounded-2xl border border-slate-200 p-4">
-                    <div class="max-h-[120px] overflow-y-auto custom-scrollbar">
-                        <div id="cuentas-empty" class="text-center py-3 text-sm text-slate-400 font-medium italic">Sin cuentas abiertas</div>
-                    </div>
-                </div>
-
-                <!-- Descuento content -->
-                <div id="descuento-content" class="hidden bg-slate-50 rounded-2xl border border-slate-200 p-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <label class="text-xs font-semibold text-slate-500">Valor</label>
-                        <div class="flex items-center gap-2">
-                            <input type="number" id="cart-discount-input" min="0" step="0.01" class="w-24 bg-white border-2 border-slate-200 rounded-xl text-slate-700 font-bold p-2 outline-none text-sm text-right transition-all focus:border-rose-400" placeholder="0" value="0">
-                            <select id="cart-discount-type" class="bg-white border-2 border-slate-200 rounded-xl text-slate-500 font-bold p-2 outline-none text-sm cursor-pointer transition-all focus:border-rose-400">
-                                <option value="usd">$</option>
-                                <option value="percent">%</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Desglose -->
-                <div id="checkout-breakdown" class="hidden bg-slate-50 rounded-2xl border border-slate-200 divide-y divide-slate-200 overflow-hidden">
-                    <div class="flex justify-between px-4 py-2.5">
-                        <span class="text-xs font-bold text-slate-400 uppercase">Subtotal</span>
-                        <span id="checkout-subtotal-val" class="text-sm font-black text-slate-700">$0.00</span>
-                    </div>
-                    <div id="checkout-discount-row" class="flex justify-between px-4 py-2.5 text-rose-500 hidden">
-                        <span class="text-xs font-bold uppercase">Descuento</span>
-                        <span id="checkout-discount-val" class="text-sm font-black">-$0.00</span>
-                    </div>
-                    <div id="checkout-tax-row" class="flex justify-between px-4 py-2.5 text-emerald-600 hidden">
-                        <span class="text-xs font-bold uppercase" id="checkout-tax-label">IVA</span>
-                        <span id="checkout-tax-val" class="text-sm font-black">$0.00</span>
-                    </div>
-                </div>
-
-                <!-- Notas -->
-                <textarea id="checkout-observations" rows="1" class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 focus:bg-white focus:border-brand-500 rounded-2xl outline-none text-sm font-semibold text-slate-700 transition-all resize-none placeholder:text-slate-400" placeholder="Notas adicionales..."></textarea>
-
-                <!-- Mandar a Entregas -->
-                <button id="send-to-management-btn" class="w-full py-3.5 rounded-2xl border-2 border-indigo-200 bg-indigo-50/60 text-indigo-600 font-bold hover:bg-indigo-100 hover:border-indigo-300 transition-all text-sm flex items-center justify-center gap-2">
-                    <i class="fas fa-box text-sm"></i> Mandar a Entregas App
-                </button>
-
             </div>
         </div>
     </div>
 
-    <!-- Product Modal (Add/Edit) -->
-    <div id="product-modal"
-        class="fixed inset-0 bg-slate-900/60 z-[1050] items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col pointer-events-auto"
-            id="product-modal-content">
-            <div
-                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-                <h3 class="font-bold text-xl text-slate-800" id="modal-product-title">Añadir Producto</h3>
-                <button
-                    class="close-product-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar">
-                <!-- Selector Tipo Producto -->
-                <div class="flex bg-slate-100 p-1 rounded-xl mb-5">
-                    <button type="button" id="btn-prod-simple" onclick="toggleProductType('simple')" 
-                        class="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-brand-600 transition-all">Básico</button>
-                    <button type="button" id="btn-prod-complex" onclick="toggleProductType('complex')" 
-                        class="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">Avanzado</button>
-                    <button type="button" id="btn-prod-recipe" onclick="toggleProductType('recipe')" 
-                        class="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">Receta</button>
-                </div>
-
-                <form id="product-form" class="space-y-4">
-                    <input type="hidden" id="product-id">
-
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre del Producto *</label>
-                        <input type="text" id="product-name"
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium">
-                    </div>
-
-                    <div class="advanced-field" style="display: none;">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Código de Barras
-                            (Opcional)</label>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><i
-                                    class="fas fa-barcode"></i></span>
-                            <input type="text" id="product-barcode" placeholder="Escaneé o escriba el código..."
-                                class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-mono tracking-widest text-sm">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="block text-sm font-semibold text-slate-700">Categoría *</label>
-                                <div class="flex gap-1">
-                                    <button type="button" onclick="window.addCategory()" 
-                                        class="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all shadow-sm border border-emerald-100" title="Añadir Categoría">
-                                        <i class="fas fa-plus text-[10px]"></i>
-                                    </button>
-                                    <button type="button" onclick="window.removeCategory()" 
-                                        class="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-all shadow-sm border border-rose-100" title="Eliminar Categoría Seleccionada">
-                                        <i class="fas fa-minus text-[10px]"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <select id="product-category"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium appearance-none">
-                                <!-- Options will be populated by JS -->
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">Stock Actual *</label>
-                            <input type="number" id="product-stock" min="0" value="0"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all font-medium">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 advanced-field" style="display: none;">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1"
-                                title="Precio de compra al proveedor">Costo Bruto (USD) *</label>
-                            <div class="relative">
-                                <span
-                                    class="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">$</span>
-                                <input type="number" id="product-cost-price" min="0" step="0.01" value="0.00"
-                                    class="w-full pl-9 pr-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-black text-emerald-700">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1"
-                                title="Límite para avisar por WhatsApp cuando falte stock">Stock Mínimo (Alerta)</label>
-                            <div class="relative">
-                                <span
-                                    class="absolute left-4 top-1/2 -translate-y-1/2 text-rose-400"><i class="fas fa-bell"></i></span>
-                                <input type="number" id="product-min-stock" min="1" value="1"
-                                    class="w-full pl-9 pr-4 py-2.5 bg-rose-50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition-all font-black text-rose-700">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">Puntos por Unidad</label>
-                            <div class="relative">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500"><i class="fas fa-star"></i></span>
-                                <input type="number" id="product-points" min="0" value="0"
-                                    class="w-full pl-9 pr-4 py-2.5 bg-amber-50 border border-amber-100 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all font-black text-amber-700">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 space-y-4">
-                        <div class="flex items-center gap-2 mb-1">
-                            <i class="fas fa-coins text-indigo-500"></i>
-                            <span class="text-xs font-black uppercase text-indigo-700 tracking-wider">Configuración de
-                                Precios Independientes</span>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Bolívares (VES)</label>
-                                <div class="relative group">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 font-black text-xs">Bs</span>
-                                    <input type="number" id="product-price-ves" step="0.01"
-                                        class="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-black text-slate-800">
-                                    <button type="button" onclick="suggestPrice('VES')"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-brand-500 transition-colors"
-                                        title="Sugerir precio según tasa"><i class="fas fa-bolt"></i></button>
-                                </div>
-                                <p id="preview-ves-conv" class="text-[9px] font-bold text-slate-400 mt-1 pl-1"></p>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Dólares (USD)</label>
-                                <div class="relative group">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
-                                    <input type="number" id="product-price-usd" step="0.01"
-                                        class="w-full pl-7 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-black text-slate-800">
-                                    <button type="button" onclick="suggestPrice('USD')"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors"
-                                        title="Sugerir precio según tasa"><i class="fas fa-bolt"></i></button>
-                                </div>
-                                <p id="preview-usd-conv" class="text-[9px] font-bold text-slate-400 mt-1 pl-1"></p>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black uppercase text-slate-500 mb-1">Euros (EUR)</label>
-                                <div class="relative group">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 font-black text-xs">€</span>
-                                    <input type="number" id="product-price-eur" step="0.01"
-                                        class="w-full pl-7 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-black text-slate-800">
-                                    <button type="button" onclick="suggestPrice('EUR')"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors"
-                                        title="Sugerir precio según tasa"><i class="fas fa-bolt"></i></button>
-                                </div>
-                                <p id="preview-eur-conv" class="text-[9px] font-bold text-slate-400 mt-1 pl-1"></p>
-                            </div>
-                        </div>
-
-                        <div class="pt-2 border-t border-indigo-100/50">
-                            <label class="block text-[10px] font-black uppercase text-slate-400 mb-1">Precio Promoción
-                                (Bs) - Opcional</label>
-                            <div class="relative">
-                                <span
-                                    class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 font-bold text-xs">Bs</span>
-                                <input type="number" id="product-promo-price-ves" step="0.01" placeholder="Ej. 950"
-                                    class="w-full pl-9 pr-3 py-2 bg-white/50 border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-bold text-rose-600 placeholder:text-rose-200 text-sm">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- VARIANTS SECTION -->
-                    <div class="advanced-field" style="display: none;">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                                <i class="fas fa-tags text-purple-500"></i> Sabores / Variantes
-                            </label>
-                            <button type="button" id="add-variant-btn" class="text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition-colors"><i class="fas fa-plus mr-1"></i>Agregar Variante</button>
-                        </div>
-                        <div id="variants-container" class="space-y-2"></div>
-                        <div id="variants-empty" class="text-center py-4 text-sm text-purple-400 bg-purple-50/50 rounded-xl border border-dashed border-purple-200">Sin variantes. Presiona "Agregar Variante" para añadir.</div>
-                    </div>
-
-                    <!-- COMPOSITE PRODUCT ACCORDION -->
-                    <div class="advanced-field" style="display: none;">
-                        <div class="accordion-header flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100/50 transition-colors" onclick="toggleSection('product-composite-body')">
-                            <div class="flex items-center gap-2">
-                                <i class="fas fa-cubes text-amber-500"></i>
-                                <span class="text-sm font-bold text-amber-800">Producto Compuesto</span>
-                                <span class="text-xs text-amber-500 font-medium" id="composite-item-count">0 ítems</span>
-                                <i class="fas fa-info-circle text-amber-300 text-xs cursor-help" title="Marca esta opción si el producto se compone de sub-items que pueden venderse por unidad (ej. una caja de cigarros compuesta por cigarros individuales)."></i>
-                            </div>
-                            <i class="fas fa-chevron-down text-amber-400 transition-transform duration-200" id="composite-arrow"></i>
-                        </div>
-                        <div id="product-composite-body" class="mt-2" style="display: none;">
-                            <div class="bg-amber-50/50 border border-amber-200 rounded-xl p-4">
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-xs font-bold text-amber-700">Componentes del lote</span>
-                                    <button type="button" id="add-composite-row" class="text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"><i class="fas fa-plus mr-1"></i>Agregar componente</button>
-                                </div>
-                                <div id="composite-rows-container"></div>
-                                <div id="composite-empty" class="text-center py-4 text-sm text-amber-400">No hay componentes. Agrega los sub-items que componen este producto.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 advanced-field" style="display: none;">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">Fecha de Vencimiento (Opcional)</label>
-                            <input type="date" id="product-expiry"
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all text-sm font-medium">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1">URL de Imagen</label>
-                            <input type="url" id="product-img" placeholder="https://..."
-                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all text-sm">
-                        </div>
-                    </div>
-
-                    <div class="advanced-field" style="display: none;">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Descripción del Producto (Opcional)</label>
-                        <textarea id="product-description" rows="2" placeholder="Detalles extra, ingredientes, procedencia..."
-                            class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all text-sm resize-none"></textarea>
-                    </div>
-
-            <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between advanced-field" style="display: none;">
-                <div>
-                    <label class="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        <i class="fas fa-star text-amber-400"></i> Producto Destacado
-                    </label>
-                    <p class="text-[10px] text-slate-500 mt-1">Se mostrará con prioridad y diseño especial en la
-                        app móvil.</p>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="product-featured" class="sr-only peer">
-                    <div
-                        class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-400">
-                    </div>
-                </label>
-            </div>
-
-            <div class="recipe-field" style="display: none;">
-                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
-                    <h4 class="font-bold text-amber-800 text-sm mb-1"><i class="fas fa-blender mr-1"></i> Escandallo / Receta</h4>
-                    <p class="text-[10px] text-amber-700">Selecciona los ingredientes que conforman este producto. Al venderlo, se descontarán del inventario de materia prima.</p>
-                </div>
-                
-                <div class="flex gap-2 mt-3 mb-3">
-                    <select id="recipe-ing-select" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                        <option value="">Seleccione Ingrediente...</option>
-                    </select>
-                    <input type="number" step="0.01" id="recipe-ing-qty" placeholder="Cant." class="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center">
-                    <button type="button" onclick="addRecipeRow()" class="bg-brand-500 text-white px-3 py-2 rounded-lg font-bold hover:bg-brand-600"><i class="fas fa-plus"></i></button>
-                </div>
-
-                <div class="border border-slate-200 rounded-lg overflow-hidden">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
-                            <tr>
-                                <th class="py-2 px-3">Ingrediente</th>
-                                <th class="py-2 px-3 w-20 text-center">Cant.</th>
-                                <th class="py-2 px-3 w-12 text-center"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="recipe-tbody" class="divide-y divide-slate-100">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                    <div id="recipe-empty-state" class="text-center py-6 text-slate-400 text-xs font-medium">
-                        No hay ingredientes añadidos.
-                    </div>
-                </div>
-            </div>
-            </form>
-
-            <!-- Product Change History -->
-            <div id="product-changes-section" class="hidden mt-6 border-t border-slate-100 pt-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 class="font-bold text-sm text-slate-700"><i class="fas fa-history text-blue-500 mr-1"></i> Últimos Cambios</h4>
-                    <button type="button" onclick="showFullProductHistory()" class="text-xs text-brand-600 hover:text-brand-800 font-semibold">
-                        Ver historial completo <i class="fas fa-arrow-right ml-1"></i>
-                    </button>
-                </div>
-                <div id="product-changes-list" class="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-        </div>
-
-        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
-            <button
-                class="close-product-modal py-2.5 px-5 rounded-xl border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-slate-50 hover:text-slate-800 transition-colors">Cancelar</button>
-            <button form="product-form" type="submit"
-                class="py-2.5 px-6 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/30 transition-all">Guardar
-                Producto</button>
-        </div>
-    </div>
-    </div>
-    <!-- Full Product History Modal -->
-    <div id="product-history-modal"
-        class="fixed inset-0 bg-slate-900/60 z-[1060] items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col pointer-events-auto">
-            <div
-                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-                <h3 class="font-bold text-xl text-slate-800" id="product-history-modal-title">Historial de Cambios</h3>
-                <button
-                    class="close-product-history-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="product-history-full-list" class="p-6 flex-1 overflow-y-auto custom-scrollbar">
-                <!-- Populated by JS -->
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end gap-3 shrink-0">
-                <button
-                    class="close-product-history-modal py-2.5 px-5 rounded-xl border border-slate-300 bg-white text-slate-600 font-semibold hover:bg-slate-50 hover:text-slate-800 transition-colors">Cerrar</button>
-            </div>
-        </div>
-    </div>
-    <!-- Client Modal -->
-    <div id="client-modal"
-        class="fixed inset-0 bg-slate-900/60 z-[1050] items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden relative pointer-events-auto"
-            id="client-modal-content">
-
-
-            <div
-                class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-                <h3 class="font-bold text-xl text-slate-800" id="modal-client-title">Añadir Cliente</h3>
-                <button
-                    class="close-client-modal w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="p-6">
-                <form id="client-form" class="space-y-4">
-                    <input type="hidden" id="client-id">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Tipo de Contacto</label>
-                        <select id="client-type"
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium focus:border-brand-500 transition-colors">
-                            <option value="cliente">👤 Cliente</option>
-                            <option value="proveedor">🚚 Proveedor</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Cédula / RIF *</label>
-                        <input type="text" id="client-document" placeholder="V-12345678" required
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo *</label>
-                        <input type="text" id="client-name" required
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Teléfono o Email</label>
-                        <input type="text" id="client-phone"
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    </div>
-                </form>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
-                <button form="client-form" type="submit"
-                    class="w-full py-2.5 px-6 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-md shadow-brand-500/30">Guardar</button>
-            </div>
-
-        </div>
-    </div>
-    </div>
-
-    <!-- === MODAL MOVIMIENTO/MERMA === -->
-    <div id="movement-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh] overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-                <h3 class="font-bold text-xl text-slate-800">Registrar Movimiento</h3>
-                <button onclick="closeMovementModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-6">
-                <form id="movement-form" class="space-y-4" onsubmit="saveMovement(event)">
-                    <input type="hidden" id="movement-product-id">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Producto *</label>
-                        <select id="movement-product-select" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium focus:border-orange-500" required>
-                            <option value="">Seleccionar producto...</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Tipo de Movimiento *</label>
-                        <select id="movement-type" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium focus:border-orange-500" required>
-                            <option value="entry">Entrada (ajuste +)</option>
-                            <option value="exit">Salida (ajuste -)</option>
-                            <option value="waste">Merma / Pérdida</option>
-                            <option value="expiry">Vencimiento</option>
-                            <option value="adjustment">Ajuste de Inventario</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Cantidad *</label>
-                        <input type="number" id="movement-qty" step="0.01" min="0" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium focus:border-orange-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">Motivo / Razón</label>
-                        <textarea id="movement-reason" rows="2" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium focus:border-orange-500" placeholder="Ej: Producto dañado, vencido, error de inventario..."></textarea>
-                    </div>
-                    <button type="submit" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg transition-all">
-                        <i class="fas fa-save mr-2"></i> Registrar Movimiento
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- === MODAL TRANSFERENCIA DE STOCK === -->
-
-
-    <!-- === THERMAL PRINT TICKET TEMPLATE 80mm === -->
-    <div id="print-ticket-container" class="print-ticket bg-white text-black font-mono">
-        <div class="text-center" style="padding:0;margin:0;">
-            <h1 id="branding-ticket-name" class="font-black uppercase" style="margin:0;padding:0;line-height:1;">...</h1>
-            <p id="branding-ticket-rif" class="font-bold text-xs" style="margin:0;padding:0;"></p>
-            <p class="font-bold" id="print-ticket-num-header" style="margin:0;padding:0;font-size:0.9em;"></p>
-        </div>
-        <div
-            style="font-size:0.85em;font-weight:700;margin:0;padding:0;border-top:1px dashed black;border-bottom:1px dashed black;">
-            <span id="print-ticket-client-name"></span> | <span id="print-ticket-client-doc"></span><br>
-            <span id="print-ticket-date" style="font-size:0.8em;"></span><br>
-            <span style="font-size:0.8em;">CAJERO: <span id="print-ticket-cashier"></span></span>
-        </div>
-        <table class="w-full font-black border-collapse" style="table-layout:fixed;font-size:0.9em;">
-            <thead>
-                <tr style="border-bottom:1px solid black;">
-                    <th style="width:50%;text-align:left;padding:0;">PRODUCTO</th>
-                    <th style="width:10%;text-align:center;padding:0;">CT</th>
-                    <th style="width:20%;text-align:right;padding:0;">UNIT</th>
-                    <th style="width:20%;text-align:right;padding:0;">TOTAL</th>
-                </tr>
-            </thead>
-            <tbody id="print-ticket-items"></tbody>
-        </table>
-        <table class="w-full font-black" style="table-layout:fixed;font-size:1em;border-top:1px solid black;" id="print-ticket-totals-table">
-            <tr>
-                <td style="width:40%;text-align:left;padding:0;">TOTAL Bs:</td>
-                <td style="width:60%;text-align:right;padding:0;font-size:11px;">Bs <span
-                        id="print-ticket-total-ves"></span></td>
-            </tr>
-            <tr>
-                <td style="width:40%;text-align:left;padding:0;">REF USD:</td>
-                <td style="width:60%;text-align:right;padding:0;">$ <span id="print-ticket-total-usd"></span></td>
-            </tr>
-        </table>
-        <div id="print-ticket-payments" class="hidden" style="font-size:0.85em;margin:0;padding:0;"></div>
-        <div id="print-ticket-observations-container" class="hidden"
-            style="font-size:0.75em;font-weight:700;border-top:1px dashed black;margin:0;padding:0;">
-            <span>NOTAS: <span id="print-ticket-observations" style="font-weight:400;"></span></span>
-        </div>
-        <div class="text-center"
-            style="font-size:0.75em;font-weight:700;border-top:1px dashed black;padding:0;margin:0;line-height:1.1;position:relative;">
-            <span id="branding-ticket-footer">¡Gracias por preferirnos!</span>
-            <div style="font-size: 7px; text-transform: uppercase; color: #94a3b8; margin-top: 4px; font-weight: 900; letter-spacing: 0.5px;">Powered by Punto Pila</div>
-        </div>
-    </div>
-
-    <!-- Secret Admin Modal -->
-    <div id="secret-admin-modal"
-        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden relative max-h-[90vh]">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i class="fas fa-user-secret text-brand-600"></i> Admin Oculto</h3>
-                <button onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"><i class="fas fa-times"></i></button>
-            </div>
-            <!-- Buscador -->
-            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
-                <div class="relative">
-                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <input type="text" id="admin-search-input" placeholder="Buscar función..." oninput="window.renderAdminFeatures()" class="w-full pl-9 pr-4 py-2.5 bg-slate-100 border-2 border-transparent rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all">
-                </div>
-            </div>
-            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
-                <div class="flex items-center gap-3">
-                    <i class="fas fa-table text-slate-400 text-sm w-4 text-center"></i>
-                    <input type="text" id="settings-google-sheet-id" placeholder="Google Sheet ID (membresía)" class="flex-1 px-3 py-2 bg-slate-100 border-2 border-transparent rounded-lg text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 outline-none transition-all" title="ID del Google Sheet con códigos de membresía. Columnas: codigo, cliente, vencimiento. El sheet debe ser público.">
-                    <button onclick="window.testGoogleSheet()" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-flask mr-1"></i>Probar</button>
-                </div>
-            </div>
-            <!-- License Management -->
-            <div class="px-6 py-3 border-b border-slate-100 bg-white shrink-0">
-                <button onclick="const c=document.getElementById('license-admin-container');const i=this.querySelector('i');if(c.classList.contains('hidden')){c.classList.remove('hidden');i.className='fas fa-chevron-up mr-1';window.LicenseManager.renderLicenseAdmin(c)}else{c.classList.add('hidden');i.className='fas fa-chevron-down mr-1'}" class="w-full flex items-center justify-between px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all">
-                    <span><i class="fas fa-shield-alt mr-2 text-brand-500"></i>Gestión de Licencias</span>
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-                <div id="license-admin-container" class="hidden mt-3"></div>
-            </div>
-            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar" id="admin-features-list">
-                <!-- Generado por JS -->
-                <div class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-                <div class="flex gap-2">
-                    <button onclick="window.adminToggleAll(true)" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-check-double mr-1"></i> Todo ON</button>
-                    <button onclick="window.adminToggleAll(false)" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all"><i class="fas fa-xmark mr-1"></i> Todo OFF</button>
-                </div>
-                <button onclick="document.getElementById('secret-admin-modal').classList.add('hidden'); document.getElementById('secret-admin-modal').classList.remove('flex')" class="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- PIN Modal -->
-    <div id="pin-modal"
-        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[999] items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xs flex flex-col overflow-hidden relative">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h3 class="font-black text-lg text-slate-800 flex items-center gap-2"><i
-                        class="fas fa-lock text-brand-600"></i> Acceso Restringido</h3>
-                <button
-                    onclick="document.getElementById('pin-modal').classList.add('hidden'); document.getElementById('pin-modal').classList.remove('flex')"
-                    class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-slate-500 mb-4 text-center font-medium">Ingresa el PIN de Administrador</p>
-                <input type="password" id="admin-pin-input" placeholder="****"
-                    class="w-full text-center tracking-[0.5em] font-bold text-2xl px-4 py-3 bg-slate-100 border-2 border-transparent rounded-xl focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all"
-                    maxlength="4" onkeypress="if(event.key === 'Enter') verifyAdminPin()">
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-stretch">
-                <button onclick="verifyAdminPin()"
-                    class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow transition-colors">Desbloquear</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Hidden PDF Report Template (For WhatsApp Professional) -->
-    <div style="display: none;">
-        <div id="whatsapp-pdf-template" style="width: 700px; padding: 30px; font-family: 'Inter', sans-serif; color: #1e293b; background: white; box-sizing: border-box;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #1d4ed8; padding-bottom: 20px; margin-bottom: 30px;">
-                <div>
-                    <h1 id="branding-pdf-header-name" style="margin: 0; color: #1d4ed8; font-size: 32px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase;">...</h1>
-                    <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px; font-weight: 600;">Reporte Automatizado de Ventas</p>
-                </div>
-                <div style="text-align: right;">
-                    <div id="pdf-report-date" style="font-weight: 800; color: #1e293b; font-size: 16px;"></div>
-                    <div id="pdf-report-range" style="color: #64748b; font-size: 12px; margin-top: 5px; font-weight: 700;"></div>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px;">
-                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                    <p style="margin: 0 0 8px 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Ingreso Total USD</p>
-                    <p id="pdf-total-usd" style="margin: 0; font-size: 24px; font-weight: 900; color: #0f172a;"></p>
-                </div>
-                <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                    <p style="margin: 0 0 8px 0; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Ingreso Total VES</p>
-                    <p id="pdf-total-ves" style="margin: 0; font-size: 24px; font-weight: 900; color: #0f172a;"></p>
-                </div>
-            </div>
-
-            <h3 style="font-size: 14px; font-weight: 800; color: #1e293b; text-transform: uppercase; margin-bottom: 15px; border-left: 4px solid #1d4ed8; padding-left: 10px;">Detalle de las Ultimas Ventas</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-                <thead>
-                    <tr style="background: #1e293b; color: white;">
-                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; border-radius: 8px 0 0 0; width: 15%;">TICKET</th>
-                        <th style="padding: 12px; text-align: left; font-size: 11px; font-weight: 700; width: 45%;">CLIENTE</th>
-                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; width: 20%;">TOTAL USD</th>
-                        <th style="padding: 12px; text-align: right; font-size: 11px; font-weight: 700; border-radius: 0 8px 0 0; width: 20%;">TOTAL VES</th>
-                    </tr>
-                </thead>
-                <tbody id="pdf-sales-table-body">
-                    <!-- Filas dinámicas -->
-                </tbody>
-            </table>
-
-            <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
-                <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 500;">Este documento fue generado automáticamente por el sistema de administración.</p>
-                <div style="margin-top: 5px; font-size: 9px; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">Powered by <span style="color: #1d4ed8;">Punto Pila</span></div>
-                <p id="branding-pdf-footer-line" style="margin: 5px 0 0 0; font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase;"></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- === MODAL PEDIDOS MÓVILES === -->
-    <div id="mobile-orders-modal"
-        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh] overflow-hidden"
-            id="mobile-orders-modal-content">
-            <!-- Header -->
-            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-                <div class="flex items-center gap-4">
-                    <div
-                        class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-xl shadow-inner">
-                        <i class="fas fa-bell"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-black text-2xl text-slate-800 tracking-tight">Pedidos Entrantes</h3>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Desde la APP Móvil</p>
-                    </div>
-                </div>
-                <button id="close-mobile-orders-modal"
-                    class="w-10 h-10 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-500 flex items-center justify-center transition-all active:scale-90">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <!-- List of Orders -->
-            <div class="flex-1 overflow-y-auto p-8 bg-slate-50/30 custom-scrollbar space-y-4" id="mobile-orders-list">
-                <!-- JS renders cards here -->
-                <div class="text-center py-20">
-                    <div
-                        class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                        <i class="fas fa-inbox text-3xl"></i>
-                    </div>
-                    <p class="text-slate-400 font-bold">No hay pedidos pendientes por el momento.</p>
-                </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="px-8 py-6 border-t border-slate-100 bg-white text-center shrink-0">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Punto Pila POS Server Edition v1.1</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- QRCode Library -->
-    <script src="vendor/qrcode.min.js"></script>
-    <!-- SweetAlert2 -->
-    <script src="vendor/sweetalert2.js"></script>
-
-    <!-- Ingredients Modal -->
-    <div id="ingredients-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
-            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white rounded-t-2xl shrink-0">
-                <h3 class="font-bold text-xl text-slate-800"><i class="fas fa-carrot text-emerald-500 mr-2"></i> Materia Prima / Ingredientes</h3>
-                <button onclick="document.getElementById('ingredients-modal').classList.add('hidden'); document.getElementById('ingredients-modal').classList.remove('flex')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-6 flex-1 overflow-hidden flex flex-col md:flex-row gap-6">
-                <!-- List -->
-                <div class="flex-1 flex flex-col overflow-hidden">
-                    <div class="flex justify-between items-center mb-4 shrink-0">
-                        <input type="text" id="search-ingredient" onkeyup="renderIngredients()" placeholder="Buscar ingrediente..." class="bg-slate-100 border-none rounded-lg py-2 px-4 text-sm w-64 focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                    <div class="border border-slate-200 rounded-xl overflow-hidden flex-1 flex flex-col">
-                        <div class="overflow-y-auto flex-1 custom-scrollbar">
-                            <table class="w-full text-left relative">
-                                <thead class="bg-slate-50 text-xs text-slate-500 uppercase sticky top-0 shadow-sm z-10">
-                                    <tr>
-                                        <th class="py-3 px-4">Ingrediente</th>
-                                        <th class="py-3 px-4">Unidad</th>
-                                        <th class="py-3 px-4">Costo ($)</th>
-                                        <th class="py-3 px-4">Stock</th>
-                                        <th class="py-3 px-4 text-center">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ingredients-tbody" class="text-sm divide-y divide-slate-100">
-                                    <!-- JS Populated -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                <!-- Form -->
-                <div class="w-full md:w-72 bg-slate-50 p-5 rounded-xl border border-slate-200 shrink-0 overflow-y-auto custom-scrollbar">
-                    <h4 class="font-bold text-slate-700 mb-4" id="ingredient-form-title">Nuevo Ingrediente</h4>
-                    <form id="ingredient-form" onsubmit="saveIngredient(event)">
-                        <input type="hidden" id="ing-id">
-                        <div class="space-y-3">
-                            <div>
-                                <label class="text-xs font-semibold text-slate-500">Nombre</label>
-                                <input type="text" id="ing-name" required class="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm mt-1 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-                            </div>
-                            <div>
-                                <label class="text-xs font-semibold text-slate-500">Unidad de Medida</label>
-                                <select id="ing-unit" class="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm mt-1 focus:ring-2 focus:ring-emerald-500 outline-none">
-                                    <option value="Und">Unidades (Und)</option>
-                                    <option value="Kg">Kilogramos (Kg)</option>
-                                    <option value="L">Litros (L)</option>
-                                    <option value="g">Gramos (g)</option>
-                                    <option value="Porcion">Porción</option>
-                                </select>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="text-xs font-semibold text-slate-500">Stock Actual</label>
-                                    <input type="number" step="0.01" id="ing-stock" required class="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm mt-1">
-                                </div>
-                                <div>
-                                    <label class="text-xs font-semibold text-slate-500">Stock Min.</label>
-                                    <input type="number" step="0.01" id="ing-minStock" class="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm mt-1">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="text-xs font-semibold text-slate-500">Costo ($)</label>
-                                <input type="number" step="0.01" id="ing-cost" required class="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm mt-1 font-bold text-emerald-700">
-                            </div>
-                            <button type="submit" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
-                                Guardar
-                            </button>
-                            <button type="button" onclick="resetIngredientForm()" class="w-full mt-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm transition-colors hidden" id="ing-cancel-btn">
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- === CIERRE DE CAJA — INTERFAZ COMPLETA === -->
+        <!-- CIERRE DE CAJA — INTERFAZ COMPLETA === -->
     <div id="cierre-modal"
         class="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[999] items-center justify-center p-4 hidden transition-all duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col max-h-[92vh] overflow-hidden transform scale-95 transition-all duration-300" id="cierre-modal-content">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col h-[94vh] overflow-hidden transform transition-all duration-300 border border-slate-200" id="cierre-modal-content">
 
             <!-- Header -->
             <div class="bg-gradient-to-br from-brand-600 to-brand-700 px-6 pt-5 pb-5 shrink-0 relative overflow-hidden">
@@ -4754,7 +4092,7 @@
                         <span class="text-[10px] font-bold text-slate-400" id="cierre-date-display"></span>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                         <!-- USD -->
                         <div class="bg-white rounded-2xl border border-slate-200 p-3 text-center">
                             <div class="w-8 h-8 mx-auto bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-sm mb-1.5">
@@ -4805,6 +4143,17 @@
                         </div>
                     </div>
 
+                    <!-- Por Cobrar / Fiados del Día -->
+                    <div class="mt-2 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center text-xs shrink-0">
+                                <i class="fas fa-hand-holding-dollar"></i>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Fiados / Por Cobrar hoy:</span>
+                        </div>
+                        <p class="text-base font-black text-rose-600" id="cierre-credit-amount">$0.00</p>
+                    </div>
+
                     <!-- Total row -->
                     <div class="mt-2 flex items-center justify-between bg-slate-800 rounded-2xl px-4 py-3">
                         <div class="flex items-center gap-2.5">
@@ -4836,8 +4185,6 @@
                                 </div>
                                 <span class="text-xs font-bold text-slate-500">USD Apertura</span>
                             </div>
-                            <span class="text-base font-black text-slate-700" id="cierre-opening-usd">$0.00</span>
-                        </div>
                         <div class="bg-white rounded-2xl border border-slate-200 p-3.5 flex items-center justify-between">
                             <div class="flex items-center gap-2.5">
                                 <div class="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
@@ -4852,62 +4199,40 @@
 
                 <hr class="mx-6 border-slate-200/60">
 
-                <!-- 💰 CONTEO FÍSICO POR BILLETES -->
+                <!-- 💰 CONTEO FÍSICO POR BILLETES — DINÁMICO -->
                 <div class="px-6 py-3">
-                    <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center justify-between mb-2">
                         <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Conteo Físico por Billetes</h4>
-                        <span class="text-[10px] text-slate-400 font-medium">Ingrese cantidad de billetes</span>
+                        <span class="text-[10px] text-slate-400 font-medium">Agrega cada billete manualmente</span>
                     </div>
+                    <p class="text-[10px] text-slate-400 mb-3">Ingresa la denominación (valor del billete) y la cantidad. Funciona con cualquier billete venezolano o extranjero.</p>
 
                     <!-- USD Denomination -->
-                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-3">
-                        <div class="bg-emerald-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between cursor-pointer" onclick="toggleCollapse('usd-bills')">
+                    <div class="bg-white rounded-2xl border border-emerald-200 overflow-hidden mb-3">
+                        <div class="bg-emerald-50 px-4 py-2.5 border-b border-emerald-100 flex items-center justify-between cursor-pointer" onclick="toggleCollapse('usd-bills')">
                             <div class="flex items-center gap-2">
                                 <div class="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-xs">
                                     <i class="fas fa-dollar-sign"></i>
                                 </div>
-                                <span class="text-xs font-black text-emerald-700 uppercase">Efectivo USD</span>
+                                <span class="text-xs font-black text-emerald-700 uppercase">💵 Billetes USD</span>
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-[10px] font-bold text-emerald-600" id="cierre-usd-total-counted">$0.00</span>
+                                <span class="text-xs font-black text-emerald-600" id="cierre-usd-total-counted">$0.00</span>
                                 <i class="fas fa-chevron-down text-emerald-400 text-xs transition-transform" id="usd-bills-chevron"></i>
                             </div>
                         </div>
-                        <div id="usd-bills" class="divide-y divide-slate-100">
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$100</span> ×</span>
-                                <input type="number" id="denom-usd-100" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-100-total">$0</span>
+                        <div id="usd-bills">
+                            <div class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-4 py-1.5 bg-slate-50/60">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase">Denominación</span>
+                                <span class="text-[9px] font-bold text-slate-400 uppercase text-center">Cantidad</span>
+                                <span class="text-[9px] font-bold text-slate-400 uppercase text-right">Subtotal</span>
+                                <span class="w-7"></span>
                             </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$50</span> ×</span>
-                                <input type="number" id="denom-usd-50" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-50-total">$0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$20</span> ×</span>
-                                <input type="number" id="denom-usd-20" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-20-total">$0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$10</span> ×</span>
-                                <input type="number" id="denom-usd-10" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-10-total">$0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$5</span> ×</span>
-                                <input type="number" id="denom-usd-5" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-5-total">$0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-emerald-600">$1</span> ×</span>
-                                <input type="number" id="denom-usd-1" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-1-total">$0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center bg-slate-50/50">
-                                <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-coins text-amber-500"></i> Monedas</span>
-                                <input type="number" id="denom-usd-coins" min="0" step="0.01" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-emerald-500 transition-all text-center" placeholder="0.00">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-usd-coins-total">$0</span>
+                            <div id="denom-usd-rows" class="divide-y divide-emerald-50"></div>
+                            <div class="px-4 py-2.5">
+                                <button type="button" onclick="addDenomRow('usd')" class="w-full py-2 text-xs font-black text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all flex items-center justify-center gap-2 border-2 border-dashed border-emerald-200">
+                                    <i class="fas fa-plus-circle"></i> Agregar billete USD
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -4926,49 +4251,23 @@
                                 <i class="fas fa-chevron-down text-blue-400 text-xs transition-transform" id="ves-bills-chevron"></i>
                             </div>
                         </div>
-                        <div id="ves-bills" class="divide-y divide-slate-100">
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 100</span> ×</span>
-                                <input type="number" id="denom-ves-100" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-100-total">Bs 0</span>
+                        <div id="ves-bills">
+                            <div class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-4 py-1.5 bg-slate-50/60">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase">Denominación</span>
+                                <span class="text-[9px] font-bold text-slate-400 uppercase text-center">Cantidad</span>
+                                <span class="text-[9px] font-bold text-slate-400 uppercase text-right">Subtotal</span>
+                                <span class="w-7"></span>
                             </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 50</span> ×</span>
-                                <input type="number" id="denom-ves-50" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-50-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 20</span> ×</span>
-                                <input type="number" id="denom-ves-20" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-20-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 10</span> ×</span>
-                                <input type="number" id="denom-ves-10" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-10-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 5</span> ×</span>
-                                <input type="number" id="denom-ves-5" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-5-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 2</span> ×</span>
-                                <input type="number" id="denom-ves-2" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-2-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center">
-                                <span class="text-xs font-bold text-slate-500"><span class="text-blue-600">Bs 1</span> ×</span>
-                                <input type="number" id="denom-ves-1" min="0" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-1-total">Bs 0</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-3 px-4 py-2.5 items-center bg-slate-50/50">
-                                <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-coins text-amber-500"></i> Monedas</span>
-                                <input type="number" id="denom-ves-coins" min="0" step="0.01" value="0" oninput="calcularCuadre()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:border-blue-500 transition-all text-center" placeholder="0.00">
-                                <span class="text-xs font-bold text-slate-600 text-right" id="denom-ves-coins-total">Bs 0</span>
+                            <div id="denom-ves-rows" class="divide-y divide-blue-50"></div>
+                            <div class="px-4 py-2.5">
+                                <button type="button" onclick="addDenomRow('ves')" class="w-full py-2 text-xs font-black text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-xl transition-all flex items-center justify-center gap-2 border-2 border-dashed border-blue-200">
+                                    <i class="fas fa-plus-circle"></i> Agregar billete Bs
+                                </button>
                             </div>
                         </div>
                     </div>
+
+
 
                     <!-- Cuadre Pago Móvil y Punto -->
                     <div class="grid grid-cols-2 gap-3">
@@ -5040,10 +4339,6 @@
                         <i class="fas fa-clock-rotate"></i> Historial de Arqueos
                     </button>
 
-                    <button onclick="printCierreZ()" class="w-full py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 font-bold text-sm transition-all border-2 border-slate-200 flex items-center justify-center gap-2.5 mb-2">
-                        <i class="fas fa-print"></i> Imprimir Corte Z
-                    </button>
-
                     <button onclick="confirmFinalCierre()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 active:scale-[0.98] text-white font-black text-sm transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-brand-600/30">
                         <i class="fas fa-paper-plane"></i> Finalizar y Enviar al Jefe
                     </button>
@@ -5052,6 +4347,8 @@
             </div>
         </div>
     </div>
+
+    <!-- 
 
     <!-- Historial de Arqueos Modal -->
     <div id="historial-arqueos-modal"
@@ -5318,7 +4615,7 @@
         };
     </script>
     <script src="src/modules/license-manager.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=1785964959815"></script>
     <script>
         // ============================================================
         // SIDEBAR COLLAPSE TOGGLE
