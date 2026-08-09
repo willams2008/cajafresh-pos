@@ -1,0 +1,18 @@
+{
+  "antigravity.alwaysRun": true,
+  "antigravity.alwaysRun.enabled": true,
+  "antigravity.autoApprove": true,
+  "antigravity.alwaysApproveCommands": true,
+  "antigravity.autoRunCommands": true,
+  "antigravity.autoExecute": true,
+  "antigravity-plus.autoApprove.enabled": true,
+  "antigravity-plus.autoApprove.denyList": [],
+  "antigravity-plus.autoApprove.allowList": [
+    "*"
+  ],
+  "antigravity-plus.quotaMonitor.enabled": true,
+  "antigravity-plus.quotaMonitor.pollInterval": 30000,
+  "antigravity-plus.quotaMonitor.displayStyle": "iconNamePercentage",
+  "antigravity-plus.autoWakeup.enabled": false,
+  "antigravity-plus.ui.language": "es"
+}

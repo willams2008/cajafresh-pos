@@ -31,6 +31,30 @@ if (typeof window.Swal === 'undefined') {
     }
 }
 
+
+// Apply role restrictions to rate inputs
+function applyRoleRestrictions() {
+    const isAdmin = (typeof currentRole === 'undefined' || currentRole === 'admin');
+    const rateInputs = ['exchange-rate-input', 'euro-rate-input', 'binance-rate-input'];
+    const syncBtn = document.getElementById('sync-rate-btn');
+    rateInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.readOnly = !isAdmin;
+            el.style.opacity = isAdmin ? '1' : '0.5';
+            el.style.cursor = isAdmin ? '' : 'not-allowed';
+            if (!isAdmin) {
+                el.title = 'Solo el administrador puede cambiar las tasas';
+            }
+        }
+    });
+    if (syncBtn) {
+        syncBtn.disabled = !isAdmin;
+        syncBtn.style.opacity = isAdmin ? '1' : '0.5';
+    }
+}
+window.applyRoleRestrictions = applyRoleRestrictions;
+
 // State variables
 window.onerror = function (msg, url, lineNo, columnNo, error) {
     if (typeof Swal !== 'undefined') {
@@ -2539,6 +2563,11 @@ function initNavigation() {
     const cashupNav = document.getElementById('nav-cashup');
     if (cashupNav) {
         cashupNav.addEventListener('click', (e) => {
+        // ROLE GUARD: Block rate change for cajero
+        if (typeof currentRole !== 'undefined' && currentRole === 'cajero') {
+            Swal.fire('Acceso Denegado', 'Solo el administrador puede modificar las tasas de cambio. Contacta a tu supervisor.', 'warning');
+            return;
+        }
             e.preventDefault();
             document.querySelectorAll('.nav-item').forEach(el => {
                 el.classList.remove('bg-emerald-50', 'bg-rose-50', 'bg-amber-50', 'text-emerald-600', 'text-rose-600', 'text-amber-600', 'text-brand-600', 'bg-brand-50');
@@ -3172,7 +3201,8 @@ function initInventory() {
         if (el) el.addEventListener('input', window.updatePricePreviews);
     });
 
-    document.getElementById('product-form').addEventListener('submit', (e) => {
+    const _productForm = document.getElementById('product-form');
+    if (_productForm) _productForm.addEventListener('submit', (e) => {
         e.preventDefault();
         if (currentRole !== 'admin') {
             Swal.fire('Acceso Denegado', 'No tienes permiso para realizar esta acción.', 'error');
@@ -3418,7 +3448,7 @@ window.editProduct = (id) => {
 
     const p = products.find(i => i.id === id);
     if (!p) return;
-    document.getElementById('product-id').value = p.id;
+    _s('product-id', p.id); const _s = (id, val) => { const el = document.getElementById(id); if(el) el.value = val ?? ''; };
     document.getElementById('product-name').value = p.name;
     document.getElementById('product-category').value = p.category;
     document.getElementById('product-price-ves').value = p.priceVES;
@@ -3814,7 +3844,8 @@ function initClients() {
         });
     });
 
-    document.getElementById('client-form').addEventListener('submit', (e) => {
+    const _clientForm = document.getElementById('client-form');
+    if (_clientForm) _clientForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const id = document.getElementById('client-id').value;
         const doc = document.getElementById('client-document').value;
