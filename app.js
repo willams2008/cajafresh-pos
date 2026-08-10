@@ -13120,3 +13120,104 @@ window.removeMixedPayment = function(idx) {
     renderMixedPaymentsList();
     validatePayment();
 };
+
+
+// ==========================================
+// ARQUEO DE CAJA (Conteo sin cerrar turno)
+// ==========================================
+window.openArqueo = function() {
+    const modal = document.getElementById('arqueo-modal');
+    if (!modal) { Swal.fire('No disponible', 'Módulo de arqueo no disponible.', 'info'); return; }
+
+    const todayStr = new Date().toDateString();
+    const todaySales = (typeof sales !== 'undefined' ? sales : []).filter(s =>
+        new Date(s.date || s.timestamp).toDateString() === todayStr && s.status !== 'pending'
+    );
+    const sysUSD = todaySales.reduce((a, s) => a + (parseFloat(s.totalUSD) || 0), 0);
+    const sysVES = todaySales.reduce((a, s) => a + (parseFloat(s.totalVES) || 0), 0);
+
+    const el = id => document.getElementById(id);
+    if (el('arqueo-sys-usd')) el('arqueo-sys-usd').textContent = '$' + sysUSD.toFixed(2);
+    if (el('arqueo-sys-ves')) el('arqueo-sys-ves').textContent = 'Bs ' + sysVES.toLocaleString('es-VE', {minimumFractionDigits: 2});
+    if (el('arqueo-sys-count')) el('arqueo-sys-count').textContent = todaySales.length;
+    const cashup = typeof currentCashup !== 'undefined' ? currentCashup : null;
+    const opening = cashup ? (parseFloat(cashup.opening_usd) || 0) : 0;
+    if (el('arqueo-sys-opening')) el('arqueo-sys-opening').textContent = '$' + opening.toFixed(2);
+    if (el('arqueo-usd')) el('arqueo-usd').value = '';
+    if (el('arqueo-ves')) el('arqueo-ves').value = '';
+    if (el('arqueo-notes')) el('arqueo-notes').value = '';
+    if (el('arqueo-diff-box')) el('arqueo-diff-box').classList.add('hidden');
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+window.closeArqueo = function() {
+    const modal = document.getElementById('arqueo-modal');
+    if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+};
+
+window.calcArqueoDiff = function() {
+    const todayStr = new Date().toDateString();
+    const todaySales = (typeof sales !== 'undefined' ? sales : []).filter(s =>
+        new Date(s.date || s.timestamp).toDateString() === todayStr && s.status !== 'pending'
+    );
+    const sysUSD = todaySales.reduce((a, s) => a + (parseFloat(s.totalUSD) || 0), 0);
+    const er = (settings && settings.exchangeRate > 0) ? settings.exchangeRate : 1;
+    const countedUSD = parseFloat(document.getElementById('arqueo-usd') && document.getElementById('arqueo-usd').value) || 0;
+    const countedVES = parseFloat(document.getElementById('arqueo-ves') && document.getElementById('arqueo-ves').value) || 0;
+    const countedTotalUSD = countedUSD + (countedVES / er);
+    const diffUSD = countedTotalUSD - sysUSD;
+
+    const box = document.getElementById('arqueo-diff-box');
+    const val = document.getElementById('arqueo-diff-val');
+    const msg = document.getElementById('arqueo-diff-msg');
+    if (box) box.classList.remove('hidden');
+    if (val) {
+        val.textContent = (diffUSD >= 0 ? '+' : '') + '$' + diffUSD.toFixed(2);
+        val.className = 'text-base font-black ' + (diffUSD >= 0 ? 'text-emerald-600' : 'text-red-600');
+    }
+    if (msg) {
+        if (Math.abs(diffUSD) < 0.05) {
+            msg.textContent = '✅ Caja cuadra perfectamente';
+            msg.className = 'text-xs text-emerald-600 font-bold mt-1';
+        } else if (diffUSD > 0) {
+            msg.textContent = 'Sobrante de $' + diffUSD.toFixed(2) + ' — verificar entradas';
+            msg.className = 'text-xs text-amber-600 font-bold mt-1';
+        } else {
+            msg.textContent = 'Faltante de $' + Math.abs(diffUSD).toFixed(2) + ' — verificar pagos';
+            msg.className = 'text-xs text-red-600 font-bold mt-1';
+        }
+    }
+};
+
+window.saveArqueo = function() {
+    const usdEl = document.getElementById('arqueo-usd');
+    const vesEl = document.getElementById('arqueo-ves');
+    const notesEl = document.getElementById('arqueo-notes');
+    const countedUSD = parseFloat(usdEl ? usdEl.value : 0) || 0;
+    const countedVES = parseFloat(vesEl ? vesEl.value : 0) || 0;
+    const notes = notesEl ? notesEl.value.trim() : '';
+
+    const arqueoRecord = {
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        countedUSD, countedVES, notes, type: 'arqueo'
+    };
+    let arqueos = [];
+    try { arqueos = JSON.parse(localStorage.getItem('freshpos_arqueos') || '[]'); } catch(e) {}
+    arqueos.push(arqueoRecord);
+    localStorage.setItem('freshpos_arqueos', JSON.stringify(arqueos));
+
+    if (window.db && window.db.saveCashup) {
+        window.db.saveCashup(Object.assign({}, arqueoRecord, { status: 'arqueo' })).catch(function(e) { console.warn('Arqueo DB:', e); });
+    }
+    if (typeof logAction === 'function') logAction('ARQUEO', 'Arqueo: $' + countedUSD + ' + Bs' + countedVES, arqueoRecord);
+
+    window.closeArqueo();
+    Swal.fire({
+        icon: 'success', title: '✅ Arqueo Guardado',
+        html: '<div class="text-sm">USD: <b>$' + countedUSD.toFixed(2) + '</b><br>Bs: <b>' + countedVES.toLocaleString('es-VE') + '</b>' + (notes ? '<br><i>' + notes + '</i>' : '') + '</div>',
+        timer: 3000, showConfirmButton: false
+    });
+};

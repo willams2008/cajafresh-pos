@@ -417,6 +417,11 @@
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-hand-holding-dollar text-lg"></i></div>
                         <span class="hidden lg:block font-semibold text-sm truncate">Cierre de Caja</span>
                     </a>
+                    <a href="#" id="nav-arqueo" onclick="window.openArqueo()"
+                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-violet-50 hover:text-violet-600 transition-all cursor-pointer">
+                        <div class="w-8 flex justify-center shrink-0"><i class="fas fa-calculator text-lg"></i></div>
+                        <span class="hidden lg:block font-semibold text-sm truncate">Arqueo de Caja</span>
+                    </a>
                     <a href="#" id="nav-clients"
                         class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-brand-600 transition-all cursor-pointer">
                         <div class="w-8 flex justify-center shrink-0"><i class="fas fa-users text-lg"></i></div>
@@ -3874,6 +3879,143 @@
                         <i class="fas fa-save mr-2"></i> Guardar Contacto
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- ======= MODAL ADMIN SECRETO (tipear 32447974) ======= -->
+    <div id="secret-admin-modal" class="fixed inset-0 z-[999] hidden items-center justify-center" style="background:rgba(0,0,0,0.85);backdrop-filter:blur(8px)">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden border border-slate-200" style="max-height:90vh">
+            <div class="px-6 py-4 bg-gradient-to-r from-indigo-900 to-slate-900 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-500/30 flex items-center justify-center">
+                        <i class="fas fa-crown text-amber-400 text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-white text-sm">Panel de Superadmin</h3>
+                        <p class="text-[10px] text-slate-400">Acceso restringido — Sistema interno</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('secret-admin-modal').classList.remove('flex');document.getElementById('secret-admin-modal').classList.add('hidden')" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Google Sheet ID field -->
+            <div class="px-6 pt-4 pb-0 bg-slate-50 border-b border-slate-200">
+                <label class="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                    <i class="fas fa-table-columns mr-1 text-emerald-500"></i> Google Sheet ID (Licencias)
+                </label>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="settings-google-sheet-id" placeholder="Pega el ID del Google Sheet de licencias"
+                        class="flex-1 px-3 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:border-indigo-500 outline-none">
+                    <button onclick="(async()=>{const id=document.getElementById('settings-google-sheet-id').value.trim();if(!id)return;settings.googleSheetId=id;localStorage.setItem('google_sheet_id',id);if(typeof window.LicenseManager?.renderLicenseAdmin==='function')window.LicenseManager.renderLicenseAdmin(document.getElementById('license-admin-container'));})()"
+                        class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap">
+                        <i class="fas fa-plug mr-1"></i> Probar
+                    </button>
+                </div>
+                <div id="license-admin-container" class="max-h-32 overflow-y-auto text-xs mb-2"></div>
+            </div>
+
+            <!-- Features list -->
+            <div class="overflow-y-auto flex-1 px-6 py-4">
+                <div id="admin-features-list"></div>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- ======= MODAL ARQUEO DE CAJA (Conteo sin cerrar turno) ======= -->
+    <div id="arqueo-modal" class="fixed inset-0 z-50 hidden items-center justify-center" style="background:rgba(15,23,42,0.75);backdrop-filter:blur(6px)">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-slate-100" style="max-height:90vh;overflow-y:auto">
+            <div class="px-6 py-5 bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-calculator text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-white text-base">Arqueo de Caja</h3>
+                        <p class="text-[11px] text-violet-200">Conteo físico — Sin cerrar el turno</p>
+                    </div>
+                </div>
+                <button onclick="closeArqueo()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-all">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <!-- Resumen del sistema -->
+                <div class="bg-violet-50 rounded-2xl p-4 border border-violet-100">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-violet-600 mb-3">📊 Resumen del Sistema (Ventas del turno)</p>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="bg-white rounded-xl p-3 border border-violet-100">
+                            <span class="text-slate-400 font-bold block">Total Ventas USD</span>
+                            <span id="arqueo-sys-usd" class="font-black text-slate-800 text-sm">$0.00</span>
+                        </div>
+                        <div class="bg-white rounded-xl p-3 border border-violet-100">
+                            <span class="text-slate-400 font-bold block">Total Ventas Bs</span>
+                            <span id="arqueo-sys-ves" class="font-black text-slate-800 text-sm">Bs 0,00</span>
+                        </div>
+                        <div class="bg-white rounded-xl p-3 border border-violet-100">
+                            <span class="text-slate-400 font-bold block">Transacciones</span>
+                            <span id="arqueo-sys-count" class="font-black text-slate-800 text-sm">0</span>
+                        </div>
+                        <div class="bg-white rounded-xl p-3 border border-violet-100">
+                            <span class="text-slate-400 font-bold block">Fondo Inicial</span>
+                            <span id="arqueo-sys-opening" class="font-black text-slate-800 text-sm">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conteo físico -->
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-3">💵 Conteo Físico de Dinero</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Efectivo USD contado</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-emerald-600">$</span>
+                                <input type="number" id="arqueo-usd" min="0" step="0.01" value="0" oninput="calcArqueoDiff()"
+                                    class="w-full pl-7 pr-3 py-3 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-violet-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Efectivo Bs contado</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-600">Bs</span>
+                                <input type="number" id="arqueo-ves" min="0" step="1" value="0" oninput="calcArqueoDiff()"
+                                    class="w-full pl-8 pr-3 py-3 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-violet-500 outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diferencia -->
+                <div id="arqueo-diff-box" class="bg-slate-50 rounded-2xl p-4 border border-slate-200 hidden">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">📐 Diferencia</p>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-600">Esperado - Contado</span>
+                        <span id="arqueo-diff-val" class="text-base font-black text-slate-800"></span>
+                    </div>
+                    <p id="arqueo-diff-msg" class="text-xs text-slate-500 mt-1"></p>
+                </div>
+
+                <!-- Notas -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Notas del arqueo</label>
+                    <textarea id="arqueo-notes" rows="2" placeholder="Observaciones opcionales..."
+                        class="w-full px-4 py-3 border-2 border-slate-200 rounded-2xl text-sm text-slate-700 focus:border-violet-500 outline-none resize-none"></textarea>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="closeArqueo()" class="flex-1 py-3 border-2 border-slate-200 text-slate-600 font-bold rounded-2xl text-sm hover:bg-slate-50 transition-all">
+                        Cancelar
+                    </button>
+                    <button onclick="saveArqueo()" class="flex-1 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black rounded-2xl text-sm shadow-lg shadow-violet-500/30 transition-all hover:shadow-xl">
+                        <i class="fas fa-save mr-2"></i> Guardar Arqueo
+                    </button>
+                </div>
             </div>
         </div>
     </div>
