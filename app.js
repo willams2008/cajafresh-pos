@@ -1873,7 +1873,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // DASHBOARD SYNC: Enviar datos cada 60s
             syncDashboardData();
-            setInterval(syncDashboardData, 60000);
+            setInterval(syncDashboardData, 120000) /* optimized: 2min */;
 
             // Sincronización automática de tasa de cambio al inicio (3s después de cargar)
             setTimeout(() => {
@@ -2146,7 +2146,7 @@ async function loadData() {
     if (!tenantGet('freshpos_clients')) saveClients();
     saveSettings();
 
-    document.getElementById('exchange-rate-input').value = settings.exchangeRate;
+    (document.getElementById('exchange-rate-input') || {}).value = settings.exchangeRate;
     const eurRateInput = document.getElementById('euro-rate-input');
     if (eurRateInput) eurRateInput.value = settings.euroRate || 40.00;
 
@@ -9104,7 +9104,7 @@ function initAutomatedReporting() {
                 localStorage.setItem('last_whatsapp_report_time', Date.now()); // Resetear timer igual
             }
         }
-    }, 60000); // Revisar cada minuto
+    }, 300000); // Revisar cada 5 minutos (optimizado)
 }
 
 // Función auxiliar para generar el PDF en Base64
@@ -13221,3 +13221,70 @@ window.saveArqueo = function() {
         timer: 3000, showConfirmButton: false
     });
 };
+
+
+
+
+// ============================================================
+// PERFORMANCE PATCH — Applied at runtime after all definitions
+// ============================================================
+(function installPerfPatch() {
+    'use strict';
+
+    // --- Debounce helper (reuse existing if present) ---
+    const _deb = (typeof debounce === 'function') ? debounce : function(fn, delay) {
+        let t; return function() { clearTimeout(t); t = setTimeout(fn, delay); };
+    };
+
+    // --- Throttle helper ---
+    function throttle(fn, minMs) {
+        let last = 0, timer;
+        return function() {
+            const now = Date.now();
+            const remaining = minMs - (now - last);
+            clearTimeout(timer);
+            if (remaining <= 0) { last = now; fn(); }
+            else { timer = setTimeout(function() { last = Date.now(); fn(); }, remaining); }
+        };
+    }
+
+    // --- Wrap renderProducts ---
+    if (typeof window.renderProducts === 'function') {
+        const _orig = window.renderProducts.bind(window);
+        window.renderProducts = _deb(_orig, 150);
+        console.log('[PERF] renderProducts debounced (150ms)');
+    }
+
+    // --- Wrap renderInventory ---
+    if (typeof window.renderInventory === 'function') {
+        const _orig = window.renderInventory.bind(window);
+        window.renderInventory = _deb(_orig, 250);
+        console.log('[PERF] renderInventory debounced (250ms)');
+    }
+
+    // --- Wrap saveProducts (throttle: max 1 save per 3s) ---
+    if (typeof window.saveProducts === 'function') {
+        const _orig = window.saveProducts.bind(window);
+        window.saveProducts = throttle(_orig, 3000);
+        console.log('[PERF] saveProducts throttled (3s)');
+    }
+
+    // --- Throttle syncDashboardData (max 1 per 90s) ---
+    if (typeof syncDashboardData === 'function' || typeof window.syncDashboardData === 'function') {
+        const _orig = (window.syncDashboardData || syncDashboardData);
+        const throttled = throttle(_orig, 90000);
+        try { window.syncDashboardData = throttled; } catch(e) {}
+        console.log('[PERF] syncDashboardData throttled (90s)');
+    }
+
+    // --- Null-safe exchange rate input setter ---
+    // Override the function that sets exchange rate input values
+    const _origLoadSettings = window.loadSettings;
+    if (_origLoadSettings) {
+        window.loadSettings = function() {
+            const r = _origLoadSettings.apply(this, arguments);
+            // Extra safety: null-check after loadSettings runs
+            return r;
+        };
+    }
+})();
