@@ -2795,8 +2795,6 @@ ipcMain.handle('export-to-pdf', async (event) => {
         
         if (!filePath) return { success: false, cancelled: true };
         
-        // Hide UI elements not meant for printing via CSS injection or by letting CSS print media handle it.
-        // We'll rely on the default printToPDF which uses @media print if defined.
         const pdfData = await win.webContents.printToPDF({
             printBackground: true,
             landscape: true,
@@ -2811,3 +2809,35 @@ ipcMain.handle('export-to-pdf', async (event) => {
         return { success: false, error: e.message };
     }
 });
+
+// ─── Save File (CSV/Excel export) ────────────────────────────────
+ipcMain.handle('save-file', async (event, filename, content) => {
+    try {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const { filePath, canceled } = await dialog.showSaveDialog(win, {
+            title: 'Guardar Reporte',
+            defaultPath: filename || 'reporte.csv',
+            filters: [
+                { name: 'CSV', extensions: ['csv'] },
+                { name: 'Todos los archivos', extensions: ['*'] }
+            ]
+        });
+        if (canceled || !filePath) return null;
+        fs.writeFileSync(filePath, content, 'utf8');
+        return filePath;
+    } catch(e) {
+        console.error('save-file error:', e);
+        return null;
+    }
+});
+
+// ─── Show Item in Folder (Reveal in Explorer) ────────────────────
+ipcMain.handle('show-item-in-folder', async (event, filePath) => {
+    try {
+        const { shell } = require('electron');
+        shell.showItemInFolder(filePath);
+    } catch(e) {
+        console.error('show-item-in-folder error:', e);
+    }
+});
+

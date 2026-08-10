@@ -246,19 +246,47 @@
         function formatVES(n) { return 'Bs ' + (Number(n) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }); }
 
         async function initBossApp() {
+            // Load config from localStorage (set by POS app) or URL params
             try {
-                // 1. Cargar configuración desde el servidor local o URL
-                const res = await fetch('/api/boss/config');
-                const cfg = await res.json();
-                if (cfg.supabaseUrl && cfg.supabaseKey) {
-                    config.supabaseUrl = cfg.supabaseUrl.replace(/\/$/, '');
-                    config.supabaseKey = cfg.supabaseKey;
-                    config.tenantId = cfg.tenantId || 'tenant_default';
+                // Method 1: URL search params (for deep link sharing)
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('url') && params.get('key')) {
+                    config.supabaseUrl = decodeURIComponent(params.get('url')).replace(/\/$/, '');
+                    config.supabaseKey = decodeURIComponent(params.get('key'));
+                    config.tenantId = params.get('tenant') || 'tenant_default';
+                }
+                // Method 2: localStorage (populated by the POS Electron app)
+                const lsSettings = localStorage.getItem('freshpos_settings');
+                if (lsSettings) {
+                    const s = JSON.parse(lsSettings);
+                    if (s.supabaseUrl && !config.supabaseUrl) config.supabaseUrl = s.supabaseUrl.replace(/\/$/, '');
+                    if (s.supabaseKey && !config.supabaseKey) config.supabaseKey = s.supabaseKey;
+                    if (s.tenantId && !config.tenantId) config.tenantId = s.tenantId;
+                    if (s.storeId) config.storeId = s.storeId;
+                    config.tenantId = config.tenantId || s.storeId || 'tenant_default';
+                }
+                // Method 3: Try electronAPI (when opened as Electron window)
+                if (window.electronAPI && window.electronAPI.getSettings) {
+                    const es = await window.electronAPI.getSettings();
+                    if (es && es.supabaseUrl && !config.supabaseUrl) {
+                        config.supabaseUrl = es.supabaseUrl.replace(/\/$/, '');
+                        config.supabaseKey = es.supabaseKey;
+                        config.tenantId = es.tenantId || es.storeId || 'tenant_default';
+                    }
                 }
             } catch(e) {
-                console.warn('Fallback a modo directo Supabase');
+                console.warn('Config load error:', e);
             }
-            document.getElementById('tenant-badge').textContent = config.tenantId;
+
+            document.getElementById('tenant-badge').textContent = config.tenantId || 'Sin Tenant';
+
+            if (!config.supabaseUrl || !config.supabaseKey) {
+                const banner = document.createElement('div');
+                banner.className = 'fixed top-14 left-0 right-0 z-50 bg-rose-600 text-white text-xs font-bold text-center py-2 px-4';
+                banner.innerHTML = '⚠️ No hay conexión configurada a Supabase. Abre la App del POS primero, configura Supabase en Ajustes, luego vuelve aquí.';
+                document.body.prepend(banner);
+                return;
+            }
             refreshAllData();
         }
 

@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getPublicIP: () => ipcRenderer.invoke('get-public-ip'),
     selectMobileBg: () => ipcRenderer.invoke('select-mobile-bg'),
     exportToPDF: () => ipcRenderer.invoke('export-to-pdf'),
+    saveFile: (filename, content) => ipcRenderer.invoke('save-file', filename, content),
+    showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
     // Fiscal Printer
     writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
     // Auto-Updater
