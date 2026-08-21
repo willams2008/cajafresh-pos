@@ -31,6 +31,7 @@ const config = {
     // ─── Túneles ───────────────────────────────────────────────
     cloudflare: {
         token: process.env.CLOUDFLARE_TOKEN || '',
+        domain: process.env.CLOUDFLARE_DOMAIN || '',
     },
     ngrok: {
         authToken: process.env.NGROK_AUTH_TOKEN || '',

@@ -238,6 +238,18 @@ async function createTables() {
     try {
         await runQuery(`ALTER TABLE sales ADD COLUMN discount REAL`);
     } catch (e) { }
+    try {
+        await runQuery(`ALTER TABLE sales ADD COLUMN totalUSD REAL`);
+    } catch (e) { }
+    try {
+        await runQuery(`ALTER TABLE sales ADD COLUMN totalVES REAL`);
+    } catch (e) { }
+    try {
+        await runQuery(`ALTER TABLE sales ADD COLUMN totalEUR REAL`);
+    } catch (e) { }
+    try {
+        await runQuery(`ALTER TABLE sales ADD COLUMN totalCostUSD REAL`);
+    } catch (e) { }
 
     // Tabla de Créditos con store_id
     await runQuery(`
@@ -758,13 +770,17 @@ const api = {
     saveSale: async (storeId, sale) => {
         const sid = storeId || '';
         await runQuery(
-            `INSERT INTO sales (id, store_id, date, timestamp, total, method, client_id, items, pagoMovilRef, subtotal, tax, payments, cashier_name, status, discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO sales (id, store_id, date, timestamp, total, totalUSD, totalVES, totalEUR, totalCostUSD, method, client_id, items, pagoMovilRef, subtotal, tax, payments, cashier_name, status, discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 sale.id,
                 sid,
                 sale.date,
                 sale.timestamp,
                 sale.totalUSD || sale.total || 0,
+                sale.totalUSD || sale.total || 0,
+                sale.totalVES || 0,
+                sale.totalEUR || 0,
+                sale.totalCostUSD || 0,
                 sale.method,
                 sale.clientId || null,
                 JSON.stringify(sale.items),

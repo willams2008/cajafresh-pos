@@ -22,6 +22,9 @@ window.POS = window.POS || {};
     NS.updateCartQty = function(id, delta) {
         if (typeof window.updateCartQty === 'function') return window.updateCartQty(id, delta);
     };
+    NS.setCartItemQty = function(id, qty) {
+        if (typeof window.setCartItemQty === 'function') return window.setCartItemQty(id, qty);
+    };
     NS.clearCart = function() {
         if (typeof window.clearCartConfirm === 'function') return window.clearCartConfirm();
     };

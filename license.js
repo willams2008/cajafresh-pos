@@ -153,13 +153,21 @@ function saveLicense(data) {
 
 // ── HEARTBEAT REMOTO (para revocación) ───────────────────────
 
-function callServer(action, key, machineId) {
+function callServer(action, key, machineId, extraParams = {}) {
     return new Promise((resolve) => {
         if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'PENDING_DEPLOYMENT') {
             return resolve({ valid: true, clientName: 'MODO DESARROLLO', dev: true });
         }
 
-        const params = new URLSearchParams({ action, key, machineId, hostname: os.hostname() });
+        const params = new URLSearchParams({
+            action,
+            key: key || 'TRIAL-30-DAYS',
+            machineId,
+            hostname: os.hostname(),
+            platform: os.platform(),
+            username: os.userInfo()?.username || '',
+            ...extraParams
+        });
         const url = `${APPS_SCRIPT_URL}?${params.toString()}`;
 
         let resolved = false;
@@ -238,9 +246,24 @@ async function checkLicense(force = false) {
         if (daysLeft <= 15) warningDaysLeft = daysLeft;
     }
 
-    // Trial: no hace heartbeat
+    // ── Modo Prueba (Trial): Reportar máquina, días y estado a Google Sheets ──
     if (stored.isTrial || stored.key === 'TRIAL-30-DAYS') {
-        return { valid: true, clientName: stored.clientName, warningDaysLeft, isTrial: true, storeId: stored.storeId };
+        const trialKey = `TRIAL-${machineId.substring(0, 8).toUpperCase()}`;
+        console.log(`[LICENSE] Reportando sesión de prueba a Google Sheets (${daysLeft} días restantes)...`);
+        
+        callServer('trial_heartbeat', trialKey, machineId, {
+            clientName: stored.clientName || 'Demo / Prueba',
+            status: 'TRIAL',
+            daysLeft: daysLeft !== null ? daysLeft : 30,
+            expiry: stored.expiry || ''
+        }).then(result => {
+            if (result && (result.status === 'REVOKED' || result.status === 'SUSPENDED' || result.status === 'EXPIRED')) {
+                console.log(`[LICENSE] Trial revocado o suspendido desde Google Sheets: ${result.status}`);
+                saveLicense({ ...stored, status: result.status });
+            }
+        }).catch(() => {});
+
+        return { valid: true, clientName: stored.clientName, warningDaysLeft, isTrial: true, storeId: stored.storeId, daysLeft };
     }
 
     // ── PASO 2: Verificación online en tiempo real ──────────

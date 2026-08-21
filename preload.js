@@ -1,86 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose safe APIs to the window object
-contextBridge.exposeInMainWorld('electronAPI', {
-    printTicket: () => ipcRenderer.invoke('print-ticket'),
-    onServerInfo: (callback) => ipcRenderer.on('server-info', (event, info) => callback(info)),
-    onIncomingOrder: (callback) => ipcRenderer.on('incoming-order', (event, order) => callback(order)),
-    onRequestSync: (callback) => ipcRenderer.on('request-sync', () => callback()),
-    onTunnelInfo: (callback) => ipcRenderer.on('tunnel-info', (event, info) => callback(info)),
-    onRemoteQR: (callback) => ipcRenderer.on('remote-qr', (event, qr) => callback(qr)),
-    onDownloadQR: (callback) => ipcRenderer.on('download-qr', (event, qr) => callback(qr)),
-    onSyncStatus: (callback) => ipcRenderer.on('sync-status', (event, status) => callback(status)),
-    generateQR: (url) => ipcRenderer.send('generate-remote-qr', url),
-    generateDownloadQR: (url) => ipcRenderer.send('generate-download-qr', url),
-    syncProducts: (products) => ipcRenderer.send('sync-products', products),
-    // WhatsApp Professional APIs
-    sendWhatsAppBackground: (phone, message) => ipcRenderer.invoke('whatsapp-send-report', { phone, message }),
-    sendWhatsAppPDF: (phone, base64Data, filename) => ipcRenderer.invoke('whatsapp-send-pdf', { phone, base64Data, filename }),
-    sendWASaleAlert: (phone, sale, dailyTotal) => ipcRenderer.invoke('whatsapp-sale-alert', { phone, sale, dailyTotal }),
-    onWhatsAppQR: (callback) => ipcRenderer.on('whatsapp-qr', (event, qr) => callback(qr)),
-    onWhatsAppStatus: (callback) => ipcRenderer.on('whatsapp-status', (event, status) => callback(status)),
-    getWhatsAppStatus: () => ipcRenderer.invoke('whatsapp-get-status'),
-    initWhatsApp: () => ipcRenderer.invoke('whatsapp-init'),
-    logoutWhatsApp: () => ipcRenderer.invoke('whatsapp-logout'),
-    onPaymentDetected: (callback) => ipcRenderer.on('payment-detected', (event, payment) => callback(payment)),
-    requestDiscoveryUpdate: () => ipcRenderer.send('request-discovery-update'),
-    requestTunnelInfo: () => ipcRenderer.send('request-tunnel-info'),
-    saveData: (data) => ipcRenderer.invoke('save-data', data),
-    loadData: (data) => ipcRenderer.invoke('load-data', data),
-    restartTunnels: () => ipcRenderer.send('restart-tunnels'),
-    onProductUpdatedRemote: (callback) => ipcRenderer.on('product-updated-remote', (event, product) => callback(product)),
-    onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (event, product) => callback(product)),
-    onRemotePriceUpdated: (callback) => ipcRenderer.on('remote-price-updated', (event, data) => callback(data)),
-    // License System
-    activateLicense: (key, storeName) => ipcRenderer.invoke('license-activate', key, storeName),
-    licenseActivated: () => ipcRenderer.send('license-activated'),
-    getMachineId: () => ipcRenderer.invoke('license-get-id'),
-    getLicenseStatus: () => ipcRenderer.invoke('license-get-status'),
-    openActivation: () => ipcRenderer.send('open-activation'),
-    licenseForceCheck: () => ipcRenderer.invoke('license-force-check'),
-    getPublicIP: () => ipcRenderer.invoke('get-public-ip'),
-    selectMobileBg: () => ipcRenderer.invoke('select-mobile-bg'),
-    exportToPDF: () => ipcRenderer.invoke('export-to-pdf'),
-    saveFile: (filename, content) => ipcRenderer.invoke('save-file', filename, content),
-    showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
-    // Fiscal Printer
-    writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
-    // Auto-Updater
-    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-    checkForUpdates: () => ipcRenderer.send('check-for-updates'),
-    downloadUpdate: () => ipcRenderer.send('download-update'),
-    installUpdate: () => ipcRenderer.send('install-update'),
-    onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
-    // Dashboard Remoto
-    syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
-    // Sunmi P3 Integration
-    sunmiGetStatus: () => ipcRenderer.invoke('sunmi-get-status'),
-    sunmiStartMonitoring: () => ipcRenderer.invoke('sunmi-start-monitoring'),
-    sunmiStopMonitoring: () => ipcRenderer.invoke('sunmi-stop-monitoring'),
-    onSunmiStatus: (callback) => ipcRenderer.on('sunmi-status', (event, data) => callback(data)),
-    testPrint: () => ipcRenderer.invoke('test-print'),
-    send: (channel, data) => {
-        const validChannels = ['dashboard-data', 'sync-products', 'generate-remote-qr', 'generate-download-qr', 'request-discovery-update', 'request-tunnel-info', 'license-activated'];
-        if (validChannels.includes(channel)) ipcRenderer.send(channel, data);
-    },
-    on: (channel, callback) => {
-        const validChannels = [
-            'product-updated-remote-full', 
-            'exchange-rate-updated-remote', 
-            'remote-price-updated', 
-            'incoming-order', 
-            'payment-detected',
-            'whatsapp-qr',
-            'whatsapp-status',
-            'catalog-pulled-from-cloud'
-        ];
-        if (validChannels.includes(channel)) {
-            ipcRenderer.on(channel, (event, ...args) => callback(...args));
-        }
-    }
-});
-
-contextBridge.exposeInMainWorld('db', {
+const dbMethods = {
     getSettings: () => ipcRenderer.invoke('db-get-settings'),
     getProducts: () => ipcRenderer.invoke('db-get-products'),
     saveProduct: (product) => ipcRenderer.invoke('db-save-product', product),
@@ -148,7 +68,90 @@ contextBridge.exposeInMainWorld('db', {
     getRecipes: (storeId) => ipcRenderer.invoke('db-get-recipes', storeId),
     saveRecipe: (storeId, recipe) => ipcRenderer.invoke('db-save-recipe', storeId, recipe),
     deleteRecipe: (storeId, id) => ipcRenderer.invoke('db-delete-recipe', storeId, id)
+};
+
+// Expose safe APIs to the window object
+contextBridge.exposeInMainWorld('electronAPI', {
+    printTicket: () => ipcRenderer.invoke('print-ticket'),
+    onServerInfo: (callback) => ipcRenderer.on('server-info', (event, info) => callback(info)),
+    onIncomingOrder: (callback) => ipcRenderer.on('incoming-order', (event, order) => callback(order)),
+    onRequestSync: (callback) => ipcRenderer.on('request-sync', () => callback()),
+    onTunnelInfo: (callback) => ipcRenderer.on('tunnel-info', (event, info) => callback(info)),
+    onRemoteQR: (callback) => ipcRenderer.on('remote-qr', (event, qr) => callback(qr)),
+    onDownloadQR: (callback) => ipcRenderer.on('download-qr', (event, qr) => callback(qr)),
+    onSyncStatus: (callback) => ipcRenderer.on('sync-status', (event, status) => callback(status)),
+    generateQR: (url) => ipcRenderer.send('generate-remote-qr', url),
+    generateDownloadQR: (url) => ipcRenderer.send('generate-download-qr', url),
+    syncProducts: (products) => ipcRenderer.send('sync-products', products),
+    // WhatsApp Professional APIs
+    sendWhatsAppBackground: (phone, message) => ipcRenderer.invoke('whatsapp-send-report', { phone, message }),
+    sendWhatsAppPDF: (phone, base64Data, filename) => ipcRenderer.invoke('whatsapp-send-pdf', { phone, base64Data, filename }),
+    sendWASaleAlert: (phone, sale, dailyTotal) => ipcRenderer.invoke('whatsapp-sale-alert', { phone, sale, dailyTotal }),
+    onWhatsAppQR: (callback) => ipcRenderer.on('whatsapp-qr', (event, qr) => callback(qr)),
+    onWhatsAppStatus: (callback) => ipcRenderer.on('whatsapp-status', (event, status) => callback(status)),
+    getWhatsAppStatus: () => ipcRenderer.invoke('whatsapp-get-status'),
+    initWhatsApp: () => ipcRenderer.invoke('whatsapp-init'),
+    logoutWhatsApp: () => ipcRenderer.invoke('whatsapp-logout'),
+    onPaymentDetected: (callback) => ipcRenderer.on('payment-detected', (event, payment) => callback(payment)),
+    requestDiscoveryUpdate: () => ipcRenderer.send('request-discovery-update'),
+    requestTunnelInfo: () => ipcRenderer.send('request-tunnel-info'),
+    saveData: (data) => ipcRenderer.invoke('save-data', data),
+    loadData: (data) => ipcRenderer.invoke('load-data', data),
+    restartTunnels: () => ipcRenderer.send('restart-tunnels'),
+    onProductUpdatedRemote: (callback) => ipcRenderer.on('product-updated-remote', (event, product) => callback(product)),
+    onProductUpdatedRemoteFull: (callback) => ipcRenderer.on('product-updated-remote-full', (event, product) => callback(product)),
+    onRemotePriceUpdated: (callback) => ipcRenderer.on('remote-price-updated', (event, data) => callback(data)),
+    // License System
+    activateLicense: (key, storeName) => ipcRenderer.invoke('license-activate', key, storeName),
+    licenseActivated: () => ipcRenderer.send('license-activated'),
+    getMachineId: () => ipcRenderer.invoke('license-get-id'),
+    getLicenseStatus: () => ipcRenderer.invoke('license-get-status'),
+    openActivation: () => ipcRenderer.send('open-activation'),
+    licenseForceCheck: () => ipcRenderer.invoke('license-force-check'),
+    getPublicIP: () => ipcRenderer.invoke('get-public-ip'),
+    selectMobileBg: () => ipcRenderer.invoke('select-mobile-bg'),
+    exportToPDF: () => ipcRenderer.invoke('export-to-pdf'),
+    saveFile: (filename, content) => ipcRenderer.invoke('save-file', filename, content),
+    showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
+    // Fiscal Printer
+    writeFiscalFile: (spoolerPath, filename, content) => ipcRenderer.invoke('write-fiscal-file', spoolerPath, filename, content),
+    // Auto-Updater
+    getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    checkForUpdates: () => ipcRenderer.send('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.send('download-update'),
+    installUpdate: () => ipcRenderer.send('install-update'),
+    onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status) => callback(status)),
+    // Dashboard Remoto
+    syncDashboard: (data) => ipcRenderer.send('dashboard-data', data),
+    // Sunmi P3 Integration
+    sunmiGetStatus: () => ipcRenderer.invoke('sunmi-get-status'),
+    sunmiStartMonitoring: () => ipcRenderer.invoke('sunmi-start-monitoring'),
+    sunmiStopMonitoring: () => ipcRenderer.invoke('sunmi-stop-monitoring'),
+    onSunmiStatus: (callback) => ipcRenderer.on('sunmi-status', (event, data) => callback(data)),
+    testPrint: () => ipcRenderer.invoke('test-print'),
+    db: dbMethods,
+    send: (channel, data) => {
+        const validChannels = ['dashboard-data', 'sync-products', 'generate-remote-qr', 'generate-download-qr', 'request-discovery-update', 'request-tunnel-info', 'license-activated'];
+        if (validChannels.includes(channel)) ipcRenderer.send(channel, data);
+    },
+    on: (channel, callback) => {
+        const validChannels = [
+            'product-updated-remote-full', 
+            'exchange-rate-updated-remote', 
+            'remote-price-updated', 
+            'incoming-order', 
+            'payment-detected',
+            'whatsapp-qr',
+            'whatsapp-status',
+            'catalog-pulled-from-cloud'
+        ];
+        if (validChannels.includes(channel)) {
+            ipcRenderer.on(channel, (event, ...args) => callback(...args));
+        }
+    }
 });
+
+contextBridge.exposeInMainWorld('db', dbMethods);
 
 // --- CLOUD SYNC (Multi-Sucursal) ---
 contextBridge.exposeInMainWorld('cloudSync', {

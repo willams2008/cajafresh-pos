@@ -1,10 +1,17 @@
 // Ensure Electron runs in browser mode, not Node mode
 delete process.env.ELECTRON_RUN_AS_NODE;
 
+const fs = require('fs');
+process.on('uncaughtException', (err) => {
+    fs.writeFileSync('crash_uncaught.log', err.stack || String(err));
+});
+process.on('unhandledRejection', (reason, promise) => {
+    fs.writeFileSync('crash_unhandled.log', reason ? (reason.stack || String(reason)) : 'Unhandled Rejection');
+});
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -1524,7 +1531,7 @@ function notifyTunnel(url, provider) {
 async function tryCloudflare() {
     return new Promise((resolve) => {
         const userSettings = getPersistentSettings();
-        let cfToken = userSettings.cloudflareToken;
+        let cfToken = userSettings.cloudflareToken || (config && config.cloudflare && config.cloudflare.token) || process.env.CLOUDFLARE_TOKEN;
 
         if (cfToken) {
             // Limpieza automática y robusta del token de Cloudflare
@@ -1536,14 +1543,14 @@ async function tryCloudflare() {
             }
 
             console.log('☁️  Iniciando Cloudflare Tunnel Autenticado (Dominio Propio)...');
-            const cf = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${serverPort}`, 'run', '--token', cfToken], {
+            const cf = spawn(bin, ['tunnel', '--no-autoupdate', 'run', '--token', cfToken], {
                 env: cleanEnv(),
                 stdio: ['ignore', 'pipe', 'pipe']
             });
             tunnelProcess = cf;
 
             // Al ser autenticado, asumimos que el dominio configurado por el usuario es el target
-            const domain = userSettings.cloudflareDomain || 'puntopila.emprende.ve';
+            const domain = userSettings.cloudflareDomain || (config && config.cloudflare && config.cloudflare.domain) || process.env.CLOUDFLARE_DOMAIN || 'caja-fresh.puntopila.emprende.ve';
             const url = `https://${domain}`;
             
             cf.stdout.on('data', (data) => {
@@ -2123,6 +2130,26 @@ app.whenReady().then(async () => {
             console.error('[AUTO-UPDATE] Error al buscar actualizaciones:', e.message);
         }
     }, 10000);
+
+    // Verificación periódica de licencia y revocación remota en segundo plano (cada 30 min)
+    setInterval(async () => {
+        try {
+            const licCheck = await licenseSystem.checkLicense();
+            if (!licCheck.valid) {
+                console.log(`[LICENSE] Licencia inhabilitada en tiempo real: ${licCheck.reason}`);
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.close();
+                }
+                createActivationWindow();
+                dialog.showErrorBox(
+                    'Licencia Suspendida',
+                    'Tu licencia o período de prueba ha sido suspendido por el proveedor. Contacta a soporte técnico para reactivarla.'
+                );
+            }
+        } catch (e) {
+            console.error('[LICENSE] Error en verificación periódica:', e.message);
+        }
+    }, 30 * 60 * 1000);
 });
 
 app.on('window-all-closed', () => {
@@ -2140,6 +2167,10 @@ ipcMain.on('sync-products', (event, data) => {
         if (!data) {
             console.error("❌ Recibido data null en sync-products.");
             return;
+        }
+
+        if (typeof data === 'string') {
+            data = JSON.parse(data);
         }
 
         // SI CAMBIÓ LA SUCURSAL, DESCARTAR EL CACHE ANTERIOR COMPLETAMENTE
@@ -2167,7 +2198,16 @@ ipcMain.on('sync-products', (event, data) => {
             }
         }
         
-        io.emit('products-updated', data);
+        try {
+            const safeString = JSON.stringify(data);
+            if (safeString.length < 50000000) { // Max 50MB
+                io.emit('products-updated', data);
+            } else {
+                console.error("Payload too big to emit:", safeString.length);
+            }
+        } catch(e) {
+            console.error("Failed to stringify data before emit", e);
+        }
     } catch (error) {
         console.error("❌ Error CRÍTICO en sync-products listener:", error);
     }

@@ -3,362 +3,429 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Punto Pila - Pedidos</title>
+    <title>Catálogo Digital</title>
+    
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Punto Pila">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <link rel="apple-touch-icon" href="icon-192.png">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
-        
         body { 
-            font-family: 'Outfit', sans-serif; 
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; 
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
             overscroll-behavior-y: contain;
+            background-color: #f8fafc;
+            color: #0f172a;
         }
 
-        /* Hide Scrollbars */
         * { -ms-overflow-style: none; scrollbar-width: none; }
         ::-webkit-scrollbar { display: none; }
-
-
-        .category-scroll::-webkit-scrollbar { display: none; }
         
         .product-card {
-            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
         .product-card:active {
-            transform: scale(0.95);
+            transform: scale(0.98);
         }
 
-        .cart-badge {
-            animation: bounce 0.4s ease-in-out;
+        .cart-pill-anim {
+            animation: slideUpFloat 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-
-        @keyframes bounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.3); }
-        }
-
-        .glass-nav {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-
-        /* Dark mode aesthetics */
-        .dark-theme {
-            background-color: #0f172a;
-            color: #f8fafc;
+        @keyframes slideUpFloat {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+<body class="h-screen flex flex-col overflow-hidden antialiased bg-slate-50">
 
-    <!-- Header -->
-    <header class="glass-nav sticky top-0 z-30 px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
-        <div>
-            <h1 id="mobile-header-title" class="text-xl font-extrabold text-blue-600 tracking-tight">PUNTO PILA</h1>
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">SISTEMA POS PROFESIONAL</p>
+    <!-- HEADER LIMPIO & MINIMALISTA -->
+    <header class="bg-white sticky top-0 z-30 px-4 pt-3 pb-2.5 border-b border-slate-200/80 shrink-0 shadow-sm">
+        <div class="flex justify-between items-center mb-2.5">
+            <div>
+                <h1 id="mobile-header-title" class="text-base font-extrabold text-slate-900 tracking-tight leading-none">
+                    PUNTO PILA
+                </h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Abierto
+                    </span>
+                    <span class="text-slate-300 text-xs">•</span>
+                    <span class="text-[11px] font-medium text-slate-500 font-mono">
+                        Tasa: <span class="text-slate-800 font-bold" id="rate-display">--</span> Bs/$
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Botón Scanner QR -->
+                <button id="sync-qr-btn" class="w-9 h-9 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center text-sm active:scale-95 transition-all" title="Vincular con Caja">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+
+                <!-- Carrito Header -->
+                <div class="relative" id="cart-trigger">
+                    <button class="w-9 h-9 bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center justify-center text-sm active:scale-95 transition-all shadow-sm">
+                        <i class="fas fa-shopping-bag"></i>
+                    </button>
+                    <span id="cart-count" class="hidden absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">0</span>
+                </div>
+            </div>
         </div>
 
-        <div class="flex items-center gap-2">
-            <button id="sync-qr-btn" class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg active:scale-90 transition-transform" title="Vincular con Caja">
-                <i class="fas fa-qrcode"></i>
+        <!-- BUSCADOR LIMPIO -->
+        <div class="relative">
+            <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+            <input type="text" id="search-input" placeholder="Buscar productos..." 
+                class="w-full bg-slate-100 focus:bg-white border border-transparent focus:border-slate-300 text-slate-800 rounded-xl py-2 pl-9 pr-8 text-xs font-medium placeholder-slate-400 outline-none transition-all">
+            <button id="clear-search-btn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                <i class="fas fa-times"></i>
             </button>
-            <div class="relative" id="cart-trigger">
-                <button class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl shadow-sm active:scale-90 transition-transform">
-                    <i class="fas fa-shopping-basket"></i>
-                </button>
-                <span id="cart-count" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white cart-badge">0</span>
-            </div>
         </div>
     </header>
 
-    <!-- Categories -->
-    <div class="px-6 py-4 overflow-x-auto category-scroll flex gap-3 bg-white border-b border-gray-50 shrink-0">
-        <button class="cat-btn active px-5 py-2 rounded-full bg-blue-600 text-white text-sm font-bold shadow-md whitespace-nowrap" data-category="Todos">Todos</button>
-        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Gaseosas">Gaseosas</button>
-        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Aguas">Aguas</button>
-        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Jugos">Jugos</button>
-        <button class="cat-btn px-5 py-2 rounded-full bg-gray-100 text-gray-500 text-sm font-bold whitespace-nowrap" data-category="Energizantes">Energizantes</button>
+    <!-- CATEGORÍAS DINÁMICAS (Solo las que existan en inventario) -->
+    <div class="px-4 py-2 overflow-x-auto flex items-center gap-1.5 bg-white border-b border-slate-200/60 shrink-0" id="categories-container">
+        <button class="cat-btn active px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold whitespace-nowrap" data-category="Todos">
+            Todos
+        </button>
     </div>
 
-    <!-- Search Bar -->
-    <div class="px-6 pt-4 pb-1 bg-white shrink-0">
-        <div class="relative">
-            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-            <input type="text" id="search-input" placeholder="Buscar productos..." class="w-full bg-gray-100 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-3.5 pl-12 text-sm font-bold outline-none transition-all">
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-6" id="main-content">
-        <!-- New: Featured Products Section -->
-        <div id="featured-section" class="mb-8 hidden">
-            <div class="flex items-center gap-2 mb-4">
-                <i class="fas fa-fire text-amber-500 text-xl"></i>
-                <h2 class="text-xl font-black text-slate-800">Destacados</h2>
-            </div>
-            <!-- Horizontal scroll container -->
-            <div id="featured-list" class="flex gap-4 overflow-x-auto pb-4 category-scroll snap-x">
-                <!-- Featured cards injected here -->
-            </div>
+    <!-- LISTA DE PRODUCTOS (Con Control de Stock) -->
+    <main class="flex-1 overflow-y-auto p-4" id="main-content">
+        <div class="flex items-center justify-between mb-3 px-0.5">
+            <h3 class="font-bold text-slate-500 uppercase tracking-wider text-[11px]" id="category-title">
+                Todos los Productos
+            </h3>
+            <span id="results-count" class="text-[11px] font-medium text-slate-400">
+                0 productos
+            </span>
         </div>
 
-        <h3 class="font-bold text-slate-400 uppercase tracking-widest text-xs mb-4" id="category-title">Todos los Productos</h3>
-        <!-- Products Grid -->
-        <div id="product-list">
-            <div class="flex flex-col items-center justify-center h-full text-center py-20">
-                <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-                <p class="text-gray-400 font-bold">Conectando con Servidor...</p>
+        <div id="product-list" class="pb-24">
+            <div class="flex flex-col items-center justify-center h-48 text-center py-8">
+                <div class="w-8 h-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mb-3"></div>
+                <p class="text-slate-400 text-xs font-medium">Cargando catálogo...</p>
             </div>
         </div>
     </main>
 
-    <!-- Cart Modal (Slide Up) -->
-    <div id="cart-modal" class="fixed inset-0 z-50 invisible">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="cart-overlay"></div>
-        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl h-[85vh] transform translate-y-full transition-transform duration-500 flex flex-col" id="cart-content">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-6"></div>
-            
-            <div class="px-8 flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-gray-800">Tu Pedido</h2>
-                <button id="close-cart" class="text-gray-400 text-2xl"><i class="fas fa-times"></i></button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto px-8 space-y-4" id="cart-items">
-                <!-- Products in cart -->
-            </div>
-
-            <div class="p-8 bg-gray-50 rounded-t-[40px] border-t border-gray-100">
-                <div class="flex justify-between items-end mb-6">
-                    <div>
-                        <p class="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Monto a Pagar</p>
-                        <h3 class="text-3xl font-black text-gray-800" id="cart-total">Bs 0.00</h3>
-                    </div>
-                    <p class="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-xl" id="cart-total-usd">$0.00</p>
+    <!-- BARRA FLOTANTE DE PEDIDO -->
+    <div id="floating-cart-bar" class="hidden fixed bottom-4 inset-x-4 z-40 cart-pill-anim">
+        <div onclick="openCartModal()" class="bg-slate-900 hover:bg-slate-800 px-4 py-3 rounded-2xl shadow-xl border border-slate-700/50 flex items-center justify-between text-white cursor-pointer active:scale-98 transition-all">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-sm font-bold relative">
+                    <i class="fas fa-shopping-bag text-xs"></i>
+                    <span id="float-cart-count" class="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">1</span>
                 </div>
-                
-                <button id="checkout-trigger" class="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-500/30 text-lg flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
-                    CONTINUAR AL PAGO <i class="fas fa-arrow-right"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Payment Modal (Slide Up) -->
-    <div id="payment-modal" class="fixed inset-0 z-[60] invisible">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="payment-overlay"></div>
-        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[40px] shadow-2xl h-[92vh] transform translate-y-full transition-transform duration-500 flex flex-col" id="payment-content">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-6"></div>
-            
-            <div class="px-8 flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-black text-gray-800">Método de Pago</h2>
-                <button id="close-payment" class="text-gray-400 text-2xl"><i class="fas fa-times"></i></button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto px-8 space-y-6">
-                <!-- Payment Tabs -->
-                <div class="grid grid-cols-3 gap-3">
-                    <button class="pay-method-btn active p-4 rounded-3xl border-2 border-blue-600 bg-blue-50 flex flex-col items-center gap-2 transition-all" data-method="pago_movil">
-                        <i class="fas fa-mobile-alt text-2xl text-blue-600"></i>
-                        <span class="text-[10px] font-black uppercase text-blue-700">Pago Móvil</span>
-                    </button>
-                    <button class="pay-method-btn p-4 rounded-3xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center gap-2 transition-all" data-method="divisas">
-                        <i class="fas fa-dollar-sign text-2xl text-gray-400"></i>
-                        <span class="text-[10px] font-black uppercase text-gray-400">Efectivo $$$</span>
-                    </button>
-                    <button class="pay-method-btn p-4 rounded-3xl border-2 border-gray-100 bg-gray-50 flex flex-col items-center gap-2 transition-all" data-method="efectivo_bs">
-                        <i class="fas fa-money-bill-wave text-2xl text-gray-400"></i>
-                        <span class="text-[10px] font-black uppercase text-gray-400">Efectivo Bs</span>
-                    </button>
-                </div>
-
-                <!-- Pago Movil Details (Destino) -->
-                <div id="pago-movil-details" class="space-y-4">
-                    <div class="bg-blue-600 rounded-[32px] p-6 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-8 opacity-10 rotate-12 scale-150">
-                            <i class="fas fa-university text-8xl"></i>
-                        </div>
-                        <p class="text-[10px] font-black uppercase tracking-widest opacity-70 mb-4">Datos de Pago (BANESCO)</p>
-                        <div class="space-y-3 relative z-10">
-                            <div class="flex justify-between border-b border-white/10 pb-2">
-                                <span class="text-xs font-bold opacity-80">Teléfono:</span>
-                                <span class="font-black">04142497920</span>
-                            </div>
-                            <div class="flex justify-between border-b border-white/10 pb-2">
-                                <span class="text-xs font-bold opacity-80">C.I:</span>
-                                <span class="font-black">32447974</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-xs font-bold opacity-80">Banco:</span>
-                                <span class="font-black">Banesco (0134)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Origin Form -->
-                    <div class="space-y-4 pt-2">
-                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-widest border-l-4 border-blue-600 pl-3">Datos de tu Pago</h4>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Tu Teléfono (Origen)</label>
-                                <input type="number" id="origin-phone" placeholder="0412..." class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Tu C.I (Origen)</label>
-                                <input type="number" id="origin-ci" placeholder="V-..." class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1 leading-tight">Monto de la Transferencia</label>
-                            <div class="relative">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-blue-600">Bs</span>
-                                <input type="number" id="payment-amount" class="w-full bg-blue-50 border-2 border-blue-100 rounded-2xl p-4 pl-10 text-lg font-black text-blue-800 outline-none" readonly>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Últimos 4 dígitos de Referencia</label>
-                            <input type="number" id="origin-ref" placeholder="1234" maxlength="4" class="w-full bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl p-4 text-sm font-bold outline-none transition-all">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="other-methods-details" class="hidden text-center py-10 space-y-4">
-                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-3xl mx-auto">
-                        <i class="fas fa-hand-holding-dollar"></i>
-                    </div>
-                    <div>
-                        <h4 class="font-black text-gray-800 uppercase text-sm">Pago en Caja</h4>
-                        <p class="text-xs text-gray-500 font-medium px-10">Envía el pedido y procede a pagar en efectivo directamente en la taquilla.</p>
-                    </div>
-                </div>
-
-                <!-- Datos del Cliente (Obligatorios) -->
-                <div class="pt-6 mt-6 border-t-2 border-amber-100 bg-amber-50/30 -mx-8 px-8 pb-8 space-y-5 rounded-b-[40px]">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="w-8 h-8 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-black">!</div>
-                        <h4 class="text-sm font-black text-slate-800 uppercase tracking-widest">Datos para Facturar Orden</h4>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">📍 Nombre Completo (NUEVO CLIENTE) *</label>
-                        <input type="text" id="origin-name" placeholder="Juan Pérez" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all shadow-sm" required>
-                    </div>
-
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">📞 Número de Teléfono *</label>
-                        <input type="tel" id="origin-phone-global" placeholder="04XX-XXXXXXX" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all shadow-sm" required>
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">🕒 ¿A qué hora lo buscas?</label>
-                            <input type="time" id="pickup-time" class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">💬 Observaciones / Notas Especiales</label>
-                        <textarea id="origin-observations" rows="2" placeholder="Ej: Sin sal, bien frío..." class="w-full bg-white border-2 border-amber-200 focus:border-amber-500 rounded-2xl p-4 text-sm font-bold outline-none transition-all resize-none shadow-sm"></textarea>
-                    </div>
+                <div>
+                    <p class="text-xs font-bold text-white font-mono">
+                        <span id="float-cart-total-usd">$0.00</span>
+                        <span class="text-[11px] text-slate-400 font-normal ml-1" id="float-cart-total-ves">(Bs 0,00)</span>
+                    </p>
                 </div>
             </div>
-
-            <div class="p-8">
-                <button id="send-order" class="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-emerald-500/30 text-lg flex items-center justify-center gap-3 active:scale-95 transition-transform">
-                    <i class="fas fa-check-circle"></i> CONFIRMAR Y ENVIAR
-                </button>
-            </div>
-        </div>
-    </div>
-    <!-- QR Scan Modal -->
-    <div id="qr-modal" class="fixed inset-0 z-[100] invisible">
-        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md opacity-0 transition-opacity duration-300" id="qr-overlay"></div>
-        <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 bg-white rounded-[40px] shadow-2xl p-8 transform scale-90 opacity-0 transition-all duration-300" id="qr-content">
-            <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center text-2xl mx-auto mb-4">
-                    <i class="fas fa-qrcode"></i>
-                </div>
-                <h2 class="text-xl font-black text-slate-800">Vincular con Caja</h2>
-                <p class="text-xs text-slate-500 font-medium px-4 mt-2">Apunta la cámara al código QR que aparece en la pantalla de la computadora.</p>
-            </div>
-            
-            <div id="reader" class="overflow-hidden rounded-3xl border-4 border-slate-100 bg-slate-50 aspect-square mb-6"></div>
-            
-            <button id="close-qr" class="w-full py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-sm uppercase tracking-widest active:scale-95 transition-transform">
-                CANCELAR
+            <button class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                Ver Cesta <i class="fas fa-arrow-right text-[10px]"></i>
             </button>
         </div>
     </div>
-    <!-- Scripts -->
-    <script>
-        // Depuración inmediata: si hay un error fatal antes de que cargue app.js, mostrarlo.
-        window.onerror = function(msg, url, line, col, error) {
-            alert("Error Crítico: " + msg + "\nEn: " + url + ":" + line);
-            return false;
-        };
-    </script>
-    <script>
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('[PWA] Service Worker registrado:', reg.scope))
-                .catch(err => console.warn('[PWA] Error registrando SW:', err));
-        }
 
-        // Capture install prompt for later use
-        let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            // Show install banner
-            const banner = document.createElement('div');
-            banner.id = 'install-banner';
-            banner.className = 'fixed bottom-0 left-0 right-0 bg-indigo-600 text-white p-4 flex items-center justify-between z-[100] shadow-2xl';
-            banner.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <i class="fas fa-download text-xl"></i>
-                    <div>
-                        <p class="font-black text-sm">Instalar Punto Pila</p>
-                        <p class="text-[10px] opacity-80">Acceso directo permanente</p>
+    <!-- MODAL DE CESTA / CARRITO -->
+    <div id="cart-modal" class="fixed inset-0 z-50 invisible">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm opacity-0 transition-opacity duration-200" id="cart-overlay" onclick="closeCartModal()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] shadow-2xl max-h-[85vh] h-[85vh] transform translate-y-full transition-transform duration-200 flex flex-col" id="cart-content">
+            
+            <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-2"></div>
+            
+            <div class="px-5 pb-3 flex justify-between items-center border-b border-slate-100">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Tu Cesta</h2>
+                    <p class="text-[11px] text-slate-400">Revisa los artículos antes de pagar</p>
+                </div>
+                <button onclick="closeCartModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2.5" id="cart-items">
+                <!-- Inyectado por JS -->
+            </div>
+
+            <div class="p-5 bg-slate-50 border-t border-slate-100 shrink-0">
+                <div class="flex justify-between items-baseline mb-3">
+                    <span class="text-xs font-semibold text-slate-500">Total:</span>
+                    <div class="text-right">
+                        <span class="text-xl font-extrabold text-slate-900 font-mono" id="cart-total-usd-display">$0.00</span>
+                        <p class="text-xs font-semibold text-blue-600 font-mono" id="cart-total">Bs 0,00</p>
                     </div>
                 </div>
-                <button id="install-btn" class="bg-white text-indigo-600 font-black px-5 py-2 rounded-xl text-sm">INSTALAR</button>
-            `;
-            document.body.appendChild(banner);
-            document.getElementById('install-btn').onclick = async () => {
-                deferredPrompt.prompt();
-                const result = await deferredPrompt.userChoice;
-                if (result.outcome === 'accepted') banner.remove();
-                deferredPrompt = null;
-            };
-        });
+                
+                <button onclick="openPaymentModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 active:scale-98 transition-all">
+                    Continuar al Pago <i class="fas fa-arrow-right text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 
-        window.addEventListener('appinstalled', () => {
-            const banner = document.getElementById('install-banner');
-            if (banner) banner.remove();
-            console.log('[PWA] App instalada exitosamente');
-        });
-    </script>
-    <script src="app.js?v=41.4"></script>
+    <!-- MODAL DE CHECKOUT, ENTREGA & PAGO -->
+    <div id="payment-modal" class="fixed inset-0 z-[60] invisible">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm opacity-0 transition-opacity duration-200" id="payment-overlay" onclick="closePaymentModal()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] shadow-2xl max-h-[92vh] h-[92vh] transform translate-y-full transition-transform duration-200 flex flex-col" id="payment-content">
+            
+            <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-2"></div>
+            
+            <div class="px-5 pb-3 flex justify-between items-center border-b border-slate-100">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Finalizar Pedido</h2>
+                    <p class="text-[11px] text-slate-400">Entrega y forma de pago</p>
+                </div>
+                <button onclick="closePaymentModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center text-xs">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                
+                <!-- 1. TIPO DE ENTREGA -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">1. Modalidad de Entrega</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="delivery-type-btn active p-2.5 rounded-xl border border-slate-900 bg-slate-900 text-white flex flex-col items-center gap-1 text-center transition-all" data-type="pickup">
+                            <i class="fas fa-store text-sm text-amber-400"></i>
+                            <span class="text-[10px] font-bold">Retiro en Tienda</span>
+                        </button>
+                        <button type="button" class="delivery-type-btn p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 flex flex-col items-center gap-1 text-center transition-all" data-type="delivery">
+                            <i class="fas fa-motorcycle text-sm text-blue-500"></i>
+                            <span class="text-[10px] font-bold">Delivery</span>
+                        </button>
+                        <button type="button" class="delivery-type-btn p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 flex flex-col items-center gap-1 text-center transition-all" data-type="dinein">
+                            <i class="fas fa-utensils text-sm text-emerald-500"></i>
+                            <span class="text-[10px] font-bold">Comer en Local</span>
+                        </button>
+                    </div>
+
+                    <!-- Campos dinámicos según entrega -->
+                    <div id="delivery-address-box" class="hidden mt-2.5 bg-blue-50/60 border border-blue-100 rounded-xl p-3 space-y-2">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Dirección de Entrega Exacta *</label>
+                            <input type="text" id="order-delivery-address" placeholder="Ej: Av. Principal, Edif. Apto 4B" 
+                                class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-900 outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Punto de Referencia</label>
+                            <input type="text" id="order-delivery-ref" placeholder="Ej: Frente al centro comercial" 
+                                class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-900 outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div id="dinein-table-box" class="hidden mt-2.5 bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Número de Mesa / Ubicación *</label>
+                        <input type="text" id="order-table-num" placeholder="Ej: Mesa 5 o Terraza" 
+                            class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- 2. MÉTODO DE PAGO -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">2. Forma de Pago</label>
+                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" class="pay-method-btn active py-2 px-1 rounded-lg bg-white shadow-sm text-slate-900 text-[10px] font-bold text-center transition-all" data-method="pago_movil">
+                            Pago Móvil
+                        </button>
+                        <button type="button" class="pay-method-btn py-2 px-1 rounded-lg text-slate-500 hover:text-slate-900 text-[10px] font-bold text-center transition-all" data-method="efectivo_usd">
+                            Efectivo $
+                        </button>
+                        <button type="button" class="pay-method-btn py-2 px-1 rounded-lg text-slate-500 hover:text-slate-900 text-[10px] font-bold text-center transition-all" data-method="zelle">
+                            Zelle
+                        </button>
+                        <button type="button" class="pay-method-btn py-2 px-1 rounded-lg text-slate-500 hover:text-slate-900 text-[10px] font-bold text-center transition-all" data-method="transferencia">
+                            Transf.
+                        </button>
+                        <button type="button" class="pay-method-btn py-2 px-1 rounded-lg text-slate-500 hover:text-slate-900 text-[10px] font-bold text-center transition-all" data-method="punto">
+                            Punto / Bs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PAGO MÓVIL DETALLES -->
+                <div id="pago-movil-details" class="space-y-3">
+                    <div class="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 text-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between items-center border-b border-blue-100/60 pb-1.5">
+                            <span class="text-slate-500 text-[11px]">Banco:</span>
+                            <span class="font-bold text-slate-900" id="pm-bank-name">Banesco (0134)</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-blue-100/60 pb-1.5">
+                            <span class="text-slate-500 text-[11px]">Teléfono:</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold font-mono text-blue-700" id="pm-phone-display">04142497920</span>
+                                <button onclick="copyToClipboard(document.getElementById('pm-phone-display').textContent)" class="text-[10px] bg-white border border-blue-200 px-2 py-0.5 rounded text-blue-600 hover:bg-blue-100"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500 text-[11px]">Cédula / RIF:</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold font-mono text-blue-700" id="pm-ci-display">32447974</span>
+                                <button onclick="copyToClipboard(document.getElementById('pm-ci-display').textContent)" class="text-[10px] bg-white border border-blue-200 px-2 py-0.5 rounded text-blue-600 hover:bg-blue-100"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Últimos 4 dígitos de Referencia *</label>
+                        <input type="text" id="origin-ref" placeholder="Ej: 4829" maxlength="6" 
+                            class="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 outline-none">
+                    </div>
+                </div>
+
+                <!-- EFECTIVO USD (Con Calculadora de Vuelto) -->
+                <div id="efectivo-usd-details" class="hidden space-y-3">
+                    <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-800 text-xs">Monto Total a Cancelar:</span>
+                            <span class="font-black text-slate-900 font-mono text-sm" id="cash-total-display">$0.00</span>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">¿Con qué billete vas a pagar? (Para llevarte el vuelto exacto)</label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-slate-500 font-bold">$</span>
+                                <input type="number" id="cash-given-amount" placeholder="Ej: 10, 20, 50" step="1" min="0"
+                                    oninput="calculateCashChange()"
+                                    class="flex-1 bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold font-mono text-slate-900 outline-none focus:border-amber-500">
+                            </div>
+                        </div>
+                        <div id="cash-change-result" class="hidden pt-2 border-t border-amber-200 text-xs font-bold text-emerald-800">
+                            <span>Tu Vuelto: </span>
+                            <span class="font-mono text-sm font-black" id="cash-change-amount">$0.00</span>
+                            <span class="font-mono text-[11px] font-medium text-slate-600 ml-1" id="cash-change-ves"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ZELLE DETALLES -->
+                <div id="zelle-details" class="hidden space-y-3">
+                    <div class="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 text-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between items-center border-b border-purple-100/60 pb-1.5">
+                            <span class="text-slate-500 text-[11px]">Correo / Tel:</span>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold font-mono text-purple-700" id="zelle-email-display">pagos@tienda.com</span>
+                                <button onclick="copyToClipboard(document.getElementById('zelle-email-display').textContent)" class="text-[10px] bg-white border border-purple-200 px-2 py-0.5 rounded text-purple-600"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500 text-[11px]">Titular:</span>
+                            <span class="font-bold text-slate-900" id="zelle-name-display">Inversiones Tienda</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Nombre o Confirmación Zelle</label>
+                        <input type="text" id="zelle-ref" placeholder="Ej: Pago de María Pérez" 
+                            class="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500 rounded-xl p-2.5 text-xs font-bold text-slate-900 outline-none">
+                    </div>
+                </div>
+
+                <!-- TRANSFERENCIA DETALLES -->
+                <div id="transferencia-details" class="hidden space-y-3">
+                    <div class="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-4 text-slate-800 space-y-2 text-xs">
+                        <span class="text-slate-500 text-[11px] block">Número de Cuenta:</span>
+                        <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-emerald-200">
+                            <span class="font-bold font-mono text-emerald-800 text-[11px] break-all" id="bank-account-display">0134-0000-00-0000000000</span>
+                            <button onclick="copyToClipboard(document.getElementById('bank-account-display').textContent)" class="ml-2 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-lg shrink-0"><i class="fas fa-copy"></i> Copiar</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Número de Referencia</label>
+                        <input type="text" id="transfer-ref" placeholder="Ej: 123456" 
+                            class="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 outline-none">
+                    </div>
+                </div>
+
+                <!-- EN CAJA / PUNTO DETALLES -->
+                <div id="other-methods-details" class="hidden text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 p-4">
+                    <i class="fas fa-credit-card text-2xl text-slate-400 mb-1.5"></i>
+                    <h4 class="font-bold text-slate-800 text-xs mb-1">Punto de Venta / Efectivo Bs</h4>
+                    <p class="text-[11px] text-slate-500">Cancela en tarjeta de débito o efectivo en bolívares al retirar tu orden o al recibir.</p>
+                </div>
+
+                <!-- 3. DATOS DEL CLIENTE -->
+                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 space-y-2.5">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">3. Tus Datos</label>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Nombre Completo *</label>
+                        <input type="text" id="origin-name" placeholder="Ej: Carlos Pérez" 
+                            class="w-full bg-white border border-slate-200 focus:border-slate-800 rounded-xl p-2.5 text-xs font-bold text-slate-900 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Teléfono / WhatsApp *</label>
+                        <input type="tel" id="origin-phone-global" placeholder="0414-XXXXXXX" 
+                            class="w-full bg-white border border-slate-200 focus:border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-900 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Nota o Instrucción Especial</label>
+                        <input type="text" id="origin-observations" placeholder="Ej: Bien frío, sin bolsas..." 
+                            class="w-full bg-white border border-slate-200 focus:border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-900 outline-none">
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- BOTONES DE CONFIRMACIÓN -->
+            <div class="p-4 bg-white border-t border-slate-100 flex flex-col gap-2 shrink-0">
+                <button onclick="submitOrder()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 active:scale-98 transition-all">
+                    <i class="fas fa-check-circle text-xs text-emerald-400"></i> Enviar Pedido a la Caja
+                </button>
+                <button onclick="sendOrderViaWhatsApp()" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all">
+                    <i class="fab fa-whatsapp text-sm text-emerald-600"></i> Enviar por WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE SELECCIÓN DE SABORES / VARIANTES -->
+    <div id="flavor-modal" class="fixed inset-0 z-[70] invisible">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm opacity-0 transition-opacity duration-200" id="flavor-overlay" onclick="closeFlavorModal()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] shadow-2xl p-5 transform translate-y-full transition-transform duration-200" id="flavor-content">
+            <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+            <div class="flex justify-between items-center mb-3">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900" id="flavor-product-name">Elige una opción</h3>
+                    <p class="text-[11px] text-slate-400">Selecciona el sabor o variante deseada</p>
+                </div>
+                <button onclick="closeFlavorModal()" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center text-xs">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="flavor-options-list" class="space-y-2 max-h-60 overflow-y-auto mb-3">
+                <!-- Inyectado por JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ESCANER QR -->
+    <div id="qr-modal" class="fixed inset-0 z-[100] invisible">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-200" id="qr-overlay" onclick="stopScanner()"></div>
+        <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 bg-white rounded-3xl shadow-2xl p-5 transform scale-95 opacity-0 transition-all duration-200 text-center" id="qr-content">
+            <h2 class="text-sm font-bold text-slate-900 mb-1">Vincular con Caja POS</h2>
+            <p class="text-xs text-slate-400 mb-3">Apunta la cámara al código QR de la computadora</p>
+            <div id="reader" class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 aspect-square mb-3"></div>
+            <button onclick="stopScanner()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs">
+                Cancelar
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js?v=61.0"></script>
 </body>
 </html>

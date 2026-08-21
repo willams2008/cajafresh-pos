@@ -199,4 +199,9 @@ window.Dashboard = window.Dashboard || {};
         }).join('');
     };
 
+    window.renderDashboard = function() {
+        if (typeof NS.render === 'function') NS.render();
+    };
+
 })();
+

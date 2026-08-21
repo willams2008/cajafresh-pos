@@ -1,4 +1,6 @@
-// Compatibility polyfill for older mobile browsers
+// mobile/app.js — Clean, Minimalist & Complete POS Mobile Client
+
+// Compatibility polyfill
 if (typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
     AbortSignal.timeout = function(ms) {
         const controller = new AbortController();
@@ -7,104 +9,111 @@ if (typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
     };
 }
 
-// Smart server URL management
-const businessId = 'eb60443d3b66474b7c6c';
-const permanentUrl = 'https://puntopila.emprende.ve';
-let savedServerUrl = localStorage.getItem('pos_server_url') || permanentUrl;
-
-let socket = null;
-let isOffline = !navigator.onLine;
-
+// State
 let products = [];
-try {
-    const cachedProducts = localStorage.getItem('pos_mobile_products');
-    if (cachedProducts && cachedProducts !== 'undefined' && cachedProducts !== 'null') {
-        products = JSON.parse(cachedProducts) || [];
-    }
-} catch (e) {
-    console.error('Error parsing products cache:', e);
-}
-
 let cart = [];
-try {
-    const cachedCart = localStorage.getItem('pos_mobile_cart');
-    if (cachedCart && cachedCart !== 'undefined' && cachedCart !== 'null') {
-        cart = JSON.parse(cachedCart) || [];
-    }
-} catch (e) {
-    console.error('Error parsing cart cache:', e);
-}
-
-let exchangeRate = 36.50;
-try {
-    const cachedRate = localStorage.getItem('pos_mobile_rate');
-    if (cachedRate && cachedRate !== 'undefined' && cachedRate !== 'null') {
-        exchangeRate = parseFloat(cachedRate) || 36.50;
-    }
-} catch (e) {
-    console.error('Error parsing rate cache:', e);
-}
-
+let exchangeRate = 42.50;
 let currentCategory = 'Todos';
 let searchTerm = '';
+let selectedDeliveryType = 'pickup'; // 'pickup' | 'delivery' | 'dinein'
+let selectedPaymentMethod = 'pago_movil'; // 'pago_movil' | 'efectivo_usd' | 'zelle' | 'transferencia' | 'punto'
+let socket = null;
+let connectionLock = false;
+let isOffline = !navigator.onLine;
 
-// UI Elements for connection
+let paymentData = {
+    pmBank: 'Banesco (0134)',
+    pmPhone: '04142497920',
+    pmCi: '32447974',
+    zelleEmail: 'pagos@tienda.com',
+    zelleName: 'Inversiones Tienda',
+    bankDetails: '0134-0000-00-0000000000',
+    orderWhatsApp: '584142497920'
+};
+
+// Cargar caché previo
+try {
+    const cached = localStorage.getItem('pos_mobile_products');
+    if (cached && cached !== 'undefined' && cached !== 'null') {
+        products = JSON.parse(cached) || [];
+    }
+} catch(e) {}
+
+try {
+    const cachedCart = localStorage.getItem('pos_mobile_cart');
+    if (cachedCart) cart = JSON.parse(cachedCart) || [];
+} catch(e) {}
+
+try {
+    const cachedRate = localStorage.getItem('pos_mobile_rate');
+    if (cachedRate) exchangeRate = parseFloat(cachedRate) || 42.50;
+} catch(e) {}
+
+try {
+    const cachedPay = localStorage.getItem('pos_mobile_payment_data');
+    if (cachedPay) paymentData = Object.assign(paymentData, JSON.parse(cachedPay));
+} catch(e) {}
+
+// Banner de Estado
 const statusBanner = document.createElement('div');
 statusBanner.id = 'connection-status';
-statusBanner.className = 'bg-amber-500 text-white text-xs font-bold text-center py-1.5 transition-all duration-300 flex items-center justify-center gap-2';
-statusBanner.innerHTML = '<div class="w-2 h-2 rounded-full bg-white animate-pulse"></div> Iniciando...';
+statusBanner.className = 'bg-amber-100 text-amber-900 text-[10px] font-bold text-center py-1 transition-all duration-200 flex items-center justify-center gap-1.5 shrink-0 border-b border-amber-200/50';
+statusBanner.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span> Conectando...';
 document.body.insertBefore(statusBanner, document.body.firstChild);
 
 function updateStatus(text, colorClass, hideAfter = 0) {
-    statusBanner.style.display = '';
-    statusBanner.className = `bg-${colorClass}-500 text-white text-[10px] font-black text-center py-2 transition-all duration-300 flex items-center justify-center gap-2 uppercase tracking-tighter`;
-    statusBanner.innerHTML = `<i class="fas fa-signal animate-pulse"></i> ${text}`;
+    statusBanner.style.display = 'flex';
+    const colorStyles = {
+        amber: 'bg-amber-100 text-amber-900 border-amber-200/60',
+        emerald: 'bg-emerald-50 text-emerald-800 border-emerald-200/60',
+        rose: 'bg-rose-50 text-rose-800 border-rose-200/60'
+    };
+    statusBanner.className = `${colorStyles[colorClass] || 'bg-slate-100 text-slate-800'} text-[10px] font-bold text-center py-1 transition-all duration-200 flex items-center justify-center gap-1.5 shrink-0 border-b`;
+    statusBanner.innerHTML = `<i class="fas fa-circle text-[7px]"></i> ${text}`;
     if (hideAfter > 0) {
         setTimeout(() => { statusBanner.style.display = 'none'; }, hideAfter);
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// CONEXIÓN SOCKET.IO
+// ─────────────────────────────────────────────────────────────
 async function initConnection() {
-    // 1. Prioridad: Revisar si hay una URL o un Business ID (bid) en el hash
+    setupDeliveryEvents();
+    setupPaymentEvents();
+    updateRateDisplay();
+    updatePaymentUI();
+    renderCategories();
+    renderProducts();
+    updateCartUI();
+
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const urlOverride = hashParams.get('url');
     const bidOverride = hashParams.get('bid');
 
+    let savedServerUrl = localStorage.getItem('pos_server_url') || window.location.origin;
     if (urlOverride && urlOverride.startsWith('http')) {
-        console.log('🚀 Sobreescritura de URL detectada:', urlOverride);
         savedServerUrl = urlOverride;
         localStorage.setItem('pos_server_url', urlOverride);
     }
-
-    // Persistir el Business ID único para futuras reconexiones
     if (bidOverride) {
-        console.log('🆔 Nuevo Business ID detectado:', bidOverride);
         localStorage.setItem('pos_business_id', bidOverride);
     }
 
-    // Usar el ID dinámico o el fallback histórico
     const activeBid = localStorage.getItem('pos_business_id') || 'cajafresh_pos_v2_778899_remote';
 
-    // 2. Mostrar estado amigable
-    updateStatus('CONECTANDO...', 'amber');
-
-    // Múltiples vectores de ataque para encontrar la caja
     const candidates = [
-        window.location.origin, // Bala de plata: conectar siempre al dominio actual
-        savedServerUrl, 
-        permanentUrl,
-        `http://DESKTOP-DMAJ5AF.local:3000`, // DNS Directo (La más infalible en WiFi)
-        `http://192.168.50.24:3000`, // IP Fuerte detectada
-        `http://192.168.1.5:3000`,
-        `http://192.168.0.5:3000`
-    ].filter(u => u && u.length > 5);
+        window.location.origin,
+        savedServerUrl,
+        `http://${window.location.hostname}:3000`,
+        'http://192.168.1.37:3000',
+        'http://localhost:3000'
+    ].filter((u, i, self) => u && u.startsWith('http') && self.indexOf(u) === i);
 
-    // 2. Descubrimiento silencioso en nube vía NTFY (usando el canal del cliente)
     fetch(`https://ntfy.sh/${activeBid}/json?poll=1&since=12h`, { signal: AbortSignal.timeout(3500) })
         .then(res => res.text())
         .then(text => {
             const lines = text.trim().split('\n');
-            let foundUrl = null;
             for (let i = lines.length - 1; i >= 0; i--) {
                 const line = lines[i].trim();
                 if (!line) continue;
@@ -112,36 +121,26 @@ async function initConnection() {
                     const data = JSON.parse(line);
                     if (data.message) {
                         const match = data.message.match(/(https?:\/\/[^\s,]+)/);
-                        if (match) {
-                            foundUrl = match[1];
+                        if (match && !candidates.includes(match[1])) {
+                            tryConnect(match[1]);
                             break;
                         }
                     }
                 } catch(e) {}
             }
-            if (foundUrl && savedServerUrl !== foundUrl) {
-                console.log('🚀 Forzando cambio a nueva URL remota encontrada vía NTFY:', foundUrl);
-                tryConnect(foundUrl);
-            }
         }).catch(() => {});
 
-    // 3. Probar todos los candidatos como una escopeta
     candidates.forEach(url => tryConnect(url));
 }
-
-let connectionLock = false;
 
 function tryConnect(url) {
     if (connectionLock) return;
     
-    const isTunnel = url.includes('cloudflare') || url.includes('loca.lt');
-    console.log(`⚡ Probando (${isTunnel ? 'TUNNEL' : 'LOCAL'}):`, url);
-    
     const testSocket = io(url, {
-        timeout: 8000,
-        transports: ['polling', 'websocket'], // Fallback seguro para evitar CORS y WSS errors en iOS
+        timeout: 6000,
+        transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 5
+        reconnectionAttempts: 4
     });
 
     testSocket.on('connect', () => {
@@ -149,633 +148,828 @@ function tryConnect(url) {
             testSocket.close();
             return;
         }
-        
         connectionLock = true;
         socket = testSocket;
-        savedServerUrl = url;
         localStorage.setItem('pos_server_url', url);
-        
-        updateStatus(`CONECTADO: ${url.replace('https://','').split('/')[0]}`, 'emerald', 4000);
+        updateStatus(`En línea con la Caja`, 'emerald', 3000);
         setupSocketEvents();
     });
 
-    // Debug de errores
-    testSocket.on('connect_error', (err) => {
-        console.warn(`❌ Error en ${url}:`, err.message);
-    });
-
-    setTimeout(() => { if (!connectionLock) testSocket.close(); }, 12000); // Dar suficiente tiempo para túneles lentos
+    setTimeout(() => { if (!connectionLock) testSocket.close(); }, 8000);
 }
 
 function setupSocketEvents() {
     socket.on('connect', () => {
-        const shortUrl = savedServerUrl.replace('https://', '').replace('http://', '').split('/')[0];
-        updateStatus(`CONECTADO: ${shortUrl}`, 'emerald', 5000);
+        updateStatus('En línea con la Caja', 'emerald', 3000);
         isOffline = false;
-        saveToHistory(savedServerUrl);
-        console.log('✅ Socket conectado:', savedServerUrl);
+        socket.emit('request-sync');
     });
 
     socket.on('disconnect', () => {
-        updateStatus('Sin conexión - Reintentando...', 'rose');
+        updateStatus('Sin conexión', 'rose');
         isOffline = true;
-        
-        // Mostrar pantalla de bloqueo para forzar recarga si el túnel cambió
-        if (!document.getElementById('disconnect-overlay')) {
-            const overlay = document.createElement('div');
-            overlay.id = 'disconnect-overlay';
-            overlay.className = 'fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[1000] flex flex-col items-center justify-center p-8 text-center animate-fade-in';
-            overlay.innerHTML = `
-                <div class="w-20 h-20 bg-rose-500 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-rose-500/40">
-                    <i class="fas fa-plug text-3xl text-white animate-pulse"></i>
-                </div>
-                <h2 class="text-2xl font-black text-white mb-2 uppercase tracking-tighter">Conexión Perdida</h2>
-                <p class="text-slate-300 font-medium mb-8">El servidor de la caja se desconectó o la dirección cambió.</p>
-                <button onclick="window.location.reload()" class="w-full py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                    Refrescar Conexión
-                </button>
-                <p class="mt-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-loose">Si el problema persiste,<br>escanea el código QR de nuevo.</p>
-            `;
-            document.body.appendChild(overlay);
-        }
-    });
-
-    // Solicitar menú completo al servidor (Pull Activo)
-    socket.emit('request-sync');
-    
-    // Timeout para dar feedback si la caja no responde
-    setTimeout(() => {
-        if (products.length === 0) {
-            const list = document.getElementById('product-list');
-            if (list && list.innerHTML.includes('Conectando')) {
-                list.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-center py-20 px-6">
-                        <i class="fas fa-exclamation-triangle text-4xl text-amber-500 mb-4 animate-pulse"></i>
-                        <h3 class="text-xl font-black text-slate-800 mb-2">Conexión Lenta</h3>
-                        <p class="text-gray-500 font-medium mb-6">El servidor está conectado, pero no ha enviado los productos. Asegúrate de que el POS en la PC esté abierto.</p>
-                        <button onclick="socket.emit('request-sync');" class="px-6 py-3 bg-amber-50 text-amber-600 rounded-xl font-bold uppercase tracking-wider active:scale-95 transition-all mb-3 w-full">Reintentar</button>
-                        <button onclick="window.location.reload()" class="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold uppercase tracking-wider active:scale-95 transition-all w-full">Refrescar App</button>
-                    </div>
-                `;
-            }
-        }
-    }, 8000);
-
-    socket.on('reconnect_attempt', (attempt) => {
-        const urlToTry = savedServerUrl.replace('https://', '').replace('http://', '').split('/')[0];
-        statusBanner.innerHTML = `<i class="fas fa-sync fa-spin"></i> Reintentando (${attempt}) a ${urlToTry}... <button onclick="showServerConfig()" class="ml-2 underline text-[10px]">Cambiar</button>`;
     });
 
     socket.on('products-updated', (data) => {
         if (!data) return;
         products = data.products || [];
-        exchangeRate = parseFloat(data.exchangeRate) || 36.50;
-        
-        // Dynamic Branding update
-        const displayTitle = data.mobileTitle || data.companyName || 'PUNTO PILA';
-        document.title = displayTitle;
-        const headerTitle = document.getElementById('mobile-header-title');
-        if (headerTitle) headerTitle.textContent = displayTitle.toUpperCase();
-        
-        // Color de Marca y Detalles
-        if (data.mobileColor) {
-            const themeColor = data.mobileColor;
-            let styleTag = document.getElementById('dynamic-theme-style');
-            if (!styleTag) {
-                styleTag = document.createElement('style');
-                styleTag.id = 'dynamic-theme-style';
-                document.head.appendChild(styleTag);
-            }
-            // Inyectar CSS que sobreescribe Tailwind para los elementos clave
-            styleTag.innerHTML = `
-                :root { --brand-color: ${themeColor}; }
-                .text-blue-600 { color: ${themeColor} !important; }
-                .bg-blue-600 { background-color: ${themeColor} !important; }
-                .border-blue-600 { border-color: ${themeColor} !important; }
-                .bg-blue-50 { background-color: ${themeColor}15 !important; } /* Opacidad 15 hex aprox */
-                .cat-btn.active { background-color: ${themeColor} !important; box-shadow: 0 4px 12px ${themeColor}40; }
-                #send-order { background-color: ${themeColor} !important; box-shadow: 0 10px 20px ${themeColor}30; }
-                #mobile-header-title { text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-            `;
-        }
+        if (data.exchangeRate) exchangeRate = parseFloat(data.exchangeRate);
 
-        // Imagen de Fondo con controles dinámicos
-        if (data.mobileBg) {
-            const opacity = (data.mobileBgOpacity !== undefined) ? (1 - (data.mobileBgOpacity / 100)) : 0.1;
-            const blur = (data.mobileBgBlur !== undefined) ? data.mobileBgBlur : 0;
-            
-            document.body.style.backgroundImage = `linear-gradient(rgba(0,0,0,${opacity}), rgba(0,0,0,${opacity})), url('${data.mobileBg}')`;
-            document.body.style.backgroundSize = 'cover';
-            document.body.style.backgroundPosition = 'center';
-            document.body.style.backgroundAttachment = 'fixed';
-            
-            // Ajuste de legibilidad Dinámico
-            const mainContent = document.getElementById('main-content');
-            if (mainContent) {
-                mainContent.className = mainContent.className.replace(/bg-white\/\d+/, ''); // Limpiar opacidades previas
-                mainContent.classList.add('bg-white/50');
-                mainContent.style.backdropFilter = `blur(${blur}px)`;
-                mainContent.style.webkitBackdropFilter = `blur(${blur}px)`; // Soporte iOS
-            }
+        const brand = data.mobileTitle || data.companyName || 'PUNTO PILA';
+        const titleEl = document.getElementById('mobile-header-title');
+        if (titleEl) titleEl.textContent = brand;
+        document.title = brand;
+
+        if (data.paymentData) {
+            paymentData = Object.assign(paymentData, data.paymentData);
+            localStorage.setItem('pos_mobile_payment_data', JSON.stringify(paymentData));
+            updatePaymentUI();
         }
 
         localStorage.setItem('pos_mobile_products', JSON.stringify(products));
         localStorage.setItem('pos_mobile_rate', exchangeRate.toString());
-        if (typeof renderFeaturedProducts === 'function') renderFeaturedProducts();
-        if (typeof renderProducts === 'function') renderProducts();
+
+        updateRateDisplay();
+        renderCategories();
+        renderProducts();
     });
 }
 
-function saveToHistory(url) {
-    if (!url) return;
-    try {
-        let history = JSON.parse(localStorage.getItem('pos_server_history')) || [];
-        if (!history.includes(url)) {
-            history.unshift(url);
-            if (history.length > 5) history.pop();
-            localStorage.setItem('pos_server_history', JSON.stringify(history));
-        }
-    } catch(e) {}
+function updateRateDisplay() {
+    const rateEl = document.getElementById('rate-display');
+    if (rateEl) rateEl.textContent = exchangeRate.toFixed(2);
 }
 
-window.addEventListener('load', initConnection);
-window.addEventListener('online', () => { if (socket && !socket.connected) socket.connect(); });
-window.addEventListener('offline', () => { 
-    isOffline = true; 
-    updateStatus('SIN INTERNET EN EL MOVIL', 'rose');
-});
+function updatePaymentUI() {
+    const pmBankName = document.getElementById('pm-bank-name');
+    const pmPhone = document.getElementById('pm-phone-display');
+    const pmCi = document.getElementById('pm-ci-display');
 
-// Manual server URL configuration
-window.showServerConfig = () => {
-    const currentUrl = localStorage.getItem('pos_server_url') || '';
-    const newUrl = prompt('URL del servidor Punto Pila:', currentUrl);
-    if (newUrl && newUrl.trim()) {
-        localStorage.setItem('pos_server_url', newUrl.trim());
-        window.location.reload();
+    if (pmBankName && paymentData.pmBank) pmBankName.textContent = paymentData.pmBank;
+    if (pmPhone && paymentData.pmPhone) pmPhone.textContent = paymentData.pmPhone;
+    if (pmCi && paymentData.pmCi) pmCi.textContent = paymentData.pmCi;
+
+    const zelleEmail = document.getElementById('zelle-email-display');
+    const zelleName = document.getElementById('zelle-name-display');
+    if (zelleEmail && paymentData.zelleEmail) zelleEmail.textContent = paymentData.zelleEmail;
+    if (zelleName && paymentData.zelleName) zelleName.textContent = paymentData.zelleName;
+
+    const bankAccount = document.getElementById('bank-account-display');
+    if (bankAccount && paymentData.bankDetails) bankAccount.textContent = paymentData.bankDetails;
+}
+
+// ─────────────────────────────────────────────────────────────
+// CATEGORÍAS & DESTACADOS
+// ─────────────────────────────────────────────────────────────
+function renderCategories() {
+    const container = document.getElementById('categories-container');
+    if (!container) return;
+
+    const rawCategories = products.map(p => (p.category || '').trim()).filter(Boolean);
+    const uniqueCats = ['Todos', ...new Set(rawCategories)];
+
+    // Si hay productos destacados, agregar pestaña de destacados
+    const hasFeatured = products.some(p => p.featured);
+    if (hasFeatured) {
+        uniqueCats.splice(1, 0, '⭐ Destacados');
+    }
+
+    container.innerHTML = uniqueCats.map(cat => {
+        const isActive = cat === currentCategory;
+        return `
+            <button onclick="selectCategory('${cat}')" 
+                class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${isActive ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" 
+                data-category="${cat}">
+                ${cat}
+            </button>
+        `;
+    }).join('');
+}
+
+window.selectCategory = function(cat) {
+    currentCategory = cat;
+    const catTitle = document.getElementById('category-title');
+    if (catTitle) catTitle.textContent = cat === 'Todos' ? 'Todos los Productos' : cat;
+    renderCategories();
+    renderProducts();
+};
+
+// ─────────────────────────────────────────────────────────────
+// BUSCADOR
+// ─────────────────────────────────────────────────────────────
+const searchInput = document.getElementById('search-input');
+const clearSearchBtn = document.getElementById('clear-search-btn');
+
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        searchTerm = e.target.value;
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = searchTerm ? 'flex' : 'none';
+        }
+        renderProducts();
+    });
+}
+
+if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchTerm = '';
+        clearSearchBtn.style.display = 'none';
+        searchInput.focus();
+        renderProducts();
+    });
+}
+
+// ─────────────────────────────────────────────────────────────
+// PRODUCTOS (Control de Stock, Variantes y Destacados)
+// ─────────────────────────────────────────────────────────────
+function renderProducts() {
+    const list = document.getElementById('product-list');
+    const countEl = document.getElementById('results-count');
+    if (!list) return;
+
+    const term = searchTerm.toLowerCase().trim();
+    const filtered = products.filter(p => {
+        let matchCategory = true;
+        if (currentCategory === '⭐ Destacados') {
+            matchCategory = !!p.featured;
+        } else if (currentCategory !== 'Todos') {
+            matchCategory = (p.category || '').toLowerCase() === currentCategory.toLowerCase();
+        }
+
+        const matchSearch = !term || 
+            (p.name && p.name.toLowerCase().includes(term)) ||
+            (p.category && p.category.toLowerCase().includes(term)) ||
+            (p.barcode && p.barcode.toLowerCase().includes(term)) ||
+            (p.flavors && Array.isArray(p.flavors) && p.flavors.some(f => f.toLowerCase().includes(term)));
+        return matchCategory && matchSearch;
+    });
+
+    if (countEl) {
+        countEl.textContent = `${filtered.length} producto${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
+        list.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 text-xl mb-3">
+                    <i class="fas fa-box-open"></i>
+                </div>
+                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">
+                    ${products.length === 0 ? 'Catálogo Vacío' : 'Sin resultados'}
+                </h4>
+                <p class="text-xs text-slate-400 max-w-xs mb-3">
+                    ${products.length === 0 
+                        ? 'Crea tus productos en la caja y se mostrarán aquí de inmediato.' 
+                        : (searchTerm ? `No hay coincidencias para "${searchTerm}".` : 'No hay productos en esta sección.')}
+                </p>
+                ${searchTerm ? `
+                    <button onclick="document.getElementById('clear-search-btn').click()" class="px-3.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold">
+                        Limpiar filtro
+                    </button>
+                ` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 pb-8">
+            ${filtered.map(p => renderProductCard(p)).join('')}
+        </div>
+    `;
+}
+
+function renderProductCard(p) {
+    const priceUSD = parseFloat(p.priceUSD || p.price || 0);
+    const priceVES = (p.priceVES && parseFloat(p.priceVES) > 0) ? parseFloat(p.priceVES) : (priceUSD * exchangeRate);
+    
+    const hasStockField = p.stock !== undefined && p.stock !== null;
+    const stock = hasStockField ? parseFloat(p.stock) : 999;
+    const isOutOfStock = hasStockField && stock <= 0;
+    const isLowStock = hasStockField && stock > 0 && stock <= 5;
+    const hasFlavors = p.flavors && Array.isArray(p.flavors) && p.flavors.length > 0;
+
+    // Conteo en carrito (incluyendo variantes)
+    const inCartQty = cart.filter(c => c.productId === p.id || c.id === p.id).reduce((s, i) => s + i.qty, 0);
+
+    const imgFallback = `
+        <div class="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+            <i class="fas fa-tag text-xl mb-1 text-slate-300"></i>
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">${(p.category || 'General').substring(0, 12)}</span>
+        </div>
+    `;
+
+    return `
+        <div class="product-card bg-white rounded-2xl p-3 border border-slate-200/80 shadow-sm flex flex-col justify-between ${isOutOfStock ? 'opacity-50' : ''}">
+            
+            <!-- Badges de Stock / Destacado -->
+            <div class="h-28 rounded-xl overflow-hidden mb-2.5 bg-slate-50 relative border border-slate-100">
+                <div class="absolute top-2 left-2 z-10 flex flex-col gap-1">
+                    ${p.featured ? `
+                        <span class="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase shadow-sm">
+                            ⭐ TOP
+                        </span>
+                    ` : ''}
+                    ${isOutOfStock ? `
+                        <span class="bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase">
+                            Agotado
+                        </span>
+                    ` : isLowStock ? `
+                        <span class="bg-amber-500 text-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                            Últimos ${stock}
+                        </span>
+                    ` : ''}
+                </div>
+
+                ${p.img && p.img.startsWith('http') ? `
+                    <img src="${p.img}" alt="${p.name}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML = '${imgFallback.replace(/'/g, "\\'")}'">
+                ` : imgFallback}
+            </div>
+
+            <!-- Datos -->
+            <div class="flex-1 flex flex-col mb-2.5">
+                <div class="flex items-center justify-between mb-0.5">
+                    <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">${p.category || 'General'}</span>
+                    ${hasStockField && !isOutOfStock ? `<span class="text-[9px] text-slate-400 font-mono">Stock: ${stock}</span>` : ''}
+                </div>
+                <h4 class="text-xs font-bold text-slate-800 line-clamp-2 leading-tight min-h-[28px] mb-1">${p.name}</h4>
+                
+                <!-- Opciones / Sabores / Sub-productos -->
+                ${hasFlavors ? `
+                    <div class="flex flex-wrap gap-1 mb-2">
+                        ${p.flavors.slice(0, 3).map(f => `
+                            <span class="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">${f}</span>
+                        `).join('')}
+                        ${p.flavors.length > 3 ? `<span class="text-[8px] text-slate-400 font-bold">+${p.flavors.length - 3}</span>` : ''}
+                    </div>
+                ` : ''}
+
+                <!-- Precios -->
+                <div class="mt-auto">
+                    <p class="text-sm font-extrabold text-slate-900 font-mono leading-none">$${priceUSD.toFixed(2)}</p>
+                    <p class="text-[10px] font-medium text-slate-400 font-mono mt-0.5">
+                        Bs ${priceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Botón / Stepper -->
+            <div>
+                ${isOutOfStock ? `
+                    <button disabled class="w-full py-1.5 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-bold">
+                        Agotado
+                    </button>
+                ` : hasFlavors ? `
+                    <button onclick="openFlavorModal('${p.id}')" class="w-full py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-xl text-xs font-bold transition-all border border-blue-200 active:scale-95 flex items-center justify-center gap-1">
+                        <i class="fas fa-list-ul text-[9px]"></i> Opciones ${inCartQty > 0 ? `(${inCartQty})` : ''}
+                    </button>
+                ` : inCartQty > 0 ? `
+                    <div class="flex items-center justify-between bg-slate-900 rounded-xl p-0.5">
+                        <button onclick="changeQty('${p.id}', -1)" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-bold flex items-center justify-center active:scale-90">
+                            <i class="fas fa-minus text-[9px]"></i>
+                        </button>
+                        <span class="text-xs font-bold text-white font-mono px-2">${inCartQty}</span>
+                        <button onclick="changeQty('${p.id}', 1)" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-bold flex items-center justify-center active:scale-90">
+                            <i class="fas fa-plus text-[9px]"></i>
+                        </button>
+                    </div>
+                ` : `
+                    <button onclick="addToCart('${p.id}')" class="w-full py-1.5 bg-slate-100 hover:bg-slate-900 text-slate-800 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-200 active:scale-95">
+                        + Añadir
+                    </button>
+                `}
+            </div>
+
+        </div>
+    `;
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL DE SABORES / SUB-PRODUCTOS
+// ─────────────────────────────────────────────────────────────
+window.openFlavorModal = function(id) {
+    const product = products.find(p => String(p.id) === String(id));
+    if (!product || !product.flavors || product.flavors.length === 0) {
+        addToCart(id);
+        return;
+    }
+
+    const modal = document.getElementById('flavor-modal');
+    const overlay = document.getElementById('flavor-overlay');
+    const content = document.getElementById('flavor-content');
+    const titleEl = document.getElementById('flavor-product-name');
+    const listEl = document.getElementById('flavor-options-list');
+
+    if (titleEl) titleEl.textContent = product.name;
+    if (listEl) {
+        listEl.innerHTML = product.flavors.map(flavor => `
+            <button onclick="selectProductFlavor('${product.id}', '${flavor.replace(/'/g, "\\'")}')" 
+                class="w-full bg-slate-50 hover:bg-slate-900 text-slate-800 hover:text-white border border-slate-200 p-3 rounded-xl text-xs font-bold flex items-center justify-between transition-all active:scale-98">
+                <span><i class="fas fa-circle-dot mr-2 text-blue-500 text-[10px]"></i> ${flavor}</span>
+                <i class="fas fa-plus text-xs"></i>
+            </button>
+        `).join('');
+    }
+
+    modal.classList.remove('invisible');
+    setTimeout(() => {
+        overlay.classList.remove('opacity-0');
+        content.classList.remove('translate-y-full');
+    }, 10);
+};
+
+window.closeFlavorModal = function() {
+    const modal = document.getElementById('flavor-modal');
+    const overlay = document.getElementById('flavor-overlay');
+    const content = document.getElementById('flavor-content');
+    if (!modal) return;
+
+    overlay.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('invisible'); }, 200);
+};
+
+window.selectProductFlavor = function(id, flavor) {
+    closeFlavorModal();
+    addToCart(id, flavor);
+};
+
+// ─────────────────────────────────────────────────────────────
+// CARRITO & CONTROL DE STOCK
+// ─────────────────────────────────────────────────────────────
+window.addToCart = function(id, flavor = null) {
+    const product = products.find(p => String(p.id) === String(id));
+    if (!product) return;
+
+    const maxStock = (product.stock !== undefined && product.stock !== null) ? parseFloat(product.stock) : 999;
+    if (maxStock <= 0) {
+        alert('Este producto se encuentra agotado.');
+        return;
+    }
+
+    // Identificador único por variante
+    const cartId = flavor ? `${product.id}-${flavor}` : product.id;
+    const displayName = flavor ? `${product.name} (${flavor})` : product.name;
+
+    // Calcular cuántas unidades en total del mismo producto padre ya están en el carrito
+    const totalParentQty = cart.filter(c => c.productId === product.id || c.id === product.id).reduce((s, i) => s + i.qty, 0);
+    if (totalParentQty + 1 > maxStock) {
+        alert(`Stock máximo alcanzado (${maxStock} unidades disponibles en total).`);
+        return;
+    }
+
+    const existing = cart.find(c => String(c.id) === String(cartId));
+    if (existing) {
+        existing.qty++;
+    } else {
+        const priceUSD = parseFloat(product.priceUSD || product.price || 0);
+        const priceVES = (product.priceVES && parseFloat(product.priceVES) > 0) ? parseFloat(product.priceVES) : (priceUSD * exchangeRate);
+        cart.push({
+            id: cartId,
+            productId: product.id,
+            name: displayName,
+            flavor: flavor,
+            priceUSD: priceUSD,
+            priceVES: priceVES,
+            qty: 1,
+            maxStock: maxStock
+        });
+    }
+
+    saveCart();
+    renderProducts();
+    updateCartUI();
+};
+
+window.changeQty = function(id, delta) {
+    const idx = cart.findIndex(c => String(c.id) === String(id));
+    if (idx === -1) return;
+
+    const item = cart[idx];
+    const product = products.find(p => String(p.id) === String(item.productId || item.id));
+    const maxStock = product ? ((product.stock !== undefined && product.stock !== null) ? parseFloat(product.stock) : 999) : (item.maxStock || 999);
+
+    if (delta > 0) {
+        const totalParentQty = cart.filter(c => c.productId === (item.productId || item.id) || c.id === (item.productId || item.id)).reduce((s, i) => s + i.qty, 0);
+        if (totalParentQty + delta > maxStock) {
+            alert(`Stock máximo alcanzado (${maxStock} unidades disponibles).`);
+            return;
+        }
+    }
+
+    item.qty += delta;
+    if (item.qty <= 0) {
+        cart.splice(idx, 1);
+    }
+
+    saveCart();
+    renderProducts();
+    updateCartUI();
+    renderCartItems();
+    calculateCashChange();
+};
+
+function saveCart() {
+    localStorage.setItem('pos_mobile_cart', JSON.stringify(cart));
+}
+
+function updateCartUI() {
+    const totalCount = cart.reduce((sum, item) => sum + item.qty, 0);
+    const totalUSD = cart.reduce((sum, item) => sum + (item.priceUSD * item.qty), 0);
+    const totalVES = cart.reduce((sum, item) => sum + (item.priceVES * item.qty), 0);
+
+    const headerCount = document.getElementById('cart-count');
+    if (headerCount) {
+        headerCount.textContent = totalCount;
+        headerCount.style.display = totalCount > 0 ? 'flex' : 'none';
+    }
+
+    const floatBar = document.getElementById('floating-cart-bar');
+    const floatCount = document.getElementById('float-cart-count');
+    const floatUSD = document.getElementById('float-cart-total-usd');
+    const floatVES = document.getElementById('float-cart-total-ves');
+
+    if (floatBar) {
+        if (totalCount > 0) {
+            floatBar.classList.remove('hidden');
+            if (floatCount) floatCount.textContent = totalCount;
+            if (floatUSD) floatUSD.textContent = `$${totalUSD.toFixed(2)}`;
+            if (floatVES) floatVES.textContent = `(Bs ${totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+        } else {
+            floatBar.classList.add('hidden');
+        }
+    }
+
+    const modalUSD = document.getElementById('cart-total-usd-display');
+    const modalVES = document.getElementById('cart-total');
+    if (modalUSD) modalUSD.textContent = `$${totalUSD.toFixed(2)}`;
+    if (modalVES) modalVES.textContent = `Bs ${totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const cashTotal = document.getElementById('cash-total-display');
+    if (cashTotal) cashTotal.textContent = `$${totalUSD.toFixed(2)} (Bs ${totalVES.toFixed(2)})`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL DE CESTA
+// ─────────────────────────────────────────────────────────────
+window.openCartModal = function() {
+    renderCartItems();
+    const modal = document.getElementById('cart-modal');
+    const overlay = document.getElementById('cart-overlay');
+    const content = document.getElementById('cart-content');
+    if (!modal) return;
+
+    modal.classList.remove('invisible');
+    setTimeout(() => {
+        overlay.classList.remove('opacity-0');
+        content.classList.remove('translate-y-full');
+    }, 10);
+};
+
+window.closeCartModal = function() {
+    const modal = document.getElementById('cart-modal');
+    const overlay = document.getElementById('cart-overlay');
+    const content = document.getElementById('cart-content');
+    if (!modal) return;
+
+    overlay.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('invisible'); }, 200);
+};
+
+const cartTrigger = document.getElementById('cart-trigger');
+if (cartTrigger) cartTrigger.addEventListener('click', openCartModal);
+
+function renderCartItems() {
+    const container = document.getElementById('cart-items');
+    if (!container) return;
+
+    if (cart.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-10 text-slate-400">
+                <i class="fas fa-shopping-basket text-3xl mb-2 text-slate-300"></i>
+                <p class="text-xs font-semibold">Tu cesta está vacía</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = cart.map(item => `
+        <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3 flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+                <h4 class="text-xs font-bold text-slate-900 truncate">${item.name}</h4>
+                <p class="text-[11px] font-mono text-slate-500">
+                    $${item.priceUSD.toFixed(2)} • <span class="text-slate-700">Bs ${item.priceVES.toFixed(2)}</span>
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center bg-white rounded-lg border border-slate-200 p-0.5">
+                    <button onclick="changeQty('${item.id}', -1)" class="w-5 h-5 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">
+                        <i class="fas fa-minus text-[8px]"></i>
+                    </button>
+                    <span class="text-xs font-bold text-slate-900 font-mono px-2">${item.qty}</span>
+                    <button onclick="changeQty('${item.id}', 1)" class="w-5 h-5 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">
+                        <i class="fas fa-plus text-[8px]"></i>
+                    </button>
+                </div>
+                <button onclick="changeQty('${item.id}', -${item.qty})" class="text-slate-400 hover:text-rose-500 p-1 text-xs">
+                    <i class="fas fa-trash-alt text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODAL DE CHECKOUT & FACTORES DE ENTREGA
+// ─────────────────────────────────────────────────────────────
+function setupDeliveryEvents() {
+    document.querySelectorAll('.delivery-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.delivery-type-btn').forEach(b => {
+                b.classList.remove('active', 'border-slate-900', 'bg-slate-900', 'text-white');
+                b.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+            });
+            btn.classList.add('active', 'border-slate-900', 'bg-slate-900', 'text-white');
+            btn.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
+
+            selectedDeliveryType = btn.dataset.type;
+            const addressBox = document.getElementById('delivery-address-box');
+            const dineinBox = document.getElementById('dinein-table-box');
+
+            if (addressBox) addressBox.classList.toggle('hidden', selectedDeliveryType !== 'delivery');
+            if (dineinBox) dineinBox.classList.toggle('hidden', selectedDeliveryType !== 'dinein');
+        });
+    });
+}
+
+function setupPaymentEvents() {
+    document.querySelectorAll('.pay-method-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.pay-method-btn').forEach(b => {
+                b.classList.remove('active', 'bg-white', 'shadow-sm', 'text-slate-900');
+                b.classList.add('text-slate-500');
+            });
+            btn.classList.add('active', 'bg-white', 'shadow-sm', 'text-slate-900');
+            btn.classList.remove('text-slate-500');
+
+            selectedPaymentMethod = btn.dataset.method;
+            const pmDetails = document.getElementById('pago-movil-details');
+            const efectivoDetails = document.getElementById('efectivo-usd-details');
+            const zelleDetails = document.getElementById('zelle-details');
+            const transfDetails = document.getElementById('transferencia-details');
+            const otherDetails = document.getElementById('other-methods-details');
+
+            if (pmDetails) pmDetails.classList.toggle('hidden', selectedPaymentMethod !== 'pago_movil');
+            if (efectivoDetails) efectivoDetails.classList.toggle('hidden', selectedPaymentMethod !== 'efectivo_usd');
+            if (zelleDetails) zelleDetails.classList.toggle('hidden', selectedPaymentMethod !== 'zelle');
+            if (transfDetails) transfDetails.classList.toggle('hidden', selectedPaymentMethod !== 'transferencia');
+            if (otherDetails) otherDetails.classList.toggle('hidden', selectedPaymentMethod !== 'punto');
+        });
+    });
+}
+
+window.calculateCashChange = function() {
+    const givenInput = document.getElementById('cash-given-amount');
+    const resultBox = document.getElementById('cash-change-result');
+    const changeDisplay = document.getElementById('cash-change-amount');
+    const changeVesDisplay = document.getElementById('cash-change-ves');
+    if (!givenInput || !resultBox) return;
+
+    const totalUSD = cart.reduce((sum, item) => sum + (item.priceUSD * item.qty), 0);
+    const given = parseFloat(givenInput.value || 0);
+
+    if (given > totalUSD) {
+        const changeUSD = given - totalUSD;
+        const changeVES = changeUSD * exchangeRate;
+        resultBox.classList.remove('hidden');
+        if (changeDisplay) changeDisplay.textContent = `$${changeUSD.toFixed(2)}`;
+        if (changeVesDisplay) changeVesDisplay.textContent = `(Bs ${changeVES.toFixed(2)})`;
+    } else {
+        resultBox.classList.add('hidden');
     }
 };
 
-/* QR Scanner Logic for Linking */
+window.openPaymentModal = function() {
+    if (cart.length === 0) return;
+    closeCartModal();
+
+    const modal = document.getElementById('payment-modal');
+    const overlay = document.getElementById('payment-overlay');
+    const content = document.getElementById('payment-content');
+    if (!modal) return;
+
+    updateCartUI();
+    modal.classList.remove('invisible');
+    setTimeout(() => {
+        overlay.classList.remove('opacity-0');
+        content.classList.remove('translate-y-full');
+    }, 10);
+};
+
+window.closePaymentModal = function() {
+    const modal = document.getElementById('payment-modal');
+    const overlay = document.getElementById('payment-overlay');
+    const content = document.getElementById('payment-content');
+    if (!modal) return;
+
+    overlay.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('invisible'); }, 200);
+};
+
+window.copyToClipboard = function(text) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copiado: ' + text);
+    });
+};
+
+// ─────────────────────────────────────────────────────────────
+// ENVIAR PEDIDO
+// ─────────────────────────────────────────────────────────────
+window.submitOrder = function() {
+    const clientName = (document.getElementById('origin-name')?.value || '').trim();
+    if (!clientName) {
+        alert('Por favor escribe tu Nombre para registrar la orden.');
+        document.getElementById('origin-name')?.focus();
+        return;
+    }
+
+    const clientPhone = (document.getElementById('origin-phone-global')?.value || '').trim();
+    if (!clientPhone) {
+        alert('Por favor indica tu número de Teléfono / WhatsApp para confirmar el pedido.');
+        document.getElementById('origin-phone-global')?.focus();
+        return;
+    }
+
+    // Validar entrega
+    let deliveryInfo = { type: selectedDeliveryType };
+    if (selectedDeliveryType === 'delivery') {
+        const address = (document.getElementById('order-delivery-address')?.value || '').trim();
+        if (!address) {
+            alert('Por favor indica la dirección exacta de entrega.');
+            document.getElementById('order-delivery-address')?.focus();
+            return;
+        }
+        deliveryInfo.address = address;
+        deliveryInfo.reference = (document.getElementById('order-delivery-ref')?.value || '').trim();
+    } else if (selectedDeliveryType === 'dinein') {
+        const table = (document.getElementById('order-table-num')?.value || '').trim();
+        if (!table) {
+            alert('Por favor indica el número de mesa.');
+            document.getElementById('order-table-num')?.focus();
+            return;
+        }
+        deliveryInfo.table = table;
+    }
+
+    const notes = (document.getElementById('origin-observations')?.value || '').trim();
+    
+    let ref = '';
+    let cashGiven = 0;
+    if (selectedPaymentMethod === 'pago_movil') {
+        ref = (document.getElementById('origin-ref')?.value || '').trim();
+        if (!ref) {
+            alert('Por favor ingresa los 4 dígitos de referencia del Pago Móvil.');
+            document.getElementById('origin-ref')?.focus();
+            return;
+        }
+    } else if (selectedPaymentMethod === 'zelle') {
+        ref = (document.getElementById('zelle-ref')?.value || '').trim();
+    } else if (selectedPaymentMethod === 'transferencia') {
+        ref = (document.getElementById('transfer-ref')?.value || '').trim();
+    } else if (selectedPaymentMethod === 'efectivo_usd') {
+        cashGiven = parseFloat(document.getElementById('cash-given-amount')?.value || 0);
+    }
+
+    const totalUSD = cart.reduce((sum, item) => sum + (item.priceUSD * item.qty), 0);
+    const totalVES = cart.reduce((sum, item) => sum + (item.priceVES * item.qty), 0);
+
+    const orderData = {
+        id: 'order_' + Date.now().toString(36),
+        clientName: clientName,
+        clientPhone: clientPhone,
+        delivery: deliveryInfo,
+        notes: notes,
+        paymentMethod: selectedPaymentMethod,
+        reference: ref,
+        cashGiven: cashGiven,
+        items: cart,
+        totalUSD: totalUSD,
+        totalVES: totalVES,
+        exchangeRate: exchangeRate,
+        timestamp: new Date().toISOString()
+    };
+
+    if (socket && socket.connected) {
+        socket.emit('new-order', orderData);
+        alert('✅ ¡Pedido recibido con éxito por el comercio!');
+    } else {
+        alert('⚠️ Pedido guardado. Te sugerimos enviarlo por WhatsApp para confirmación inmediata.');
+    }
+
+    cart = [];
+    saveCart();
+    updateCartUI();
+    renderProducts();
+    closePaymentModal();
+};
+
+window.sendOrderViaWhatsApp = function() {
+    const clientName = (document.getElementById('origin-name')?.value || '').trim() || 'Cliente';
+    const clientPhone = (document.getElementById('origin-phone-global')?.value || '').trim();
+    const notes = (document.getElementById('origin-observations')?.value || '').trim();
+    
+    let ref = '';
+    let cashGiven = 0;
+    if (selectedPaymentMethod === 'pago_movil') ref = (document.getElementById('origin-ref')?.value || '').trim();
+    if (selectedPaymentMethod === 'zelle') ref = (document.getElementById('zelle-ref')?.value || '').trim();
+    if (selectedPaymentMethod === 'transferencia') ref = (document.getElementById('transfer-ref')?.value || '').trim();
+    if (selectedPaymentMethod === 'efectivo_usd') cashGiven = parseFloat(document.getElementById('cash-given-amount')?.value || 0);
+
+    const totalUSD = cart.reduce((sum, item) => sum + (item.priceUSD * item.qty), 0);
+    const totalVES = cart.reduce((sum, item) => sum + (item.priceVES * item.qty), 0);
+
+    let deliveryText = 'Retiro en Tienda';
+    if (selectedDeliveryType === 'delivery') {
+        const addr = (document.getElementById('order-delivery-address')?.value || '').trim();
+        const dref = (document.getElementById('order-delivery-ref')?.value || '').trim();
+        deliveryText = `🛵 Delivery a: ${addr} ${dref ? `(Ref: ${dref})` : ''}`;
+    } else if (selectedDeliveryType === 'dinein') {
+        const table = (document.getElementById('order-table-num')?.value || '').trim();
+        deliveryText = `🍽️ Comer en Local: Mesa ${table || '-'}`;
+    }
+
+    let msg = `🛍️ *NUEVO PEDIDO - ${document.title}*\n`;
+    msg += `👤 *Cliente:* ${clientName} (${clientPhone || 'Sin telf'})\n`;
+    msg += `📍 *Entrega:* ${deliveryText}\n`;
+    if (notes) msg += `📝 *Nota:* ${notes}\n`;
+    msg += `💳 *Pago:* ${selectedPaymentMethod.toUpperCase()}${ref ? ` (Ref: ${ref})` : ''}\n`;
+    if (cashGiven > totalUSD) {
+        msg += `💵 *Paga con:* $${cashGiven.toFixed(2)} (Vuelto: $${(cashGiven - totalUSD).toFixed(2)})\n`;
+    }
+    msg += `\n📦 *Artículos:*\n`;
+
+    cart.forEach(item => {
+        msg += `• ${item.qty}x ${item.name} ($${(item.priceUSD * item.qty).toFixed(2)})\n`;
+    });
+
+    msg += `\n💵 *Total USD:* $${totalUSD.toFixed(2)}\n`;
+    msg += `🇻🇪 *Total Bs:* Bs ${totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+
+    const targetPhone = (paymentData.orderWhatsApp || '584142497920').replace(/[^0-9]/g, '');
+    const waUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+};
+
+// ─────────────────────────────────────────────────────────────
+// QR SCANNER
+// ─────────────────────────────────────────────────────────────
 const qrBtn = document.getElementById('sync-qr-btn');
-const qrModal = document.getElementById('qr-modal');
-const qrOverlay = document.getElementById('qr-overlay');
-const qrContent = document.getElementById('qr-content');
-const closeQr = document.getElementById('close-qr');
 let html5QrCode = null;
 
 if (qrBtn) {
     qrBtn.onclick = () => {
-        qrModal.classList.remove('invisible');
+        const modal = document.getElementById('qr-modal');
+        const overlay = document.getElementById('qr-overlay');
+        const content = document.getElementById('qr-content');
+        modal.classList.remove('invisible');
         setTimeout(() => {
-            qrOverlay.classList.remove('opacity-0');
-            qrContent.classList.remove('opacity-0', 'scale-90');
+            overlay.classList.remove('opacity-0');
+            content.classList.remove('opacity-0', 'scale-95');
         }, 10);
-        
+
         html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-        
-        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 }, onScanSuccess)
             .catch(err => {
-                console.error("No se pudo iniciar la cámara:", err);
-                alert("No se pudo acceder a la cámara. Por favor permite los permisos.");
+                alert('Por favor permite el acceso a la cámara.');
                 stopScanner();
             });
     };
 }
 
 async function onScanSuccess(decodedText) {
-    console.log(`Code scanned: ${decodedText}`);
-    
-    // Vibrate if possible to give tactile feedback
-    if (window.navigator && window.navigator.vibrate) {
-        window.navigator.vibrate(200);
-    }
-
-    await stopScanner();
-    
     if (decodedText.startsWith('http')) {
-        let cleanUrl = decodedText;
-        if (cleanUrl.endsWith('/mobile')) {
-            cleanUrl = cleanUrl.replace('/mobile', '');
-        }
-        
+        let cleanUrl = decodedText.split('/mobile')[0];
         localStorage.setItem('pos_server_url', cleanUrl);
-        
-        // Show a more professional overlay or alert
-        const statusBanner = document.getElementById('status-banner');
-        if (statusBanner) {
-            statusBanner.innerHTML = '¡Conexión Exitosa! Recargando...';
-            statusBanner.className = 'fixed top-0 left-0 right-0 bg-emerald-500 text-white text-[10px] font-black py-2 px-4 flex items-center justify-center gap-2 z-[100] animate-bounce';
-        }
-
-        setTimeout(() => {
-            window.location.href = cleanUrl + '/mobile';
-        }, 500);
-    } else {
-        alert('❌ El código escaneado no es un link de Punto Pila válido.');
+        await stopScanner();
+        window.location.href = cleanUrl + '/mobile';
     }
 }
 
-async function stopScanner() {
+window.stopScanner = async function() {
     if (html5QrCode && html5QrCode.isScanning) {
-        try {
-            await html5QrCode.stop();
-            html5QrCode.clear();
-        } catch (err) {
-            console.error("Error al detener el scanner:", err);
-        }
+        try { await html5QrCode.stop(); html5QrCode.clear(); } catch(e) {}
     }
-    closeQrModal();
-}
-
-function closeQrModal() {
-    qrOverlay.classList.add('opacity-0');
-    qrContent.classList.add('opacity-0', 'scale-90');
-    setTimeout(() => {
-        qrModal.classList.add('invisible');
-    }, 300);
-}
-
-if (closeQr) closeQr.onclick = stopScanner;
-
-
-// UI Elements
-const productList = document.getElementById('product-list');
-const cartCount = document.getElementById('cart-count');
-const cartItems = document.getElementById('cart-items');
-const cartTotal = document.getElementById('cart-total');
-const cartTotalUSD = document.getElementById('cart-total-usd');
-const cartModal = document.getElementById('cart-modal');
-const cartContent = document.getElementById('cart-content');
-const cartOverlay = document.getElementById('cart-overlay');
-
-// The following global listeners were causing a crash because 'socket' was null.
-// They have been consolidated into setupSocketEvents() above.
-
-function getPriceVES(p) {
-    return p.promoPriceVES > 0 ? p.promoPriceVES : p.priceVES;
-}
-
-function renderFeaturedProducts() {
-    const featuredSection = document.getElementById('featured-section');
-    const featuredList = document.getElementById('featured-list');
-    
-    const featured = products.filter(p => p.featured && p.stock > 0);
-    
-    if (featured.length === 0) {
-        featuredSection.classList.add('hidden');
-        return;
-    }
-    
-    featuredSection.classList.remove('hidden');
-    featuredList.innerHTML = '';
-    
-    featured.forEach(p => {
-        const priceVES = getPriceVES(p);
-        const hasPromo = p.promoPriceVES > 0;
-        
-        const div = document.createElement('div');
-        div.className = 'min-w-[200px] w-[200px] bg-white rounded-3xl p-4 shadow-sm border border-amber-100 flex flex-col relative shrink-0 overflow-hidden';
-        
-        div.innerHTML = `
-            ${hasPromo ? '<div class="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl z-10">OFERTA</div>' : ''}
-            <div class="h-32 bg-gray-50 rounded-2xl mb-3 overflow-hidden relative">
-                <img src="${p.img || 'https://via.placeholder.com/150'}" class="w-full h-full object-cover">
-                <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/50 to-transparent"></div>
-                <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap">
-                    ${(p.flavors || []).slice(0, 2).map(f => `<span class="bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md border border-white/30">${f}</span>`).join('')}
-                </div>
-            </div>
-            <h4 class="text-sm font-extrabold text-gray-800 line-clamp-1 mb-1">${p.name}</h4>
-            <div class="mt-auto flex items-center justify-between">
-                <div>
-                    <p class="text-lg font-black text-amber-600 leading-none">Bs ${priceVES}</p>
-                    <p class="text-[10px] text-gray-400 font-bold">$${p.priceUSD.toFixed(2)}</p>
-                </div>
-                <button onclick="addToCart('${p.id}')" class="w-10 h-10 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white rounded-xl flex items-center justify-center transition-colors shadow-sm">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        `;
-        featuredList.appendChild(div);
-    });
-}
-
-function renderProducts() {
-    productList.innerHTML = '';
-    const searchLower = searchTerm.toLowerCase().trim();
-    const filtered = products.filter(p => {
-        const catMatch = currentCategory === 'Todos' || p.category === currentCategory;
-        const nameMatch = !searchLower || (p.name && p.name.toLowerCase().includes(searchLower));
-        return catMatch && nameMatch;
-    });
-
-    if (filtered.length === 0) {
-        productList.innerHTML = `<div class="text-center py-20 text-gray-400 font-bold">No hay productos en esta categoría.</div>`;
-        return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-2 gap-4 pb-20';
-
-    filtered.forEach(p => {
-        const isOutOfStock = p.stock <= 0;
-        const priceVES = getPriceVES(p);
-        const hasPromo = p.promoPriceVES > 0;
-        
-        const div = document.createElement('div');
-        div.className = `product-card bg-white rounded-[32px] p-4 shadow-sm border border-gray-100 flex flex-col relative ${isOutOfStock ? 'opacity-50 grayscale' : ''}`;
-        
-        div.innerHTML = `
-            ${hasPromo ? '<div class="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl z-10">OFERTA</div>' : ''}
-            <div class="h-32 bg-gray-50 rounded-2xl mb-3 overflow-hidden">
-                <img src="${p.img || 'https://via.placeholder.com/150'}" class="w-full h-full object-cover">
-            </div>
-            <h4 class="text-sm font-extrabold text-gray-800 line-clamp-2 leading-tight h-10 mb-1">${p.name}</h4>
-            <div class="mt-auto">
-                <div class="flex items-end gap-1 mb-2">
-                    <p class="text-lg font-black text-blue-600 leading-none">Bs ${priceVES}</p>
-                    ${hasPromo ? `<p class="text-[10px] text-gray-400 line-through mb-0.5">Bs ${p.priceVES}</p>` : ''}
-                </div>
-                <p class="text-[10px] text-gray-400 font-bold mb-3">Ref: $${p.priceUSD.toFixed(2)}</p>
-                <button onclick="addToCart('${p.id}')" class="w-full py-2.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-black uppercase tracking-wider active:bg-blue-600 active:text-white transition-colors" ${isOutOfStock ? 'disabled' : ''}>
-                    ${isOutOfStock ? 'Agotado' : '<i class="fas fa-shopping-basket mr-1"></i> Añadir'}
-                </button>
-            </div>
-        `;
-        grid.appendChild(div);
-    });
-    productList.appendChild(grid);
-}
-
-
-window.addToCart = (id) => {
-    const product = products.find(p => p.id === id);
-    if (!product || product.stock <= 0) return;
-
-    const existing = cart.find(item => item.id === id);
-    if (existing) {
-        if (existing.qty < product.stock) {
-            existing.qty++;
-        } else {
-            alert('No hay más stock disponible');
-            return;
-        }
-    } else {
-        cart.push({ ...product, qty: 1 });
-    }
-    updateCartUI();
+    const modal = document.getElementById('qr-modal');
+    const overlay = document.getElementById('qr-overlay');
+    const content = document.getElementById('qr-content');
+    overlay.classList.add('opacity-0');
+    content.classList.add('opacity-0', 'scale-95');
+    setTimeout(() => { modal.classList.add('invisible'); }, 200);
 };
 
-function updateCartUI() {
-    const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
-    cartCount.textContent = totalQty;
-    cartCount.classList.toggle('hidden', totalQty === 0);
-
-    cartItems.innerHTML = '';
-    let totalVES = 0;
-    let totalUSD = 0;
-
-    cart.forEach(item => {
-        const unitPriceVES = getPriceVES(item);
-        const itemTotalVES = unitPriceVES * item.qty;
-        
-        totalVES += itemTotalVES;
-        totalUSD += (item.priceUSD * item.qty);
-
-        const div = document.createElement('div');
-        div.className = 'flex items-center gap-4 bg-gray-50 p-4 rounded-3xl';
-        div.innerHTML = `
-            <div class="w-16 h-16 bg-white rounded-2xl overflow-hidden shrink-0 relative">
-                ${item.promoPriceVES > 0 ? '<div class="absolute top-0 right-0 bg-red-500 w-2 h-2 rounded-full m-1"></div>' : ''}
-                <img src="${item.img}" class="w-full h-full object-cover">
-            </div>
-            <div class="flex-1">
-                <h5 class="text-sm font-extrabold text-gray-800 line-clamp-1">${item.name}</h5>
-                <p class="text-blue-600 font-black">Bs ${unitPriceVES} <span class="text-[10px] text-gray-400 font-bold ml-1">($${item.priceUSD})</span></p>
-            </div>
-            <div class="flex items-center gap-3">
-                <button onclick="changeQty('${item.id}', -1)" class="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 shadow-sm"><i class="fas fa-minus text-[10px]"></i></button>
-                <span class="font-black text-gray-800">${item.qty}</span>
-                <button onclick="changeQty('${item.id}', 1)" class="w-8 h-8 flex items-center justify-center bg-white rounded-full text-gray-400 shadow-sm"><i class="fas fa-plus text-[10px]"></i></button>
-            </div>
-        `;
-        cartItems.appendChild(div);
-    });
-
-    cartTotal.textContent = `Bs ${totalVES.toLocaleString()}`;
-    cartTotalUSD.textContent = `$${totalUSD.toFixed(2)}`;
-    document.getElementById('send-order').disabled = cart.length === 0;
-    
-    // Save cart to offline storage
-    localStorage.setItem('pos_mobile_cart', JSON.stringify(cart));
-}
-
-window.changeQty = (id, delta) => {
-    const index = cart.findIndex(item => item.id === id);
-    if (index === -1) return;
-
-    const product = products.find(p => p.id === id);
-    const newQty = cart[index].qty + delta;
-
-    if (newQty <= 0) {
-        cart.splice(index, 1);
-    } else if (newQty <= product.stock) {
-        cart[index].qty = newQty;
-    }
-    updateCartUI();
-};
-
-// Modals
-document.getElementById('cart-trigger').onclick = () => {
-    cartModal.classList.remove('invisible');
-    setTimeout(() => {
-        cartOverlay.classList.replace('opacity-0', 'opacity-100');
-        cartContent.classList.replace('translate-y-full', 'translate-y-0');
-    }, 10);
-};
-
-const closeCart = () => {
-    cartOverlay.classList.replace('opacity-100', 'opacity-0');
-    cartContent.classList.replace('translate-y-0', 'translate-y-full');
-    setTimeout(() => cartModal.classList.add('invisible'), 300);
-};
-
-document.getElementById('close-cart').onclick = closeCart;
-cartOverlay.onclick = closeCart;
-
-// Payment Modal
-const paymentModal = document.getElementById('payment-modal');
-const paymentContent = document.getElementById('payment-content');
-const paymentOverlay = document.getElementById('payment-overlay');
-let selectedMethod = 'pago_movil';
-
-document.getElementById('checkout-trigger').onclick = () => {
-    // Calcular total antes de abrir
-    const totalVES = cart.reduce((acc, item) => {
-        return acc + (getPriceVES(item) * item.qty);
-    }, 0);
-    document.getElementById('payment-amount').value = totalVES;
-
-    paymentModal.classList.remove('invisible');
-    setTimeout(() => {
-        paymentOverlay.classList.replace('opacity-0', 'opacity-100');
-        paymentContent.classList.replace('translate-y-full', 'translate-y-0');
-    }, 10);
-};
-
-const closePayment = () => {
-    paymentOverlay.classList.replace('opacity-100', 'opacity-0');
-    paymentContent.classList.replace('translate-y-0', 'translate-y-full');
-    setTimeout(() => paymentModal.classList.add('invisible'), 300);
-};
-
-document.getElementById('close-payment').onclick = closePayment;
-paymentOverlay.onclick = closePayment;
-
-// Payment Method Switcher
-document.querySelectorAll('.pay-method-btn').forEach(btn => {
-    btn.onclick = () => {
-        document.querySelectorAll('.pay-method-btn').forEach(b => {
-            b.classList.remove('active', 'border-blue-600', 'bg-blue-50');
-            b.classList.add('border-gray-100', 'bg-gray-50');
-            b.querySelector('i').classList.replace('text-blue-600', 'text-gray-400');
-            b.querySelector('span').classList.replace('text-blue-600', 'text-gray-400');
-        });
-
-        btn.classList.add('active', 'border-blue-600', 'bg-blue-50');
-        btn.classList.remove('border-gray-100', 'bg-gray-50');
-        btn.querySelector('i').classList.replace('text-gray-400', 'text-blue-600');
-        btn.querySelector('span').classList.replace('text-gray-400', 'text-blue-600');
-
-        selectedMethod = btn.dataset.method;
-        
-        const isPagoMovil = selectedMethod === 'pago_movil';
-        document.getElementById('pago-movil-details').classList.toggle('hidden', !isPagoMovil);
-        document.getElementById('other-methods-details').classList.toggle('hidden', isPagoMovil);
-    };
-});
-
-// Categories
-document.querySelectorAll('.cat-btn').forEach(btn => {
-    btn.onclick = (e) => {
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white'));
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.add('bg-gray-100', 'text-gray-500'));
-        
-        btn.classList.add('active', 'bg-blue-600', 'text-white');
-        btn.classList.remove('bg-gray-100', 'text-gray-500');
-        
-        currentCategory = btn.dataset.category;
-        searchTerm = '';
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) searchInput.value = '';
-        renderProducts();
-    };
-});
-
-// Search
-document.addEventListener('input', (e) => {
-    if (e.target.id === 'search-input') {
-        searchTerm = e.target.value;
-        renderProducts();
-    }
-});
-
-// Finalizar Pedido
-let isSendingOrder = false;
-
-document.getElementById('send-order').onclick = () => {
-    if (isSendingOrder) return;
-    isSendingOrder = true;
-
-    const originName = document.getElementById('origin-name').value.trim();
-    const originPhone = document.getElementById('origin-phone-global').value.trim();
-    const pmPhone = document.getElementById('origin-phone').value.trim();
-    const originCI = document.getElementById('origin-ci').value.trim();
-    const originRef = document.getElementById('origin-ref').value.trim();
-    const amount = document.getElementById('payment-amount').value;
-    const observations = document.getElementById('origin-observations').value.trim();
-    const pickupTime = document.getElementById('pickup-time').value;
-
-    // Validación global
-    if (!originName || !originPhone) {
-        alert('⚠️ Por favor, ingresa tu Nombre y Teléfono para la factura.');
-        isSendingOrder = false;
-        return;
-    }
-
-    // Validación específica para Pago Móvil
-    if (selectedMethod === 'pago_movil') {
-        if (!pmPhone || !originCI || !originRef) {
-            alert('⚠️ Para Pago Móvil, debes llenar Teléfono de Pago, Cédula y Referencia.');
-            isSendingOrder = false;
-            return;
-        }
-        if (originRef.length < 4) {
-            alert('⚠️ La referencia de pago debe tener los últimos 4 dígitos.');
-            isSendingOrder = false;
-            return;
-        }
-    }
-
-    const paymentDetails = {
-        method: selectedMethod,
-        originPhone: originPhone, // Global phone
-        originCI: originCI,
-        originName: originName,
-        originRef: originRef,
-        amount: amount,
-        observations: observations,
-        pickupTime: pickupTime
-    };
-
-    const orderData = {
-        id: '10' + Date.now().toString().slice(-4), // Simplificado para que parezca número de orden ej: 104592
-        items: cart,
-        totalVES: cart.reduce((acc, item) => acc + (getPriceVES(item) * item.qty), 0),
-        totalUSD: cart.reduce((acc, item) => acc + (item.priceUSD * item.qty), 0),
-        payment: paymentDetails,
-        timestamp: new Date().toISOString()
-    };
-
-    if (isOffline || !socket || !socket.connected) {
-        alert("⚠️ No tienes conexión con la caja. Por favor, verifica que la computadora esté encendida con la app abierta.");
-        isSendingOrder = false;
-        return;
-    }
-
-    try {
-        socket.emit('new-order', orderData);
-    } catch (err) {
-        console.error('Error enviando pedido:', err);
-        alert('❌ Error crítico al enviar: ' + err.message);
-        isSendingOrder = false;
-        return;
-    }
-    
-    // Alerta visual de éxito actualizada (a petición del usuario)
-    alert(`✅ ¡Usted es la orden N° ${orderData.id}!\n\nSu pedido y pago han sido enviados a la caja con éxito.`);
-    cart = [];
-    updateCartUI();
-    closePayment();
-    closeCart();
-
-    // Reset Form
-    document.getElementById('origin-phone-global').value = '';
-    document.getElementById('origin-phone').value = '';
-    document.getElementById('origin-ci').value = '';
-    document.getElementById('origin-name').value = '';
-    document.getElementById('origin-ref').value = '';
-    document.getElementById('origin-observations').value = '';
-    document.getElementById('pickup-time').value = '';
-
-    setTimeout(() => { isSendingOrder = false; }, 2000);
-};
-
-// Initial render from local cache if available 
-// (Done after all functions are defined)
-if(products.length > 0) {
-    renderFeaturedProducts();
-    renderProducts();
-    updateCartUI(); 
-}
+// Auto-start
+window.addEventListener('load', initConnection);
