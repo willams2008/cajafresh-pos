@@ -2429,56 +2429,26 @@ async function loadData() {
             if (el) el.textContent = 'v' + ver;
         });
     }
+
+    // Inicio Seguro: Mostrar siempre el modal de Login al abrir el programa para separar turnos de cajeros
     var overlay = document.getElementById('login-overlay');
-    var savedUser = JSON.parse(localStorage.getItem('loggedUser') || 'null');
-    
-    if (savedUser) {
-        (async () => {
-            try {
-                var userData = await window.db.getUser(savedUser.username);
-                if (!userData && savedUser.id && savedUser.id.includes('master_test')) {
-                    userData = savedUser;
-                }
-                if (userData && userData.active) {
-                    currentUser = userData;
-                    currentRole = userData.role;
-                    if (overlay) overlay.classList.add('hidden');
-                    var text = document.getElementById('role-text');
-                    if (text) text.textContent = (userData.name || userData.username) + (userData.role === 'admin' ? ' (Admin)' : ' (Cajero)');
-                    var badge = document.getElementById('role-status-badge');
-                    if (badge) {
-                        if (userData.role === 'admin') {
-                            badge.className = 'absolute -bottom-1 -right-1 bg-brand-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center';
-                            badge.innerHTML = '<i class="fas fa-crown text-[8px] text-white"></i>';
-                        } else {
-                            badge.className = 'absolute -bottom-1 -right-1 bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center';
-                            badge.innerHTML = '<i class="fas fa-check text-[8px] text-white"></i>';
-                        }
-                    }
-                    _updateRoleUI(userData.role);
-                } else {
-                    if (overlay) overlay.classList.remove('hidden');
-                }
-            } catch(e) { 
-                console.error('[Auth] Error restoring session:', e); 
-                if (overlay) overlay.classList.remove('hidden');
-            }
-        })();
-    } else {
-        // No hay sesión guardada (el usuario hizo logout previamente): Exigir Inicio de Sesión
-        currentUser = null;
-        currentRole = null;
-        if (overlay) overlay.classList.remove('hidden');
-        var text = document.getElementById('role-text');
-        if (text) text.textContent = 'Sin Sesión';
-        var badge = document.getElementById('role-status-badge');
-        if (badge) { badge.className = 'absolute -bottom-1 -right-1 bg-slate-400 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; badge.innerHTML = '<i class="fas fa-lock text-[8px] text-white"></i>'; }
-        _updateRoleUI(null);
-        setTimeout(function() {
-            var uInp = document.getElementById('login-username');
-            if (uInp) uInp.focus();
-        }, 300);
+    currentUser = null;
+    currentRole = null;
+    localStorage.removeItem('loggedUser');
+    if (overlay) overlay.classList.remove('hidden');
+    var text = document.getElementById('role-text');
+    if (text) text.textContent = 'Iniciar Sesión';
+    var badge = document.getElementById('role-status-badge');
+    if (badge) { 
+        badge.className = 'absolute -bottom-1 -right-1 bg-slate-400 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center'; 
+        badge.innerHTML = '<i class="fas fa-lock text-[8px] text-white"></i>'; 
     }
+    _updateRoleUI(null);
+    setTimeout(function() { 
+        var uInput = document.getElementById('login-username');
+        if (uInput) uInput.focus(); 
+    }, 250);
+
     if (typeof window.renderCategoryOptions === 'function') window.renderCategoryOptions();
     if (typeof renderProducts === 'function') renderProducts();
     if (typeof renderInventory === 'function') renderInventory();
@@ -3059,6 +3029,11 @@ function initPOS() {
     const searchInput = document.getElementById('search-product');
     const clearProdBtn = document.getElementById('clear-search-product-btn');
     if (searchInput) {
+        const debouncedPOSSearch = debounce((term) => {
+            searchTerm = term.toLowerCase().trim();
+            renderProducts();
+        }, 80);
+
         searchInput.addEventListener('input', (e) => {
             const val = e.target.value;
             if (clearProdBtn) clearProdBtn.classList.toggle('hidden', !val);
@@ -3066,10 +3041,7 @@ function initPOS() {
                 searchTerm = '';
                 renderProducts();
             } else {
-                debounce(() => {
-                    searchTerm = searchInput.value.toLowerCase().trim();
-                    renderProducts();
-                }, 200)();
+                debouncedPOSSearch(val);
             }
         });
         searchInput.addEventListener('keydown', (e) => {
@@ -3901,14 +3873,31 @@ window.deleteProduct = (id) => {
         Swal.fire('Acceso Denegado', 'No tienes permiso para realizar esta acción.', 'error');
         return;
     }
-    Swal.fire({ title: '¿Eliminar?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' }).then((res) => {
-
+    Swal.fire({ 
+        title: '¿Eliminar producto?', 
+        text: 'Esta acción eliminará el producto del inventario de forma permanente.',
+        icon: 'warning', 
+        showCancelButton: true, 
+        confirmButtonColor: '#ef4444', 
+        confirmButtonText: 'Eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then(async (res) => {
         if (res.isConfirmed) {
-            if (window.db && window.db.deleteProduct) {
-                window.db.deleteProduct(id).catch(e => console.error('[DB] Error soft-delete:', e));
+            localStorage.setItem('puntopila_products_cleared', 'true');
+            if (window.db && window.db.setMeta) {
+                await window.db.setMeta('seed_products_done', 'true').catch(() => {});
             }
-            products = products.filter(p => p.id !== id);
-            saveProducts(); renderInventory(); renderProducts();
+            if (window.db && window.db.deleteProduct) {
+                await window.db.deleteProduct(id).catch(e => console.error('[DB] Error deleteProduct:', e));
+            }
+            if (window.cloudSync && window.cloudSync.pushDeleteProduct) {
+                window.cloudSync.pushDeleteProduct(id).catch(() => {});
+            }
+            products = products.filter(p => String(p.id) !== String(id));
+            saveProducts();
+            renderInventory();
+            renderProducts();
+            Swal.fire({ title: 'Eliminado', text: 'Producto eliminado del catálogo.', icon: 'success', timer: 1200, showConfirmButton: false });
         }
     });
 };
@@ -5289,6 +5278,7 @@ function processPayment() {
                 const prod = products.find(p => p.id === item.id || p.id === item.parentId);
                 return acc + ((prod?.costPrice || 0) * item.qty);
             }, 0),
+            cashier: (currentUser?.name || currentUser?.username || currentRole || 'Cajero'),
             timestamp: Date.now(),
             status: isPartialCredit ? 'pending' : (window.pendingStatus || 'paid'),
             id: padTicketNumber(currentTicketNumber),
@@ -5302,44 +5292,53 @@ function processPayment() {
 
         saveProducts(); saveSales(); incTicketNumber();
 
-        logAction('SALE_COMPLETE', `Venta #${saleRecord.ticket}`, { totalUSD: currentTotalUSD, method: checkoutMethod });
-
-        if (typeof checkLowStockAlerts === 'function') checkLowStockAlerts();
-
-        // Multi-Branch Cloud Sync
-        if (typeof cloudSyncPushSale === 'function') cloudSyncPushSale(saleRecord);
-        if (typeof cloudSyncPushAlerts === 'function') cloudSyncPushAlerts();
-
-        // 📲 Alerta automática de venta al Jefe por WhatsApp
-        if (window.electronAPI && window.electronAPI.sendWASaleAlert && settings.bossPhone) {
-            const todayStr = new Date().toDateString();
-            const dailyTotalUSD = sales
-                .filter(s => new Date(s.date).toDateString() === todayStr && s.status !== 'pending')
-                .reduce((acc, s) => acc + (parseFloat(s.totalUSD) || 0), 0);
-            window.electronAPI.sendWASaleAlert(settings.bossPhone, saleRecord, dailyTotalUSD)
-                .catch(e => console.warn('WA sale alert failed:', e));
-        }
-
-        // Limpiar UI
-        cart = []; updateCartUI(); renderProducts();
+        // Limpiar UI y carrito DE INMEDIATO para liberar al cajero al instante (0ms lag)
+        cart = []; 
+        updateCartUI(); 
+        renderProducts();
         if (!document.getElementById('view-inventory').classList.contains('hidden')) renderInventory();
 
         // Cerrar Modal
         const closeBtn = document.querySelector('.close-checkout-modal');
         if (closeBtn) closeBtn.click();
 
-        // Alerta Final
+        // Re-enfocar buscador de inmediato para la siguiente venta
+        setTimeout(() => {
+            const searchEl = document.getElementById('search-product') || document.getElementById('search-input');
+            if (searchEl) searchEl.focus();
+        }, 50);
+
+        // Tareas en segundo plano (No bloqueantes)
+        setTimeout(() => {
+            logAction('SALE_COMPLETE', `Venta #${saleRecord.ticket}`, { totalUSD: currentTotalUSD, method: checkoutMethod });
+            if (typeof checkLowStockAlerts === 'function') checkLowStockAlerts();
+            if (typeof cloudSyncPushSale === 'function') cloudSyncPushSale(saleRecord);
+            if (typeof cloudSyncPushAlerts === 'function') cloudSyncPushAlerts();
+
+            // 📲 Alerta automática de venta al Jefe por WhatsApp
+            if (window.electronAPI && window.electronAPI.sendWASaleAlert && settings.bossPhone) {
+                const todayStr = new Date().toDateString();
+                const dailyTotalUSD = sales
+                    .filter(s => new Date(s.date).toDateString() === todayStr && s.status !== 'pending')
+                    .reduce((acc, s) => acc + (parseFloat(s.totalUSD) || 0), 0);
+                window.electronAPI.sendWASaleAlert(settings.bossPhone, saleRecord, dailyTotalUSD)
+                    .catch(e => console.warn('WA sale alert background failed:', e));
+            }
+        }, 0);
+
+        // Alerta / Impresión Final
         if (settings.autoPrint) {
             printTicket(saleRecord);
-            Swal.fire({ title: '¡Pago Exitoso!', text: `Ticket #${saleRecord.ticket} procesado e imprimiendo...`, icon: 'success', timer: 2000, showConfirmButton: false });
+            Swal.fire({ title: '¡Pago Exitoso!', text: `Ticket #${saleRecord.ticket} procesado.`, icon: 'success', timer: 1200, showConfirmButton: false });
         } else {
             Swal.fire({
                 icon: 'success', title: '¡Pago Exitoso!',
                 text: `Ticket #${saleRecord.ticket} procesado.`,
                 showCancelButton: true,
                 confirmButtonText: '<i class="fas fa-print"></i> Imprimir',
-                cancelButtonText: 'Nueva Venta',
-                reverseButtons: true
+                cancelButtonText: 'Siguiente Venta',
+                reverseButtons: true,
+                timer: 4000
             }).then((res) => { if (res.isConfirmed) printTicket(saleRecord); });
         }
         
