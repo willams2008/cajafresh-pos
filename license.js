@@ -359,11 +359,14 @@ async function activateLicense(key, clientName) {
     }
 
     // ── Guardar licencia localmente ───────────────────────────
+    const tenantId = `tenant_${(finalClientName || localCheck.storeId || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
     saveLicense({
         key: trimmedKey,
         machineId,
         clientName: finalClientName,
         storeId: localCheck.storeId,
+        tenantId,
         expiry: expiryStr,
         status: 'ACTIVE',
         lastCheck: Date.now(),
@@ -371,7 +374,7 @@ async function activateLicense(key, clientName) {
         isTrial: false,
     });
 
-    return { clientName: finalClientName, storeId: localCheck.storeId, expiry: expiryStr };
+    return { clientName: finalClientName, storeId: localCheck.storeId, tenantId, expiry: expiryStr };
 }
 
 /** Expone el Machine ID para mostrarlo en la pantalla de activación. */

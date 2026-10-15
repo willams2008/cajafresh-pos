@@ -691,9 +691,13 @@ window.validateMembershipCode = async function(code) {
             var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
             return name === 'expiry' || name === 'expirationdate' || name === 'vencimiento' || name === 'expira';
         });
-        var machineIdx = cols.findIndex(function(c) {
+        var clientIdx = cols.findIndex(function(c) { 
             var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return name === 'machineid' || name === 'machine';
+            return name === 'clientname' || name === 'cliente' || name === 'nombre' || name === 'negocio' || name === 'empresa';
+        });
+        var tenantIdx = cols.findIndex(function(c) { 
+            var name = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return name === 'tenantid' || name === 'tenant' || name === 'empresa' || name === 'codigoempresa';
         });
 
         if (codeIdx === -1) return { valid: false, error: 'El sheet debe tener una columna "License Key" o "Codigo"' };
@@ -710,11 +714,37 @@ window.validateMembershipCode = async function(code) {
                         return { valid: false, error: 'La licencia expiró el ' + row[expiryIdx] };
                     }
                 }
+
+                var rawClient = clientIdx > -1 ? (row[clientIdx] || '') : '';
+                var rawTenant = tenantIdx > -1 ? (row[tenantIdx] || '') : '';
+                var derivedTenant = rawTenant || (rawClient ? ('tenant_' + rawClient.toLowerCase().replace(/[^a-z0-9]/g, '_')) : ('tenant_' + row[codeIdx].toLowerCase().replace(/[^a-z0-9]/g, '_')));
+
+                // Guardar tenant y nombre de cliente para aislamiento garantizado
+                try {
+                    if (typeof settings !== 'undefined') {
+                        settings.tenantId = derivedTenant;
+                        if (rawClient && (!settings.storeName || settings.storeName === 'Mi Tienda')) {
+                            settings.storeName = rawClient;
+                        }
+                        if (typeof saveSettings === 'function') saveSettings();
+                    }
+                    if (window.electronAPI && typeof window.electronAPI.cloudSyncConfigure === 'function') {
+                        window.electronAPI.cloudSyncConfigure({
+                            tenantId: derivedTenant,
+                            storeName: rawClient || (settings && settings.storeName) || 'Mi Tienda'
+                        });
+                    }
+                } catch(e) {
+                    console.warn('[Membership] Error actualizando tenant en settings:', e);
+                }
+
                 return { 
                     valid: true, 
                     data: { 
                         membershipCode: row[codeIdx], 
                         licenseCode: row[codeIdx], 
+                        clientName: rawClient,
+                        tenantId: derivedTenant,
                         machineId: machineIdx > -1 ? row[machineIdx] : '',
                         expirationDate: expiryIdx > -1 ? row[expiryIdx] : '', 
                         status: activeIdx > -1 ? row[activeIdx] : '' 

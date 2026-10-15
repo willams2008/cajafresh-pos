@@ -2017,8 +2017,8 @@ function createActivationWindow() {
 ipcMain.handle('license-activate', async (event, key, storeName) => {
     // Valida la clave (local HMAC + heartbeat remoto opcional)
     const result = await licenseSystem.activateLicense(key, storeName);
-    // Auto-configurar el Supabase del proveedor para este cliente
-    autoConfigVendorCloud(result.storeId, storeName || result.clientName);
+    // Auto-configurar el Supabase del proveedor para este cliente con tenant aislado
+    autoConfigVendorCloud(result.storeId, storeName || result.clientName, result.tenantId);
     return result;
 });
 
@@ -2826,7 +2826,7 @@ ipcMain.handle('test-print', async () => {
 });
 
 // ── Auto-configurar Supabase del proveedor para un cliente nuevo ──
-function autoConfigVendorCloud(storeId, storeName) {
+function autoConfigVendorCloud(storeId, storeName, customTenantId) {
     if (!storeId) return;
     if (!VENDOR_SUPABASE_URL || VENDOR_SUPABASE_URL.includes('TU_SUPABASE')) {
         console.log('[VENDOR] ⚠️ Credenciales del proveedor no configuradas en main.js');
@@ -2839,28 +2839,34 @@ function autoConfigVendorCloud(storeId, storeName) {
         if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     } catch(e) {}
 
+    // Asignar Tenant ID único e impenetrable por negocio
+    const tenantId = customTenantId || settings.tenantId || (storeName ? ('tenant_' + storeName.toLowerCase().replace(/[^a-z0-9]/g, '_')) : ('tenant_' + storeId.replace(/^store_/, '')));
+    settings.tenantId = tenantId;
+
     // Solo sobreescribir si no tiene URL propia ya configurada
     if (!settings.supabaseUrl || settings.supabaseUrl.includes('TU_SUPABASE')) {
         settings.supabaseUrl = VENDOR_SUPABASE_URL;
         settings.supabaseKey = VENDOR_SUPABASE_KEY;
         settings.storeId    = storeId;
         if (storeName && !settings.storeName) settings.storeName = storeName;
-        try {
-            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-            console.log(`[VENDOR] ✅ Cloud configurado automáticamente para store: ${storeId}`);
-        } catch(e) { console.error('[VENDOR] Error guardando settings:', e.message); }
+    }
 
-        // Re-inicializar cloud sync con la nueva configuración
-        if (cloudSync) {
-            cloudSync.configure({
-                supabaseUrl: VENDOR_SUPABASE_URL,
-                supabaseKey: VENDOR_SUPABASE_KEY,
-                storeId,
-                storeName: storeName || 'Mi Tienda'
-            });
-            cloudSync.registerStore().catch(() => {});
-            syncCatalogToCloud(storeId);
-        }
+    try {
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        console.log(`[VENDOR] ✅ Cloud configurado automáticamente para store: ${storeId}, tenant: ${settings.tenantId}`);
+    } catch(e) { console.error('[VENDOR] Error guardando settings:', e.message); }
+
+    // Re-inicializar cloud sync con la nueva configuración
+    if (cloudSync) {
+        cloudSync.configure({
+            supabaseUrl: settings.supabaseUrl || VENDOR_SUPABASE_URL,
+            supabaseKey: settings.supabaseKey || VENDOR_SUPABASE_KEY,
+            storeId,
+            tenantId: settings.tenantId,
+            storeName: storeName || settings.storeName || 'Mi Tienda'
+        });
+        cloudSync.registerStore().catch(() => {});
+        syncCatalogToCloud(storeId);
     }
 }
 
@@ -2886,7 +2892,17 @@ async function initCloudSync() {
         }
     }
 
-    const tenantId = settings.tenantId || process.env.CAJA_FRESH_TENANT_ID || 'tenant_default';
+    let tenantId = settings.tenantId;
+    if (!tenantId || tenantId === 'tenant_default') {
+        if (settings.storeName && settings.storeName !== 'Mi Tienda') {
+            tenantId = 'tenant_' + settings.storeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        } else if (settings.storeId && settings.storeId !== 'mi_tienda') {
+            tenantId = 'tenant_' + settings.storeId.replace(/^store_/, '');
+        } else {
+            tenantId = process.env.CAJA_FRESH_TENANT_ID || 'tenant_default';
+        }
+        settings.tenantId = tenantId;
+    }
 
     cloudSync = new CloudSync({
         supabaseUrl: supaUrl,

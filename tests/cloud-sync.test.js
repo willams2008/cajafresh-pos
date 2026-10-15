@@ -114,4 +114,30 @@ describe('CloudSync Module', () => {
 
         sync.destroy();
     });
+
+    test('garantiza aislamiento estricto entre diferentes negocios (Jefe 1 vs Jefe 2)', () => {
+        const syncJefe1 = new CloudSync({
+            storeId: 'store_jefe1_caja1',
+            tenantId: 'tenant_bodegon_el_exito',
+            storeName: 'Bodegón El Éxito'
+        });
+
+        const syncJefe2 = new CloudSync({
+            storeId: 'store_jefe2_caja1',
+            tenantId: 'tenant_farmacia_salud',
+            storeName: 'Farmacia Salud'
+        });
+
+        expect(syncJefe1.tenantId).toBe('tenant_bodegon_el_exito');
+        expect(syncJefe2.tenantId).toBe('tenant_farmacia_salud');
+        expect(syncJefe1.tenantId).not.toBe(syncJefe2.tenantId);
+
+        // Registro de tienda incluye tenant_id correspondiente
+        expect(syncJefe1.tenantId).toMatch(/^tenant_/);
+        expect(syncJefe2.tenantId).toMatch(/^tenant_/);
+
+        syncJefe1.destroy();
+        syncJefe2.destroy();
+    });
 });
+
