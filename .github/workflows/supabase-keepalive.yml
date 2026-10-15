@@ -1,0 +1,31 @@
+name: Supabase Keep-Alive
+
+# Evita que Supabase (plan gratuito) pause el proyecto por inactividad (~7 dias).
+# Hace una consulta de lectura ligera cada 2 dias, sin depender del POS ni de tu PC.
+on:
+  schedule:
+    - cron: '0 12 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Faltan los secrets SUPABASE_URL y/o SUPABASE_ANON_KEY"; exit 1
+          fi
+          code=$(curl -s -o /tmp/resp.txt -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/stores?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "HTTP $code"
+          head -c 300 /tmp/resp.txt; echo
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Supabase no respondio bien (posible proyecto pausado). Reactivalo en el dashboard."
+            exit 1
+          fi
