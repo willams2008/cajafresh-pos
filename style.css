@@ -392,3 +392,16 @@ input[type=number] {
     opacity: 0;
     pointer-events: none;
 }
+
+/* FastAuth PIN Pad & Cashier Selector Animations */
+@keyframes shakePin {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-8px); }
+    40%, 80% { transform: translateX(8px); }
+}
+.animate-shake {
+    animation: shakePin 0.4s ease-in-out;
+}
+.fade-in {
+    animation: fadeInOverlay 0.25s ease-out;
+}

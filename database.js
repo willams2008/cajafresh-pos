@@ -841,7 +841,7 @@ const api = {
 
     // --- USUARIOS ---
     getUsers: async (storeId) => {
-        if (storeId) { return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE store_id = ? ORDER BY name ASC`, [storeId]); }
+        if (storeId) { return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users WHERE (store_id = ? OR store_id = '' OR store_id IS NULL) ORDER BY name ASC`, [storeId]); }
         return getQuery(`SELECT id, store_id, username, role, name, phone, document, photo, active, created_at, last_login FROM users ORDER BY name ASC`);
     },
     getUser: async (storeId, username) => {

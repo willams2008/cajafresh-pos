@@ -334,6 +334,9 @@ function generateSalt() {
     return _buf2hex(arr);
 }
 
+window.hashPassword = hashPassword;
+window.generateSalt = generateSalt;
+
 async function ensureAdminUser() {
     try {
         var users = await window.db.getUsers();
@@ -502,9 +505,9 @@ function _updateRoleUI(role) {
         'nav-dashboard', 'nav-inventory', 'nav-reports', 'nav-analytics',
         'nav-settings', 'nav-purchases', 'nav-payables', 'nav-proveedores',
         'nav-credits', 'nav-expenses', 'nav-transfers', 'nav-purchase-orders',
-        'nav-excel-export', 'nav-movements', 'nav-provisionar'
+        'nav-excel-export', 'nav-movements', 'nav-provisionar', 'nav-team'
     ];
-    var isAdmin = (role === 'admin');
+    var isAdmin = (role === 'admin' || role === 'boss');
     adminNavs.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) {
