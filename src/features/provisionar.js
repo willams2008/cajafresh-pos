@@ -960,7 +960,8 @@ window.Provisionar = (function() {
         if (!select) return;
         select.innerHTML = '<option value="">-- Seleccionar material --</option>' +
             materiales.map(function(m) {
-                return '<option value="' + m.id + '">' + escHtml(m.nombre) + ' (' + m.largo + 'x' + m.ancho + 'mm, $' + m.costoM2.toFixed(2) + '/m²)</option>';
+                var cM2 = (typeof m.costoM2 === 'number') ? m.costoM2 : (m.costoPlancha && m.largo && m.ancho ? (m.costoPlancha / ((m.largo * m.ancho) / 1000000)) : 0);
+                return '<option value="' + m.id + '">' + escHtml(m.nombre) + ' (' + m.largo + 'x' + m.ancho + 'mm, $' + Number(cM2).toFixed(2) + '/m²)</option>';
             }).join('');
         // También actualizar costo de plancha
         select.onchange = function() {
@@ -968,7 +969,8 @@ window.Provisionar = (function() {
             if (mat) {
                 document.getElementById('opt-lamina-largo').value = mat.largo;
                 document.getElementById('opt-lamina-ancho').value = mat.ancho;
-                document.getElementById('costeo-costo-plancha').value = mat.costoPlancha.toFixed(2);
+                var cPlancha = (typeof mat.costoPlancha === 'number') ? mat.costoPlancha : (mat.costoM2 && mat.largo && mat.ancho ? (mat.costoM2 * ((mat.largo * mat.ancho) / 1000000)) : 0);
+                document.getElementById('costeo-costo-plancha').value = Number(cPlancha).toFixed(2);
             }
         };
     }

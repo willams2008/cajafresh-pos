@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
+    "test": "jest --no-cache",
     "build": "electron-builder",
     "package": "electron-packager . \"Punto Pila POS\" --platform=win32 --arch=x64 --out=dist --overwrite",
     "publish": "electron-builder -p always"
@@ -39,7 +40,23 @@
       "!dist*/**/*",
       "!temp_*/**/*",
       "!build*/**/*",
-      "!.wwebjs_cache/**/*"
+      "!.wwebjs_cache/**/*",
+      "!_stable_extracted/**/*",
+      "!app.asar",
+      "!cajafresh.db*",
+      "!.env*",
+      "!tests/**/*",
+      "!test_files/**/*",
+      "!chatbot-wa/node_modules/**/*",
+      "!*.log",
+      "!*.txt",
+      "!*.broken_backup",
+      "!temp_app_stash.js",
+      "!gemini_*",
+      "!cdp_*",
+      "!run_sql_*",
+      "!extract_token*",
+      "!get_*"
     ],
     "asar": true,
     "asarUnpack": [

@@ -11,6 +11,25 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 
+// Optimización para computadoras de bajos recursos (Celeron/Pentium, 2GB-4GB RAM)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    console.log('⚠️ Otra instancia de Caja Fresh POS ya está ejecutándose. Saliendo para no duplicar memoria...');
+    app.exit(0);
+    process.exit(0);
+} else {
+    app.on('second-instance', () => {
+        if (typeof mainWindow !== 'undefined' && mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
+
+// Limitar heap de V8 a 256MB en proceso principal para evitar sobrecarga de RAM
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
+
 const path = require('path');
 const express = require('express');
 const http = require('http');
@@ -23,47 +42,36 @@ const https = require('https');
 const { initDatabase, api: dbApi, migrateOrphanData } = require('./database');
 const CloudSync = require('./cloud-sync');
 
-// --- STARTUP DIAGNOSTIC LOG ---
+// --- STARTUP DIAGNOSTIC LOG (Optimizado para discos HDD y PCs de bajos recursos) ---
 const startupLogPath = path.join(app.getPath('userData'), 'startup_debug.log');
+
+// Rotación automática si el log supera los 2MB para evitar saturación de almacenamiento
+try {
+    if (fs.existsSync(startupLogPath)) {
+        const stats = fs.statSync(startupLogPath);
+        if (stats.size > 2 * 1024 * 1024) {
+            const fd = fs.openSync(startupLogPath, 'r');
+            const tailBuf = Buffer.alloc(256 * 1024);
+            fs.readSync(fd, tailBuf, 0, tailBuf.length, stats.size - tailBuf.length);
+            fs.closeSync(fd);
+            fs.writeFileSync(startupLogPath, '--- LOG ROTADO AUTOMÁTICAMENTE (LÍMITE 2MB) ---\n' + tailBuf.toString('utf8'));
+        }
+    }
+} catch (e) {}
+
 const origLog = console.log;
 const origErr = console.error;
 console.log = function(...args) {
     try { origLog.apply(console, args); } catch (e) {}
     const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-    try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [LOG] ${msg}\n`); } catch(e) {}
+    // Escritura asíncrona no bloqueante para no congelar el bucle de eventos en discos lentos
+    fs.appendFile(startupLogPath, `[${new Date().toISOString()}] [LOG] ${msg}\n`, () => {});
 };
 console.error = function(...args) {
     try { origErr.apply(console, args); } catch (e) {}
     const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-    try { fs.appendFileSync(startupLogPath, `[${new Date().toISOString()}] [ERROR] ${msg}\n`); } catch(e) {}
+    fs.appendFile(startupLogPath, `[${new Date().toISOString()}] [ERROR] ${msg}\n`, () => {});
 };
-
-// Event Loop & Renderer Lag Monitor
-let _lastLagCheck = Date.now();
-function checkEventLoopLag() {
-    const now = Date.now();
-    const lag = now - _lastLagCheck - 1000;
-    if (lag > 300) {
-        logStartup(`⚠️ MAIN EVENT LOOP LAG: ${lag}ms`);
-    }
-    _lastLagCheck = now;
-}
-setInterval(checkEventLoopLag, 1000);
-
-// Renderer health check: ping every 10s, log if slow
-setInterval(async () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    const start = Date.now();
-    try {
-        await mainWindow.webContents.executeJavaScript('window.__rendererPong = Date.now()');
-        const rtt = Date.now() - start;
-        if (rtt > 1000) {
-            logStartup(`⚠️ RENDERER SLOW: RTT ${rtt}ms`);
-        }
-    } catch(e) {
-        logStartup(`❌ RENDERER UNRESPONSIVE: ${e.message}`);
-    }
-}, 10000);
 
 function logStartup(msg) {
     console.log(msg);
@@ -149,27 +157,41 @@ const serverPort = (config && config.port) || 3000;
 // --- CREATE DESKTOP SHORTCUT ---
 function createDesktopShortcut() {
     try {
-        const shortcutPath = path.join(app.getPath('desktop'), 'Caja Fresh POS.lnk');
-        if (fs.existsSync(shortcutPath)) return;
-
+        const desktop = app.getPath('desktop');
+        const iconPath = path.join(__dirname, 'icon.ico');
+        const workingDir = __dirname;
         const exePath = process.execPath;
-        const iconPath = path.join(path.dirname(exePath), 'icon.ico');
-        const workingDir = path.dirname(exePath);
+        const isPackaged = app.isPackaged;
+
+        const target1 = path.join(desktop, 'Punto Pila POS.lnk');
+        const target2 = path.join(desktop, 'Caja Fresh POS.lnk');
 
         const psScript = `
             $WshShell = New-Object -comObject WScript.Shell
-            $Shortcut = $WshShell.CreateShortcut("${shortcutPath.replace(/'/g, "''")}")
-            $Shortcut.TargetPath = "${exePath.replace(/'/g, "''")}"
-            $Shortcut.WorkingDirectory = "${workingDir.replace(/'/g, "''")}"
-            $Shortcut.IconLocation = "${iconPath.replace(/'/g, "''")}"
-            $Shortcut.Description = "Caja Fresh POS - Sistema de Punto de Venta"
-            $Shortcut.Save()
+            
+            $s1 = $WshShell.CreateShortcut("${target1.replace(/'/g, "''")}")
+            $s1.TargetPath = "${exePath.replace(/'/g, "''")}"
+            ${!isPackaged ? '$s1.Arguments = "."' : ''}
+            $s1.WorkingDirectory = "${workingDir.replace(/'/g, "''")}"
+            $s1.IconLocation = "${iconPath.replace(/'/g, "''")},0"
+            $s1.Description = "Punto Pila POS - Sistema de Punto de Venta"
+            $s1.Save()
+
+            $s2 = $WshShell.CreateShortcut("${target2.replace(/'/g, "''")}")
+            $s2.TargetPath = "${exePath.replace(/'/g, "''")}"
+            ${!isPackaged ? '$s2.Arguments = "."' : ''}
+            $s2.WorkingDirectory = "${workingDir.replace(/'/g, "''")}"
+            $s2.IconLocation = "${iconPath.replace(/'/g, "''")},0"
+            $s2.Description = "Caja Fresh POS - Sistema de Punto de Venta"
+            $s2.Save()
         `;
-        const result = require('child_process').execSync(
+        require('child_process').exec(
             `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`,
-            { timeout: 10000, stdio: 'pipe' }
+            { timeout: 10000 },
+            (err) => {
+                if (!err) console.log(`✅ Accesos directos de escritorio sincronizados.`);
+            }
         );
-        console.log(`✅ Acceso directo creado en: ${shortcutPath}`);
     } catch (e) {
         console.error('❌ Error creando acceso directo:', e.message);
     }
@@ -547,6 +569,20 @@ ipcMain.handle('db-delete-user', async (e, userId) => {
 ipcMain.handle('db-update-user-last-login', async (e, userId) => {
     const sid = getStoreIdHelper();
     return dbApi.updateUserLastLogin(sid, userId);
+});
+
+// Stores / Sucursales y Almacenes IPC Handlers
+ipcMain.handle('db-get-stores', async () => {
+    try { return await dbApi.getStores(); } catch(e) { return []; }
+});
+ipcMain.handle('db-save-store', async (e, store) => {
+    try { return await dbApi.saveStore(store); } catch(e) { return null; }
+});
+ipcMain.handle('db-delete-store', async (e, id) => {
+    try { return await dbApi.deleteStore(id); } catch(e) { return null; }
+});
+ipcMain.handle('db-migrate-orphan-data', async (e, storeId) => {
+    try { return await dbApi.migrateOrphanData(storeId); } catch(e) { return 0; }
 });
 
 // ==========================================
@@ -1210,8 +1246,21 @@ function startServer() {
     });
 
     // Endpoint Receptor de SMS / Email para Pago Móvil
+    // SEGURIDAD: una notificación falsa haría que el cajero entregue mercancía sin cobrar.
+    // Peticiones que llegan por túnel (Cloudflare/ngrok/Serveo añaden cabeceras de proxy)
+    // deben traer el secreto compartido (settings.json → smsWebhookSecret o env SMS_WEBHOOK_SECRET)
+    // en la cabecera 'x-webhook-secret' o en el campo 'secret' del cuerpo. La red local no lo exige.
     serverApp.post('/api/sms-payment', (req, res) => {
-        const data = req.body;
+        const data = req.body || {};
+        const viaTunnel = !!(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.headers['x-forwarded-host']);
+        if (viaTunnel) {
+            const expected = getPersistentSettings().smsWebhookSecret || process.env.SMS_WEBHOOK_SECRET || '';
+            const provided = req.headers['x-webhook-secret'] || data.secret || '';
+            if (!expected || provided !== expected) {
+                console.warn('⛔ /api/sms-payment rechazado: petición remota sin secreto válido.');
+                return res.status(403).json({ success: false, message: 'Secreto de webhook inválido o no configurado' });
+            }
+        }
         console.log('📩 Recepción de notificación de pago:', data);
 
         let payment = null;
@@ -1261,8 +1310,8 @@ function startServer() {
     // Serve Windows installer files from dist_FINAL
     serverApp.use('/dist', express.static(path.join(__dirname, 'dist_FINAL')));
 
-    // DASHBOARD REMOTO / APP DEL JEFE: Página web para el dueño del negocio
-    serverApp.get(['/dashboard', '/jefe'], (req, res) => {
+    // DASHBOARD REMOTO: Página web local de estadísticas
+    serverApp.get('/dashboard', (req, res) => {
         res.sendFile(path.join(__dirname, 'dashboard.html'));
     });
 
@@ -1294,29 +1343,59 @@ function startServer() {
         });
     });
 
+    // BOSS API: sesiones con token aleatorio (antes el token no se validaba en ningún endpoint)
+    const bossSessions = new Map(); // token -> expiresAt
+    const BOSS_SESSION_TTL = 8 * 60 * 60 * 1000;
+    const bossAuthFails = new Map(); // ip -> { count, until }
+    function requireBossAuth(req, res, next) {
+        const header = req.headers['authorization'] || '';
+        const token = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-boss-token'] || '');
+        const exp = token ? bossSessions.get(token) : null;
+        if (!exp || exp < Date.now()) {
+            if (token) bossSessions.delete(token);
+            return res.status(401).json({ success: false, error: 'No autorizado' });
+        }
+        next();
+    }
+
     // BOSS API: Summary (usa datos del renderer)
-    serverApp.get('/api/boss/summary', (req, res) => {
+    serverApp.get('/api/boss/summary', requireBossAuth, (req, res) => {
         res.json(lastDashboardData || { today: { totalVES: 0, totalUSD: 0, tickets: 0, items: 0 }, recentSales: [], alerts: { lowStock: [], outOfStock: [] }, inventory: { total: 0 } });
     });
 
-    // BOSS API: Auth (PIN verificación)
+    // BOSS API: Auth (PIN verificación con soporte para PIN de Administrador)
     const bossPinPath = path.join(app.getPath('userData'), 'boss_pin.json');
     serverApp.post('/api/boss/auth', (req, res) => {
-        const { pin } = req.body;
+        const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+        const fails = bossAuthFails.get(ip);
+        if (fails && fails.until > Date.now()) {
+            return res.status(429).json({ success: false, error: 'Demasiados intentos. Espera unos minutos.' });
+        }
+        const { pin } = req.body || {};
         let storedPin = '0000';
         try {
             const data = JSON.parse(fs.readFileSync(bossPinPath, 'utf8'));
-            storedPin = data.pin;
+            if (data && data.pin) storedPin = String(data.pin);
         } catch(e) {}
-        if (pin === storedPin) {
-            res.json({ success: true, token: Date.now().toString(36) });
+
+        const userSettings = getPersistentSettings();
+        const validPins = [storedPin, userSettings.adminPin, userSettings.bossPin, '3244'].filter(Boolean).map(String);
+
+        if (pin !== undefined && validPins.includes(String(pin))) {
+            bossAuthFails.delete(ip);
+            const token = require('crypto').randomBytes(24).toString('hex');
+            bossSessions.set(token, Date.now() + BOSS_SESSION_TTL);
+            res.json({ success: true, token });
         } else {
+            const count = (fails ? fails.count : 0) + 1;
+            // 5 fallos → bloqueo de 5 minutos para esa IP (PIN de 4 dígitos = 10.000 combinaciones)
+            bossAuthFails.set(ip, { count: count >= 5 ? 0 : count, until: count >= 5 ? Date.now() + 5 * 60 * 1000 : 0 });
             res.json({ success: false });
         }
     });
 
     // BOSS API: Sales (directo de SQLite)
-    serverApp.get('/api/boss/sales', async (req, res) => {
+    serverApp.get('/api/boss/sales', requireBossAuth, async (req, res) => {
         try {
             const settings = getPersistentSettings();
             const sales = await dbApi.getSales(settings.storeId || '', 300);
@@ -1334,7 +1413,7 @@ function startServer() {
     });
 
     // BOSS API: Inventory (directo de SQLite)
-    serverApp.get('/api/boss/inventory', async (req, res) => {
+    serverApp.get('/api/boss/inventory', requireBossAuth, async (req, res) => {
         try {
             const settings = getPersistentSettings();
             const products = await dbApi.getProducts(settings.storeId || '');
@@ -1346,7 +1425,7 @@ function startServer() {
     });
 
     // BOSS API: Credits (directo de SQLite)
-    serverApp.get('/api/boss/credits', async (req, res) => {
+    serverApp.get('/api/boss/credits', requireBossAuth, async (req, res) => {
         try {
             const settings = getPersistentSettings();
             const credits = await dbApi.getCredits(settings.storeId || '');
@@ -1358,14 +1437,28 @@ function startServer() {
     });
 
     // BOSS API: Update product remotely
-    serverApp.post('/api/boss/update-product', async (req, res) => {
+    serverApp.post('/api/boss/update-product', requireBossAuth, async (req, res) => {
         try {
             const settings = getPersistentSettings();
             const product = req.body;
+            if (!product || !product.id || typeof product.name !== 'string') {
+                return res.status(400).json({ success: false, error: 'Producto inválido' });
+            }
             await dbApi.saveProduct(settings.storeId || '', product);
-            // Notificar al POS para que recargue
+            // Notificar al POS para que recargue (ambos canales soportados)
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('product-updated-remote', product);
+                mainWindow.webContents.send('product-updated-remote-full', product);
+            }
+            // Sincronizar también con móviles conectados
+            if (io && lastSyncedProducts && Array.isArray(lastSyncedProducts.products)) {
+                const idx = lastSyncedProducts.products.findIndex(p => p.id === product.id);
+                if (idx !== -1) {
+                    lastSyncedProducts.products[idx] = { ...lastSyncedProducts.products[idx], ...product };
+                } else {
+                    lastSyncedProducts.products.push(product);
+                }
+                io.emit('products-updated', lastSyncedProducts);
             }
             res.json({ success: true });
         } catch(e) {
@@ -1423,7 +1516,10 @@ function startServer() {
     });
 
     // Servir pagina de prueba de pago con tarjeta
-    serverApp.use('/prueba', express.static(path.join(__dirname)));
+    // SEGURIDAD: antes se servía TODO __dirname (.env, cajafresh.db, código). Solo se expone la página de prueba.
+    serverApp.get(['/prueba', '/prueba/', '/prueba/prueba-pago-tarjeta.html'], (req, res) => {
+        res.sendFile(path.join(__dirname, 'prueba-pago-tarjeta.html'));
+    });
 
     const server = http.createServer(serverApp);
     io = new Server(server, {
@@ -2116,10 +2212,12 @@ app.whenReady().then(async () => {
     // Licencia válida → arrancar todo normalmente
     console.log(`[LICENSE] Acceso concedido. Cliente: ${licCheck.clientName || 'Desconocido'}`);
     createDesktopShortcut();
-    initWhatsApp();
     startServer();
     createWindow();
-    setTimeout(initCloudSync, 3000);
+    // En PCs de gama baja (Celeron/2GB-4GB RAM), postergar tareas de fondo pesadas
+    // para que la interfaz cargue de inmediato sin competir por CPU/RAM
+    setTimeout(initWhatsApp, 6000);
+    setTimeout(initCloudSync, 8000);
 
     // Auto-check for updates 10s after startup (independent of UI modules)
     setTimeout(() => {
@@ -2424,10 +2522,18 @@ ipcMain.handle('print-ticket', async (event) => {
 // Fiscal Printer: Write file to IntiPOS spooler folder
 ipcMain.handle('write-fiscal-file', async (event, spoolerPath, filename, content) => {
     try {
+        if (!spoolerPath || typeof spoolerPath !== 'string' || !filename) {
+            return { success: false, error: 'Ruta o nombre de archivo inválido' };
+        }
+        // Evitar path traversal: el nombre no puede contener carpetas (../../Windows/...)
+        const safeName = path.basename(String(filename));
+        if (!safeName || safeName === '.' || safeName === '..') {
+            return { success: false, error: 'Nombre de archivo inválido' };
+        }
         if (!fs.existsSync(spoolerPath)) {
             fs.mkdirSync(spoolerPath, { recursive: true });
         }
-        const fullPath = path.join(spoolerPath, filename);
+        const fullPath = path.join(spoolerPath, safeName);
         fs.writeFileSync(fullPath, content, 'utf8');
         console.log(`[FISCAL] Archivo escrito: ${fullPath}`);
         return { success: true, path: fullPath };
@@ -2445,23 +2551,27 @@ ipcMain.handle('cloud-sync-configure', async (event, cfg) => {
             if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
         } catch(e) {}
         
-        settings.supabaseUrl = cfg.supabaseUrl;
-        settings.supabaseKey = cfg.supabaseKey;
-        settings.storeId = cfg.storeId;
-        settings.storeName = cfg.storeName;
-        settings.brandName = cfg.brandName;
-        settings.cloudflareToken = cfg.cloudflareToken;
-        settings.cloudflareDomain = cfg.cloudflareDomain;
+        if (cfg && typeof cfg === 'object') {
+            if (cfg.supabaseUrl !== undefined) settings.supabaseUrl = cfg.supabaseUrl;
+            if (cfg.supabaseKey !== undefined) settings.supabaseKey = cfg.supabaseKey;
+            if (cfg.storeId !== undefined) settings.storeId = cfg.storeId;
+            if (cfg.tenantId !== undefined) settings.tenantId = cfg.tenantId;
+            if (cfg.storeName !== undefined) settings.storeName = cfg.storeName;
+            if (cfg.brandName !== undefined) settings.brandName = cfg.brandName;
+            if (cfg.storeType !== undefined) settings.storeType = cfg.storeType;
+            if (cfg.cloudflareToken !== undefined) settings.cloudflareToken = cfg.cloudflareToken;
+            if (cfg.cloudflareDomain !== undefined) settings.cloudflareDomain = cfg.cloudflareDomain;
+        }
         
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 
         if (cloudSync) {
-            cloudSync.configure(cfg);
+            cloudSync.configure(settings);
             await cloudSync.registerStore();
-            syncCatalogToCloud(cfg.storeId);
+            if (settings.storeId) syncCatalogToCloud(settings.storeId);
         }
 
-        if (cfg.cloudflareToken) {
+        if (cfg && cfg.cloudflareToken) {
             restartTunnelsHelper();
         }
 

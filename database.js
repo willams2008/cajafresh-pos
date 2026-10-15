@@ -62,6 +62,9 @@ function initDatabase(userDataPath) {
             console.log('[DATABASE] Conexión establecida.');
             db.run('PRAGMA busy_timeout = 10000;');
             db.run('PRAGMA journal_mode = WAL;');
+            db.run('PRAGMA synchronous = NORMAL;'); // Drásticamente más rápido en discos mecánicos/HDD sin riesgo en modo WAL
+            db.run('PRAGMA temp_store = MEMORY;');   // Tablas temporales e índices en RAM en vez de I/O de disco
+            db.run('PRAGMA cache_size = -4000;');   // 4MB de caché fija para evitar re-lecturas continuas de disco
             createTables().then(resolve).catch(reject);
         });
     });
@@ -86,6 +89,19 @@ function getQuery(sql, params = []) {
 }
 
 async function createTables() {
+    // Tabla de Sucursales y Almacenes (Stores)
+    await runQuery(`
+        CREATE TABLE IF NOT EXISTS stores (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            brand_name TEXT,
+            store_type TEXT DEFAULT 'kiosko',
+            status TEXT DEFAULT 'offline',
+            last_seen TEXT,
+            created_at TEXT
+        )
+    `);
+
     // Tabla de Productos con store_id
     await runQuery(`
         CREATE TABLE IF NOT EXISTS products (
@@ -1086,6 +1102,29 @@ const api = {
             [invoice.id, sid, invoice.sale_id, invoice.client_email, invoice.sent_date, invoice.status || 'SENT', invoice.pdf_data || '']
         );
     },
+
+    // --- STORES (SUCURSALES Y ALMACENES) ---
+    getStores: () => getQuery(`SELECT * FROM stores ORDER BY name ASC`).catch(() => []),
+
+    saveStore: (store) => {
+        if (!store || !store.id) return Promise.resolve(null);
+        return runQuery(
+            `INSERT OR REPLACE INTO stores (id, name, brand_name, store_type, status, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                store.id,
+                store.name || 'Mi Sucursal',
+                store.brand_name || 'Punto Pila POS',
+                store.store_type || 'kiosko',
+                store.status || 'offline',
+                store.last_seen || new Date().toISOString(),
+                store.created_at || new Date().toISOString()
+            ]
+        );
+    },
+
+    deleteStore: (storeId) => runQuery(`DELETE FROM stores WHERE id = ?`, [storeId]),
+
+    migrateOrphanData: (storeId) => migrateOrphanData(storeId),
 };
 
 // ==========================================
@@ -1120,13 +1159,12 @@ async function migrateOrphanData(storeId) {
     for (const table of tables) {
         try {
             const orphans = await getQuery(
-                `SELECT ${table.idCol} FROM ${table.name} WHERE store_id IS NULL OR store_id = '' OR store_id != ?`,
-                [sid]
+                `SELECT ${table.idCol} FROM ${table.name} WHERE store_id IS NULL OR store_id = ''`
             );
             if (orphans && orphans.length > 0) {
                 await runQuery(
-                    `UPDATE ${table.name} SET store_id = ? WHERE store_id IS NULL OR store_id = '' OR store_id != ?`,
-                    [sid, sid]
+                    `UPDATE ${table.name} SET store_id = ? WHERE store_id IS NULL OR store_id = ''`,
+                    [sid]
                 );
                 totalMigrated += orphans.length;
             }

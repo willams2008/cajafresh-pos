@@ -32,7 +32,7 @@ class CloudSync {
         this.deletedProductIds = new Set();
         this._loadDeletedIds();
         this.onStatusChange = options.onStatusChange || (() => {});
-        this.lastStatus = { synced: false, lastSync: null, error: null };
+        this.lastStatus = { synced: false, lastSync: null, error: null, isPaused: false };
 
         console.log(`[CLOUD-SYNC] 🏗️ Constructor invocado. URL: ${this.supabaseUrl ? 'OK' : 'Falta'}, ID: ${this.storeId || 'Falta'}, Tenant: ${this.tenantId}, Tipo: ${this.storeType}`);
 
@@ -90,12 +90,15 @@ class CloudSync {
                         console.log('[CLOUD-SYNC] ✅ Conexión restablecida, volviendo a sync rápido.');
                         this._syncFailCount = 0;
                     }
+                    this._updateStatus(true);
                 } catch(e) {
                     // Solo loguear el primer error y cada vez que escale
                     if (this._syncFailCount === 0 || this._syncFailCount % 3 === 0) {
                         console.log(`[CLOUD-SYNC] ⏸️ Sin conexión (intento ${this._syncFailCount + 1}), próximo intento en ${Math.round(Math.min(baseDelay * Math.pow(2, this._syncFailCount + 1), maxDelay) / 1000)}s`);
                     }
                     this._syncFailCount = Math.min(this._syncFailCount + 1, 5);
+                    const isPaused = Boolean((e.message && (e.message.includes('503') || e.message.includes('500') || e.message.toLowerCase().includes('paused') || e.message.toLowerCase().includes('inactive'))) || this._syncFailCount >= 3);
+                    this._updateStatus(false, e.message, isPaused);
                 }
                 scheduleNext();
             }, delay);
@@ -138,7 +141,6 @@ class CloudSync {
                     } else {
                         const errMsg = `[CLOUD-SYNC] ❌ ${method} ${table} → HTTP ${res.statusCode}: ${body.substring(0, 300)}`;
                         console.error(errMsg);
-                        try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${errMsg}\n`); } catch(_){}
                         reject(new Error(`Supabase ${res.statusCode}: ${body}`));
                     }
                 });
@@ -147,13 +149,12 @@ class CloudSync {
             req.on('error', (e) => {
                 const errMsg = `[CLOUD-SYNC] ERROR FETCH: ${e.message}`;
                 console.error(errMsg);
-                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${errMsg}\n`); } catch(_){}
                 reject(e);
             });
 
             req.setTimeout(15000, () => {
                 req.destroy();
-                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR FETCH: Timeout (${method} ${table})\n`); } catch(_){}
+                console.error(`[CLOUD-SYNC] ERROR FETCH: Timeout (${method} ${table})`);
                 reject(new Error('Timeout'));
             });
 
@@ -408,7 +409,6 @@ class CloudSync {
     async pushSale(saleData) {
         if (!this.enabled) {
             console.warn('[CLOUD-SYNC] ⚠️ pushSale llamado pero sync NO está habilitado.');
-            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] pushSale IGNORADO: sync deshabilitado. enabled=${this.enabled} url=${!!this.supabaseUrl} key=${!!this.supabaseKey} storeId=${this.storeId}\n`); } catch(_){}
             return;
         }
 
@@ -430,20 +430,17 @@ class CloudSync {
             exchange_rate: saleData.exchangeRate || 0,
             client_name: saleData.client?.name || 'Venta Local',
             status: saleData.status || 'paid',
-            cashier_name: saleData.cashier_name || saleData.cashier || (window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Principal'),
-            cashier_id: saleData.cashier_id || saleData.cashierId || (window.currentUser ? window.currentUser.id : null)
+            cashier_name: saleData.cashier_name || saleData.cashier || (typeof window !== 'undefined' && window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Principal'),
+            cashier_id: saleData.cashier_id || saleData.cashierId || (typeof window !== 'undefined' && window.currentUser ? window.currentUser.id : null)
         };
 
         console.log(`[CLOUD-SYNC] 🛒 Enviando venta ${sale.id} ($${sale.total_usd}) a Supabase...`);
-        try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] PUSH_SALE: ${sale.id} total=$${sale.total_usd} method=${sale.method} date=${sale.date}\n`); } catch(_){}
 
         try {
             await this._supabaseRequest('store_sales', 'POST', sale);
             console.log(`[CLOUD-SYNC] ✅ Venta ${sale.id} enviada con éxito.`);
-            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ✅ PUSH_SALE OK: ${sale.id}\n`); } catch(_){}
         } catch (e) {
             console.error('[CLOUD-SYNC] ❌ Error enviando venta:', e.message);
-            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ❌ PUSH_SALE FAIL: ${sale.id} → ${e.message}\n`); } catch(_){}
             this.pendingQueue.push({ type: 'sale', data: sale, timestamp: Date.now() });
             this._savePendingQueue();
         }
@@ -634,7 +631,7 @@ class CloudSync {
             total_ves: totals.ves || 0,
             active_items: cart.length,
             current_view: currentView,
-            cashier_name: (window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Activo'),
+            cashier_name: (typeof window !== 'undefined' && window.currentUser ? (window.currentUser.name || window.currentUser.username) : 'Cajero Activo'),
             last_activity: new Date().toISOString()
         };
 
@@ -865,13 +862,11 @@ class CloudSync {
         try {
             const msg1 = `[CLOUD-SYNC] 🔍 Buscando comandos para store: ${this.storeId}...`;
             console.log(msg1);
-            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${msg1}\n`); } catch(e){}
 
             const commands = await this._supabaseGet('store_commands', `?store_id=eq.${this.storeId}&tenant_id=eq.${this.tenantId}&status=eq.pending`);
             
             const msg2 = `[CLOUD-SYNC] 🔍 Resultado supabaseGet: ${commands ? commands.length : 'null'}`;
             console.log(msg2, commands);
-            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] ${msg2}\n`); } catch(e){}
 
             if (commands && commands.length > 0) {
                 console.log(`[CLOUD-SYNC] 📥 Recibidos ${commands.length} comandos remotos pendientes`);
@@ -906,7 +901,6 @@ class CloudSync {
                                 });
                             } else {
                                 console.warn(`[CLOUD-SYNC] ⚠️ Producto ${product_id} NO encontrado en BD local`);
-                                try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR PRODUCT NOT FOUND: ${product_id} en tienda ${this.storeId}\n`); } catch(e){}
                                 await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: 'Producto no encontrado' }, `?id=eq.${cmd.id}`);
                             }
                         } catch (err) {
@@ -989,7 +983,6 @@ class CloudSync {
                             }
                         } catch (err) {
                             console.error('[CLOUD-SYNC] Error ejecutando UPDATE_PRODUCT_FULL:', err.message);
-                            try { require('fs').appendFileSync(require('path').join(require('electron').app.getPath('userData'), 'startup_debug.log'), `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR UPDATE_PRODUCT_FULL: ${err.message} - stack: ${err.stack}\n`); } catch(e){}
                             await this._supabaseRequest('store_commands', 'PATCH', { status: 'error', executed_at: new Date().toISOString(), error_log: err ? err.message : 'Error interno' }, `?id=eq.${cmd.id}`);
                         }
                     } else if (cmd.command_type === 'PUSH_FULL_CATALOG') {
@@ -1036,11 +1029,6 @@ class CloudSync {
             }
         } catch (e) {
             console.error('[CLOUD-SYNC] ❌ Error en polling de comandos:', e.message, e.stack);
-            try {
-                const { app } = require('electron');
-                fs.appendFileSync(path.join(app.getPath('userData'), 'startup_debug.log'),
-                    `[${new Date().toISOString()}] [CLOUD-SYNC] ERROR FETCH: ${e.message}\n`);
-            } catch(_){}
         }
     }
 
@@ -1131,11 +1119,12 @@ class CloudSync {
         this._saveDeletedIds();
     }
 
-    _updateStatus(synced, error = null) {
+    _updateStatus(synced, error = null, isPaused = false) {
         this.lastStatus = {
             synced,
-            lastSync: synced ? new Date().toISOString() : this.lastStatus.lastSync,
+            lastSync: synced ? new Date().toISOString() : (this.lastStatus ? this.lastStatus.lastSync : null),
             error,
+            isPaused: Boolean(isPaused),
             pendingCount: this.pendingQueue.length,
             enabled: this.enabled,
             storeName: this.storeName,

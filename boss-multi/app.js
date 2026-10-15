@@ -235,6 +235,76 @@ setInterval(() => {
     }
 }, 60000);
 
+window.openAddStoreModal = function() {
+    const nameEl = document.getElementById('new-store-name');
+    const idEl = document.getElementById('new-store-id');
+    const typeEl = document.getElementById('new-store-type');
+    if (nameEl) nameEl.value = '';
+    if (idEl) idEl.value = '';
+    if (typeEl) typeEl.value = 'kiosko';
+    const m = document.getElementById('add-store-modal');
+    if (m) m.classList.add('active');
+};
+
+window.closeAddStoreModal = function() {
+    const m = document.getElementById('add-store-modal');
+    if (m) m.classList.remove('active');
+};
+
+window.addStore = async function() {
+    const nameEl = document.getElementById('new-store-name');
+    const idEl = document.getElementById('new-store-id');
+    const typeEl = document.getElementById('new-store-type');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const customId = idEl ? idEl.value.trim() : '';
+    const type = typeEl ? typeEl.value : 'kiosko';
+
+    if (!name) {
+        alert('Por favor ingresa un nombre para la sucursal.');
+        return;
+    }
+
+    const id = customId || 'store_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString(36);
+    const btn = document.getElementById('btn-save-store');
+    if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+
+    try {
+        const payload = {
+            id,
+            tenant_id: tenantId || 'tenant_default',
+            name,
+            store_type: type,
+            status: 'offline',
+            brand_name: businessName || 'Punto Pila POS',
+            last_seen: new Date().toISOString()
+        };
+
+        const res = await fetch(`${supabaseUrl}/rest/v1/stores`, {
+            method: 'POST',
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
+        }
+
+        alert(`✅ Sucursal "${name}" (${type === 'warehouse' ? 'Almacén' : 'Kiosko'}) creada con éxito.`);
+        closeAddStoreModal();
+        loadDashboard();
+    } catch (e) {
+        alert('Error al crear sucursal: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Crear Sucursal'; }
+    }
+};
+
 window.deleteStore = async function (storeId, event) {
     if (event) event.stopPropagation();
     const store = allStores.find(s => s.id === storeId);
@@ -280,6 +350,10 @@ function renderStores(storesToRender = allStores) {
     el.innerHTML = storesToRender.map(store => {
         const snap = allSnapshots.find(s => s.store_id === store.id);
         const isOnline = (Date.now() - new Date(store.last_seen).getTime()) < 120000;
+        const isWarehouse = store.store_type === 'warehouse';
+        const typeBadge = isWarehouse
+            ? '<span style="background:rgba(59,130,246,0.15);color:#3b82f6;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:900;text-transform:uppercase;margin-left:6px;"><i class="fas fa-warehouse mr-1"></i>Almacén</span>'
+            : '<span style="background:rgba(16,185,129,0.15);color:#10b981;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:900;text-transform:uppercase;margin-left:6px;"><i class="fas fa-shopping-cart mr-1"></i>Kiosko</span>';
 
         // CALCULAR MÉTRICAS EN TIEMPO REAL DESDE store_sales
         const storeSales = (window.allSalesToday || []).filter(s => s.store_id === store.id);
@@ -294,7 +368,10 @@ function renderStores(storesToRender = allStores) {
         return `
         <div class="card" style="padding:16px; margin-bottom:12px; position:relative;" onclick="openDetail('${store.id}')">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <div style="font-weight:900; font-size:16px;">${store.name}</div>
+                <div style="font-weight:900; font-size:16px; display:flex; align-items:center;">
+                    ${store.name}
+                    ${typeBadge}
+                </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <div style="font-size:9px; font-weight:900; color:${isOnline ? 'var(--primary)' : 'var(--text-muted)'}; text-transform:uppercase; display:flex; align-items:center; gap:4px;">
                         <div style="width:6px; height:6px; border-radius:50%; background:currentColor;"></div>

@@ -145,7 +145,12 @@
                 <div id="global-stats-container"></div>
 
                 <div class="card">
-                    <div class="card-title">Sucursales <span class="badge-count" id="stores-count">0</span></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <div class="card-title" style="margin:0;">Sucursales y Almacenes <span class="badge-count" id="stores-count">0</span></div>
+                        <button onclick="openAddStoreModal()" style="background:var(--primary); color:white; border:none; padding:7px 12px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-plus"></i> Nueva Sucursal
+                        </button>
+                    </div>
                     <div id="stores-list"></div>
                 </div>
             </div>
@@ -547,6 +552,37 @@
                 <button class="btn-save" id="btn-save-product" onclick="saveProductEdits()">
                     <i class="fas fa-save"></i> Guardar Producto
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nueva Sucursal / Almacén -->
+    <div class="modal" id="add-store-modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-title"><i class="fas fa-store" style="color:var(--primary);margin-right:8px;"></i>Nueva Sucursal o Almacén</div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Registra un nuevo punto de venta o almacén para supervisarlo desde este panel.</p>
+            
+            <div class="field">
+                <label>Nombre de la Sucursal *</label>
+                <input type="text" id="new-store-name" placeholder="Ej: Sede Principal, Kiosko Chacao, Almacén Central">
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+                <label>Tipo de Sucursal *</label>
+                <select id="new-store-type" style="width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--outline); border-radius:10px; font-size:13px; font-weight:700;">
+                    <option value="kiosko">🛒 Punto de Venta / Kiosko</option>
+                    <option value="warehouse">🏬 Almacén Central (Inventario / Despacho)</option>
+                </select>
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+                <label>ID Único (Opcional)</label>
+                <input type="text" id="new-store-id" placeholder="ej. tienda_chacao, almacen_central" style="font-family:monospace;">
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-cancel" style="flex:1;" onclick="closeAddStoreModal()">Cancelar</button>
+                <button class="btn-action" style="flex:1; margin-top:0;" id="btn-save-store" onclick="addStore()">Crear Sucursal</button>
             </div>
         </div>
     </div>

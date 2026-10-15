@@ -12456,29 +12456,81 @@ function openCloudConfig() {
 // Listen for cloud sync status updates
 if (window.cloudSync) {
     window.cloudSync.onStatusChange((status) => {
+        window._lastCloudSyncStatus = status;
         const indicator = document.getElementById('cloud-sync-indicator');
         if (indicator) {
-            if (status.synced) {
+            if (status.isPaused) {
+                indicator.innerHTML = '<i class="fas fa-cloud-bolt text-rose-500 animate-pulse hover:scale-110 transition-all"></i>';
+                indicator.title = '⚠️ Base de datos en la nube pausada o inactiva. Clic para reactivar.';
+            } else if (status.synced) {
                 indicator.innerHTML = '<i class="fas fa-cloud text-emerald-500 hover:scale-110 transition-all"></i>';
                 indicator.title = `Sincronizado: ${status.storeName || 'Cloud'}. Clic para forzar sincronización.`;
             } else if (status.enabled) {
                 indicator.innerHTML = '<i class="fas fa-cloud text-amber-500 animate-pulse hover:scale-110 transition-all"></i>';
-                indicator.title = `Sincronizando / Error: ${status.error || 'Pendiente'}. Clic para forzar sincronización.`;
+                indicator.title = `Sincronizando / Pendiente (${status.pendingCount || 0}). Clic para forzar.`;
             }
         }
     });
     
     // Initial status check
     window.cloudSync.getStatus().then(status => {
-        if (status.enabled) {
+        if (status && status.enabled) {
+            window._lastCloudSyncStatus = status;
             console.log('[CloudSync] Conectado como:', status.storeName);
+            const indicator = document.getElementById('cloud-sync-indicator');
+            if (indicator && status.synced) {
+                indicator.innerHTML = '<i class="fas fa-cloud text-emerald-500 hover:scale-110 transition-all"></i>';
+                indicator.title = `Sincronizado: ${status.storeName || 'Cloud'}. Clic para forzar sincronización.`;
+            }
         }
     });
 
     window.forceManualSync = async function() {
+        const status = window._lastCloudSyncStatus;
+        if (status && status.isPaused) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Base de datos en la nube pausada',
+                html: `
+                    <p class="text-sm text-slate-600 mb-3">
+                        Supabase pausa los proyectos gratuitos tras varios días sin uso.
+                    </p>
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 text-left mb-3">
+                        <b>¿Cómo reactivarla?</b><br>
+                        1. Entra a tu panel de <a href="https://supabase.com/dashboard" target="_blank" class="text-blue-600 font-bold underline">supabase.com</a>.<br>
+                        2. Entra a tu proyecto y pulsa <b>"Restore Project"</b>.<br>
+                        3. Espera 1 minuto y pulsa el botón "Reintentar Sincronizar" aquí abajo.
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-sync-alt"></i> Reintentar Sincronizar',
+                cancelButtonText: 'Cerrar',
+                confirmButtonColor: '#059669'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Reintentando conexión...', showConfirmButton: false });
+                        if (window.cloudSync && window.cloudSync.pushCatalog) {
+                            await window.cloudSync.pushCatalog(products);
+                        } else if (window.api && window.api.cloudSyncPushCatalog) {
+                            await window.api.cloudSyncPushCatalog(products);
+                        }
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: '¡Sincronizado con éxito!', timer: 2500, showConfirmButton: false });
+                    } catch(err) {
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Aún inaccesible', text: 'Verifica si ya terminó de restaurarse en Supabase.', timer: 3500, showConfirmButton: false });
+                    }
+                }
+            });
+            return;
+        }
+
         try {
             Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Sincronizando...', showConfirmButton: false });
-            await window.api.cloudSyncPushCatalog(products);
+            if (window.cloudSync && window.cloudSync.pushCatalog) {
+                await window.cloudSync.pushCatalog(products);
+            } else if (window.api && window.api.cloudSyncPushCatalog) {
+                await window.api.cloudSyncPushCatalog(products);
+            }
             Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Sincronización manual enviada', timer: 2000, showConfirmButton: false });
         } catch (e) {
             Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Error al sincronizar', text: e.message, timer: 3000, showConfirmButton: false });

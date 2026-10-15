@@ -69,14 +69,8 @@ async function tryAuth() {
             showPinError();
         }
     } catch (e) {
-        // Offline or server error — allow default PIN
-        if (pinCode === '0000') {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app').classList.add('active');
-            initApp();
-        } else {
-            showPinError();
-        }
+        // Sin servidor no hay datos que proteger ni mostrar: no se permite el acceso offline
+        showPinError();
     }
 }
 
@@ -126,31 +120,49 @@ async function fetchAll() {
     renderReports();
 }
 
+// Fetch autenticado: el servidor exige el token de sesión en /api/boss/*
+async function bossFetch(url, options = {}) {
+    const headers = Object.assign({}, options.headers || {}, authToken ? { 'Authorization': 'Bearer ' + authToken } : {});
+    const res = await fetch(url, Object.assign({}, options, { headers }));
+    if (res.status === 401) {
+        authToken = null;
+        pinCode = '';
+        updateDots();
+        document.getElementById('app').classList.remove('active');
+        document.getElementById('login-screen').classList.remove('hidden');
+        throw new Error('Sesión expirada');
+    }
+    return res;
+}
+
 async function fetchSummary() {
     try {
-        const res = await fetch('/api/boss/summary');
+        const res = await bossFetch('/api/boss/summary');
         dashboardData = await res.json();
     } catch (e) {}
 }
 
 async function fetchSales() {
     try {
-        const res = await fetch('/api/boss/sales');
-        allSales = await res.json();
+        const res = await bossFetch('/api/boss/sales');
+        const data = await res.json();
+        if (Array.isArray(data)) allSales = data;
     } catch (e) {}
 }
 
 async function fetchInventory() {
     try {
-        const res = await fetch('/api/boss/inventory');
-        allProducts = await res.json();
+        const res = await bossFetch('/api/boss/inventory');
+        const data = await res.json();
+        if (Array.isArray(data)) allProducts = data;
     } catch (e) {}
 }
 
 async function fetchCredits() {
     try {
-        const res = await fetch('/api/boss/credits');
-        allCredits = await res.json();
+        const res = await bossFetch('/api/boss/credits');
+        const data = await res.json();
+        if (Array.isArray(data)) allCredits = data;
     } catch (e) {}
 }
 
@@ -460,11 +472,13 @@ async function saveProduct() {
     p.priceUSD = parseFloat(document.getElementById('edit-price').value) || p.priceUSD;
     p.price = p.priceUSD;
     p.priceVES = parseFloat(document.getElementById('edit-priceVES').value) || p.priceVES;
-    p.stock = parseInt(document.getElementById('edit-stock').value) || 0;
+    // Antes: parseInt(...) || 0 → un campo vacío/inválido borraba TODO el stock del producto
+    const stockVal = parseInt(document.getElementById('edit-stock').value, 10);
+    if (!isNaN(stockVal) && stockVal >= 0) p.stock = stockVal;
     p.costPrice = parseFloat(document.getElementById('edit-cost').value) || p.costPrice;
 
     try {
-        await fetch('/api/boss/update-product', {
+        await bossFetch('/api/boss/update-product', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(p)

@@ -9,14 +9,14 @@
     <script src="vendor/tailwindcss.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="vendor/fontawesome.min.css">
-    <!-- Chart.js & html2pdf -->
-    <script src="vendor/chart.js"></script>
-    <script src="vendor/html2pdf.bundle.min.js"></script>
-    <!-- jsPDF para Libro de IVA -->
-    <script src="vendor/jspdf.umd.min.js"></script>
-    <script src="vendor/jspdf.plugin.autotable.min.js"></script>
-    <!-- Tesseract para scanner de facturas -->
-    <script src="vendor/tesseract.min.js"></script>
+    <!-- Chart.js & html2pdf (defer para acelerar arranque en PCs lentas) -->
+    <script src="vendor/chart.js" defer></script>
+    <script src="vendor/html2pdf.bundle.min.js" defer></script>
+    <!-- jsPDF para Libro de IVA (defer) -->
+    <script src="vendor/jspdf.umd.min.js" defer></script>
+    <script src="vendor/jspdf.plugin.autotable.min.js" defer></script>
+    <!-- Tesseract para scanner de facturas (defer) -->
+    <script src="vendor/tesseract.min.js" defer></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
     <!-- Domain Auto-Detection -->
@@ -185,7 +185,13 @@
         #main-sidebar.sidebar-collapsed {
             width: 0 !important;
             min-width: 0 !important;
-            border-right: none;
+            max-width: 0 !important;
+            overflow: hidden !important;
+            border-right: none !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            visibility: hidden;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s ease !important;
         }
         #main-sidebar.sidebar-compact-mode #main-brand-logo,
         #main-sidebar.sidebar-compact-mode .nav-item span,
@@ -267,13 +273,16 @@
         #cart-sidebar.resizing-active {
             transition: none !important;
         }
-        #cart-sidebar.collapsed {
+        #cart-sidebar.collapsed,
+        #cart-sidebar.cart-collapsed {
             width: 0 !important;
             min-width: 0 !important;
+            max-width: 0 !important;
             flex: 0 0 0 !important;
-            overflow: hidden;
-            border: none;
-            padding: 0;
+            overflow: hidden !important;
+            border: none !important;
+            padding: 0 !important;
+            visibility: hidden !important;
         }
 
         @keyframes welcomeSlideUp {
@@ -303,13 +312,22 @@
 <body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex selection:bg-brand-500 selection:text-white">
     <div id="pdf-export-report" class="hidden"></div>
 
-    <!-- Splash Screen -->
-    <div id="splash-screen" class="splash-screen">
-        <div class="animate-logo-pulse flex flex-col items-center px-6 text-center">
-            <h1 class="text-5xl md:text-7xl font-black tracking-tighter text-slate-900 dark:text-white mb-2">
-                Punto<span class="text-brand-600">Pila</span>
-            </h1>
-            <p class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 opacity-80">Cargando Sistema POS...</p>
+    <!-- Splash Screen con Video Centrado, Suavizado y Sin Recuadros -->
+    <div id="splash-screen" class="splash-screen" style="background: radial-gradient(circle at 50% 50%, #152232 0%, #0d1522 55%, #080d16 100%) !important;">
+        <div class="relative w-full h-full flex items-center justify-center overflow-hidden px-6">
+            <div class="relative w-full max-w-lg md:max-w-xl flex items-center justify-center">
+                <video id="splash-video"
+                    autoplay
+                    muted
+                    loop
+                    playsinline
+                    preload="auto"
+                    class="w-full h-auto pointer-events-none drop-shadow-[0_0_40px_rgba(59,130,246,0.18)]"
+                    style="-webkit-mask-image: radial-gradient(ellipse 65% 58% at 50% 50%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%); mask-image: radial-gradient(ellipse 65% 58% at 50% 50%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 80%);">
+                    <source src="effects/gemini_generated_video_9a8b334f.mp4" type="video/mp4">
+                    <source src="effects/splash_video.mp4" type="video/mp4">
+                </video>
+            </div>
         </div>
     </div>
 
@@ -376,44 +394,201 @@
         </div>
     </div>
 
-    <!-- Login Overlay -->
-    <div id="login-overlay" class="hidden fixed inset-0 z-[9998] bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
-        <div class="w-full max-w-sm">
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-black tracking-tighter text-slate-900 dark:text-white mb-1">
-                    Punto<span class="text-brand-600">Pila</span>
+    <!-- Login Overlay: Split-Screen Moderno & Profesional -->
+    <div id="login-overlay" class="hidden fixed inset-0 z-[9998] flex flex-col md:flex-row select-none bg-[#0c121e]">
+        
+        <!-- COLUMNA IZQUIERDA: Marca, Fotografía Comercial & Frases Dinámicas -->
+        <div class="relative hidden md:flex md:w-1/2 lg:w-7/12 flex-col justify-between p-10 lg:p-14 overflow-hidden bg-slate-950">
+            <!-- Imagen de fondo real con velo oscuro y gradiente cinematográfico -->
+            <img src="assets/retail_login_bg.jpg" alt="Retail Store" class="absolute inset-0 w-full h-full object-cover object-center opacity-30 select-none pointer-events-none scale-105">
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/85"></div>
+
+            <!-- Cabecera Izquierda: Ultra Minimalista (Estilo Stripe/Apple) -->
+            <div class="relative z-10 flex items-center gap-3">
+                <img src="icon.png?v=3" alt="Punto Pila" class="w-10 h-10 object-contain drop-shadow-sm select-none">
+                <h1 class="text-xl font-bold text-white tracking-tight select-none">
+                    <span>Punto</span> <span class="text-blue-400">Pila</span>
                 </h1>
-                <p id="login-subtitle" class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Sistema Inteligente POS</p>
-                <p id="login-business-name" class="text-sm font-black text-brand-600 mt-1 hidden"></p>
             </div>
-            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Usuario</label>
-                    <input type="text" id="login-username" autocomplete="off" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all" placeholder="Ingresa tu usuario">
+
+            <!-- Centro Izquierdo: Frases Motivadoras Dinámicas que cambian con el tiempo -->
+            <div class="relative z-10 my-auto max-w-lg space-y-4 py-8">
+                <div class="min-h-[140px] flex flex-col justify-center">
+                    <h2 id="login-motivational-phrase" 
+                        class="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-snug transition-all duration-500 opacity-100 transform translate-y-0 select-none">
+                        Gestión inteligente, ventas ágiles y control de inventario.
+                    </h2>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Contraseña</label>
-                    <div class="relative">
-                        <input type="password" id="login-password" autocomplete="off" class="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white placeholder-slate-300 focus:border-brand-500 outline-none transition-all pr-10" placeholder="Ingresa tu contraseña">
-                        <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 text-sm transition-colors">
-                            <i id="login-eye-icon" class="fas fa-eye"></i>
-                        </button>
+                
+                <!-- Indicadores Visuales de Frases Rotativas -->
+                <div id="phrase-indicators" class="flex items-center gap-1.5 pt-1">
+                    <span class="phrase-dot w-6 h-1 rounded-full bg-blue-500 transition-all duration-300"></span>
+                    <span class="phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300"></span>
+                    <span class="phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300"></span>
+                    <span class="phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300"></span>
+                    <span class="phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300"></span>
+                    <span class="phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300"></span>
+                </div>
+
+                <p id="station-business-name" class="text-xs font-semibold text-slate-400 tracking-wider uppercase pt-2">
+                    Caja Fresh • Terminal de Cobro
+                </p>
+            </div>
+
+            <!-- Pie Izquierdo: Versión y Reloj en Vivo Arreglado -->
+            <div class="relative z-10 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-slate-400 font-semibold tracking-wider">v1.9.2</span>
+                </div>
+                <!-- Reloj Digital en Vivo -->
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-300 font-mono shadow-sm">
+                    <i class="far fa-clock text-blue-400 text-xs"></i>
+                    <span id="login-clock" class="tracking-wider font-bold">--:--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUMNA DERECHA: Formulario de Autenticación Sobrio, Oscuro y Limpio -->
+        <div class="w-full md:w-1/2 lg:w-5/12 h-full flex flex-col justify-between bg-[#0c121e] p-8 sm:p-12 lg:p-16 overflow-y-auto">
+            
+            <!-- Barra superior móvil (Logo visible en pantallas pequeñas) -->
+            <div class="flex items-center justify-start md:hidden">
+                <div class="flex items-center gap-2.5">
+                    <img src="icon.png?v=3" alt="Punto Pila" class="w-8 h-8 object-contain">
+                    <span class="font-black text-white text-lg">Punto<span class="text-blue-500">Pila</span></span>
+                </div>
+            </div>
+
+            <!-- Formulario Central -->
+            <div class="w-full max-w-sm mx-auto my-auto py-6 space-y-6">
+                <!-- Encabezado del Formulario -->
+                <div class="text-left space-y-2">
+                    <!-- Icono compacto para interacción Superadmin (5 clics) -->
+                    <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center cursor-pointer hover:border-blue-500/40 active:scale-95 transition-all mb-4"
+                        onclick="window.handleSecretLogoClick()" title="Punto Pila (5 clics para Panel de Superadmin)">
+                        <img src="icon.png?v=3" alt="Logo" class="w-7 h-7 object-contain">
+                    </div>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Iniciar Turno</h2>
+                    <p class="text-xs font-normal text-slate-400">Ingresa tus credenciales para acceder a la terminal de caja.</p>
+                </div>
+
+                <!-- Campos de Entrada -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="login-username" class="block text-xs font-semibold text-slate-300 mb-1.5">Usuario o Código de Cajero</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
+                                <i class="fas fa-user text-xs"></i>
+                            </span>
+                            <input type="text" id="login-username" autocomplete="username"
+                                class="w-full pl-9 pr-3.5 py-3 bg-slate-950/80 border border-slate-800 rounded-lg text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+                                placeholder="Ingresa usuario o PIN">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="login-password" class="block text-xs font-semibold text-slate-300">Contraseña o PIN</label>
+                            <button type="button" onclick="window.recoverBossPassword()" class="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors cursor-pointer">
+                                ¿Olvidaste tu contraseña?
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
+                                <i class="fas fa-lock text-xs"></i>
+                            </span>
+                            <input type="password" id="login-password" autocomplete="current-password"
+                                class="w-full pl-9 pr-10 py-3 bg-slate-950/80 border border-slate-800 rounded-lg text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+                                placeholder="••••••••">
+                            <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1 text-xs transition-colors cursor-pointer" title="Ver contraseña">
+                                <i id="login-eye-icon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <p id="login-error" class="text-rose-500 text-xs font-bold hidden"></p>
-                <button id="login-btn" class="w-full py-3.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-black text-sm shadow-lg shadow-brand-500/30 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Iniciar Sesión
+
+                <!-- Mensaje de Error (si ocurre) -->
+                <p id="login-error" class="text-rose-400 text-xs font-medium hidden bg-rose-500/10 border border-rose-500/20 p-3 rounded-lg flex items-center gap-2"></p>
+
+                <!-- Botón de Envío -->
+                <button id="login-btn"
+                    class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]">
+                    <i class="fas fa-arrow-right-to-bracket text-xs"></i>
+                    <span>Acceder a Caja</span>
                 </button>
-                <button id="forgot-password-btn" class="w-full py-2.5 rounded-xl bg-transparent hover:bg-slate-50 text-slate-400 hover:text-brand-600 font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 border border-slate-100 hover:border-brand-200">
-                    <i class="fas fa-key text-[10px]"></i>
-                    Olvidé mi contraseña
-                </button>
-                <p class="text-center text-[10px] text-slate-400">Sin conexión a internet? <button onclick="skipLogin()" class="text-brand-500 hover:text-brand-600 font-bold">Acceso sin conexión</button></p>
+
+                <!-- Acciones Rápidas (Restablecer PIN) -->
+                <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <button id="forgot-password-btn" type="button" onclick="window.recoverBossPassword()" class="hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium cursor-pointer">
+                        <i class="fas fa-key text-[10px] text-blue-500"></i> Restablecer PIN Maestro
+                    </button>
+                </div>
             </div>
-            <div id="login-version" class="text-center mt-4 text-[10px] text-slate-400 font-medium"></div>
+
+            <!-- Pie Derecho Minimalista -->
+            <div class="text-center text-xs text-slate-500 pt-4">
+                <span>Punto Pila POS • Licencia Activa</span>
+            </div>
         </div>
     </div>
+
+    <!-- Script de Reloj Digital y Frases Motivadoras Dinámicas en Login -->
+    <script>
+        (function() {
+            // 1. Reloj Digital en Vivo
+            function updateLoginClock() {
+                var clockEl = document.getElementById('login-clock');
+                if (!clockEl) return;
+                var now = new Date();
+                clockEl.textContent = now.toLocaleTimeString('es-VE', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit', 
+                    hour12: true 
+                });
+            }
+            updateLoginClock();
+            setInterval(updateLoginClock, 1000);
+
+            // 2. Frases Motivadoras Rotativas
+            var phrases = [
+                "Gestión inteligente, ventas ágiles y control de inventario.",
+                "Cada venta cuenta. Hoy es una gran oportunidad para hacer crecer tu negocio.",
+                "Rapidez en cada cobro, clientes satisfechos y cuentas transparentes.",
+                "El éxito de tu negocio se construye con cada cliente bien atendido.",
+                "Control total de tus productos, ingresos y ganancias en tiempo real.",
+                "Tecnología confiable para que tu negocio nunca se detenga."
+            ];
+            var currentIdx = 0;
+            
+            function rotatePhrase() {
+                var phraseEl = document.getElementById('login-motivational-phrase');
+                var dots = document.querySelectorAll('.phrase-dot');
+                if (!phraseEl) return;
+                
+                phraseEl.style.opacity = '0';
+                phraseEl.style.transform = 'translateY(6px)';
+                
+                setTimeout(function() {
+                    currentIdx = (currentIdx + 1) % phrases.length;
+                    phraseEl.textContent = phrases[currentIdx];
+                    
+                    dots.forEach(function(dot, idx) {
+                        if (idx === currentIdx) {
+                            dot.className = 'phrase-dot w-6 h-1 rounded-full bg-blue-500 transition-all duration-300';
+                        } else {
+                            dot.className = 'phrase-dot w-2 h-1 rounded-full bg-slate-700 transition-all duration-300';
+                        }
+                    });
+                    
+                    phraseEl.style.opacity = '1';
+                    phraseEl.style.transform = 'translateY(0)';
+                }, 400);
+            }
+            
+            setInterval(rotatePhrase, 6500);
+        })();
+    </script>
 
     <!-- Sidebar Toggle Button -->
     <button id="sidebar-toggle-btn" title="Plegar/Desplegar menú" onclick="toggleSidebar()">
@@ -429,6 +604,7 @@
         <div class="flex-1 overflow-y-auto custom-scrollbar">
             <div
                 class="h-16 flex items-center justify-start px-5 border-b border-slate-100 sticky top-0 bg-white z-10">
+                <img src="icon.png?v=3" alt="Punto Pila" class="w-8 h-8 object-contain mr-2.5 rounded-lg shrink-0">
                 <h1 id="main-brand-logo" class="font-black text-lg tracking-tight text-slate-800 truncate flex-1 min-w-0">Punto<span
                         class="text-brand-600">Pila</span></h1>
             </div>
@@ -708,45 +884,48 @@
             <div class="flex-1 flex flex-col h-full bg-slate-50 relative z-0">
                 <!-- Top Header -->
                 <header
-                    class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
-                    <div class="flex items-center gap-4">
-                        <h2 class="text-2xl font-bold tracking-tight hidden md:block">Catálogo</h2>
-                        <!-- Cloud Sync Indicator -->
-                        <div id="cloud-sync-indicator" onclick="forceManualSync()" class="text-lg text-slate-300 hidden md:flex items-center justify-center cursor-pointer transition-all hover:scale-110" title="Cloud Sync No Configurado">
-                            <i class="fas fa-cloud"></i>
+                    class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-xs z-10">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-black tracking-tight text-slate-800 hidden md:block">Catálogo</h2>
+                        <!-- Muelle de Herramientas Compacto / Utility Dock -->
+                        <div class="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-xs">
+                            <!-- Cloud Sync Indicator -->
+                            <div id="cloud-sync-indicator" onclick="forceManualSync()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-white transition-all cursor-pointer" title="Sincronización en la Nube">
+                                <i class="fas fa-cloud text-xs"></i>
+                            </div>
+
+                            <!-- Botón Campana con activación forzosa -->
+                            <button id="mobile-orders-bell" onclick="openMobileOrdersPanel()"
+                                class="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-red-500 transition-all cursor-pointer" title="Pedidos Móviles">
+                                <i class="fas fa-bell text-xs"></i>
+                                <span id="bell-badge"
+                                    class="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center hidden animate-bounce">0</span>
+                            </button>
+
+                            <!-- Botón Acceso Rápido QR Móvil -->
+                            <button onclick="switchView('view-server')"
+                                class="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-slate-600 hover:text-indigo-600 hover:bg-white transition-all text-xs font-bold cursor-pointer" title="Ver Códigos QR de App del Jefe, Clientes y Escáner de Teléfono">
+                                <i class="fas fa-qrcode text-xs text-indigo-500"></i>
+                                <span class="hidden xl:inline text-[11px]">Móvil</span>
+                            </button>
                         </div>
-
-                        <!-- Botón Campana con activación forzosa -->
-                        <button id="mobile-orders-bell" onclick="openMobileOrdersPanel()"
-                            class="relative p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all group" title="Pedidos Móviles">
-                            <i class="fas fa-bell text-xl"></i>
-                            <span id="bell-badge"
-                                class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white hidden animate-bounce">0</span>
-                        </button>
-
-                        <!-- Botón Acceso Rápido QR Móvil (App Jefe, Clientes y Escáner) -->
-                        <button onclick="switchView('view-server')"
-                            class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200/50 transition-all font-bold text-xs shadow-xs active:scale-95 cursor-pointer" title="Ver Códigos QR de App del Jefe, Clientes y Escáner de Teléfono">
-                            <i class="fas fa-qrcode text-sm"></i>
-                            <span class="hidden sm:inline">QR Móvil</span>
-                        </button>
                     </div>
                     <div class="flex-1 md:ml-6 max-w-3xl flex gap-3">
                         <div class="relative w-1/3 min-w-[180px] group">
                             <span
-                                class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-brand-500 transition-colors pointer-events-none">
-                                <i class="fas fa-user"></i>
+                                class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 group-focus-within:text-brand-500 transition-colors pointer-events-none">
+                                <i class="fas fa-user text-xs"></i>
                             </span>
                             <input type="text" id="pos-client-search" placeholder="Cliente..." title="Buscar cliente (F2) — Presiona Esc para limpiar" autocomplete="off"
-                                class="w-full bg-slate-100 border-2 border-transparent rounded-full py-2.5 pl-11 pr-14 text-sm font-medium focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all">
+                                class="w-full bg-slate-100/90 border border-slate-200/80 rounded-xl py-2 pl-9 pr-14 text-xs font-semibold text-slate-800 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-slate-400">
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                 <button id="clear-pos-client-btn" onclick="window.clearPOSClientSearch()" class="hidden text-slate-400 hover:text-rose-500 transition-colors p-0.5" title="Limpiar Cliente (Esc)">
-                                    <i class="fas fa-times-circle text-sm"></i>
+                                    <i class="fas fa-times-circle text-xs"></i>
                                 </button>
-                                <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-black bg-white border border-slate-200 text-slate-500 rounded-md shadow-xs pointer-events-none">F2</kbd>
+                                <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-black bg-white border border-slate-200 text-slate-500 rounded-md shadow-xs pointer-events-none">F2</kbd>
                             </div>
                             <div id="pos-client-results"
-                                class="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 hidden max-h-60 overflow-y-auto custom-scrollbar">
+                                class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 z-50 hidden max-h-60 overflow-y-auto custom-scrollbar">
                                 <!-- Results here -->
                             </div>
                             <input type="hidden" id="pos-client-id" value="">
@@ -756,16 +935,16 @@
                         </div>
                         <div class="relative group flex-1">
                             <span
-                                class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-brand-500 transition-colors pointer-events-none">
-                                <i class="fas fa-search"></i>
+                                class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 group-focus-within:text-brand-500 transition-colors pointer-events-none">
+                                <i class="fas fa-search text-xs"></i>
                             </span>
                             <input type="text" id="search-product" placeholder="Buscar por nombre o código de barra..." title="Buscar producto (F3 / Ctrl+F / Enter para cobrar)"
-                                class="w-full bg-slate-100 border-2 border-transparent rounded-full py-2.5 pl-11 pr-24 text-sm font-medium focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all">
+                                class="w-full bg-slate-100/90 border border-slate-200/80 rounded-xl py-2 pl-9 pr-24 text-xs font-semibold text-slate-800 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder-slate-400">
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                                 <button id="clear-search-product-btn" onclick="window.clearPOSProductSearch()" class="hidden text-slate-400 hover:text-rose-500 transition-colors p-0.5" title="Limpiar Búsqueda (Esc)">
-                                    <i class="fas fa-times-circle text-sm"></i>
+                                    <i class="fas fa-times-circle text-xs"></i>
                                 </button>
-                                <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-black bg-white border border-slate-200 text-slate-500 rounded-md shadow-xs pointer-events-none">F3 / Ctrl+F</kbd>
+                                <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-black bg-white border border-slate-200 text-slate-500 rounded-md shadow-xs pointer-events-none">F3 / Ctrl+F</kbd>
                             </div>
                         </div>
                     </div>
@@ -4051,9 +4230,9 @@
     </div>
 
     
-    <!-- ======= MODAL ADMIN SECRETO (tipear 32447974) ======= -->
-    <div id="secret-admin-modal" class="fixed inset-0 z-[999] hidden items-center justify-center" style="background:rgba(0,0,0,0.85);backdrop-filter:blur(8px)">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden border border-slate-200" style="max-height:90vh">
+    <!-- ======= MODAL ADMIN SECRETO (tipear 32447974 o F8 o 5 clics en logo) ======= -->
+    <div id="secret-admin-modal" class="fixed inset-0 z-[99999] hidden items-center justify-center p-4" style="background:rgba(2,6,23,0.88);backdrop-filter:blur(10px)">
+        <div class="bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden border border-slate-700/80 text-white" style="max-height:90vh">
             <div class="px-6 py-4 bg-gradient-to-r from-indigo-900 to-slate-900 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-xl bg-indigo-500/30 flex items-center justify-center">
@@ -4401,167 +4580,275 @@
     <!-- === MODALS === -->
 
     <!-- Checkout Modal -->
-    <!-- Checkout Modal (Dual Column POS Suite) -->
+    <!-- Checkout Modal (Premium Dual-Column Payment Gateway) -->
     <div id="checkout-modal"
-        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 items-center justify-center p-3 md:p-6 hidden transition-all duration-300">
-        <div class="bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row max-h-[95vh] overflow-hidden transform transition-all duration-300 border border-slate-800"
+        class="fixed inset-0 bg-slate-950/85 backdrop-blur-xl z-50 items-center justify-center p-3 sm:p-5 md:p-6 hidden transition-all duration-300 select-none">
+        <div class="bg-slate-900/95 backdrop-blur-2xl rounded-[32px] shadow-[0_25px_80px_rgba(0,0,0,0.85)] w-full max-w-5xl flex flex-col md:flex-row max-h-[94vh] overflow-hidden transform transition-all duration-300 border border-slate-700/80 text-white"
             id="checkout-modal-content">
 
-            <!-- === LEFT COLUMN: Dark Summary Panel === -->
-            <div class="w-full md:w-5/12 bg-slate-900 text-white p-6 md:p-8 flex flex-col justify-between relative overflow-hidden shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
-                <div class="absolute -left-12 -top-12 w-48 h-48 rounded-full bg-brand-500/10 blur-3xl pointer-events-none"></div>
+            <!-- === LEFT COLUMN: Ticket Summary, Breakdown & Progress === -->
+            <div class="w-full md:w-5/12 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 text-white p-6 md:p-8 flex flex-col justify-between relative overflow-hidden shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
+                <!-- Ambient Subtle Lighting Orbs -->
+                <div class="absolute -left-12 -top-12 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
                 <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none"></div>
 
-                <div class="relative z-10">
-                    <!-- Header Branding -->
-                    <div class="flex items-center gap-2.5 mb-6">
-                        <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center border border-brand-500/30">
-                            <i class="fas fa-cash-register text-sm"></i>
+                <div class="relative z-10 space-y-5">
+                    <!-- Header Bar & Client Badge -->
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 shadow-inner">
+                            <div class="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
+                                <i class="fas fa-cash-register"></i>
+                            </div>
+                            <span class="text-[10px] font-black text-slate-200 uppercase tracking-widest">COBRO POS</span>
                         </div>
-                        <span class="text-xs font-black text-slate-300 uppercase tracking-widest">COBRO POS</span>
+                        <div class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800/50 border border-slate-700/50 text-xs text-slate-300 max-w-[200px]" title="Cliente Asignado">
+                            <i class="fas fa-user-circle text-slate-400 text-xs shrink-0"></i>
+                            <span id="checkout-customer-name-display" class="font-bold truncate text-slate-200">Consumidor Final</span>
+                        </div>
                     </div>
 
-                    <!-- Total Amount Display -->
-                    <div class="mb-6">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">TOTAL A PAGAR</p>
-                        <div class="text-4xl md:text-5xl font-black text-white tracking-tight font-mono" id="checkout-total-display">$0.00</div>
+                    <!-- Grand Total Showcase -->
+                    <div class="pt-1">
+                        <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1">TOTAL A PAGAR</p>
+                        <div class="text-4xl sm:text-5xl font-black text-white tracking-tight font-mono drop-shadow-sm" id="checkout-total-display">$0.00</div>
+                        
+                        <!-- Multi-Currency Equivalencies -->
                         <div class="flex items-center gap-2 mt-3 flex-wrap">
-                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-300" id="checkout-total-ves-display">Bs 0,00</span>
-                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-300" id="checkout-total-eur-display">0,00 €</span>
+                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-sky-400 font-mono shadow-sm" id="checkout-total-ves-display">Bs 0,00</span>
+                            <span class="px-3 py-1 bg-slate-800/90 border border-slate-700/80 rounded-xl text-xs font-bold text-amber-300 font-mono shadow-sm" id="checkout-total-eur-display">0,00 €</span>
+                            <span class="px-2.5 py-1 bg-slate-800/60 border border-slate-700/50 rounded-xl text-[10px] font-semibold text-slate-400">Tasa: <span id="checkout-bcv-rate" class="font-bold text-slate-200 font-mono">--</span></span>
                             <span class="text-xs font-bold text-amber-400" id="checkout-points-display"></span>
                         </div>
+                    </div>
 
-                        <!-- 📊 DESGLOSE EN VIVO (ABONADO Y RESTANTE) -->
-                        <div class="mt-5 p-4 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abonado / Cubierto</span>
-                                <span class="text-sm font-black text-emerald-400 font-mono" id="checkout-left-paid">$0.00</span>
+                    <!-- Mini Cart Items Preview -->
+                    <div class="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
+                        <div class="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                            <span>Artículos en Ticket (<span id="checkout-items-count" class="text-emerald-400 font-mono font-bold">0</span>)</span>
+                            <span>Monto</span>
+                        </div>
+                        <div id="checkout-cart-items-preview" class="space-y-1.5 max-h-28 overflow-y-auto custom-scrollbar pr-1">
+                            <!-- Populated dynamically upon opening -->
+                            <div class="text-[11px] text-slate-500 italic py-1">Sin productos en carrito</div>
+                        </div>
+                    </div>
+
+                    <!-- Live Breakdown & Payment Progress Card -->
+                    <div class="p-4 rounded-2xl bg-slate-800/90 border border-slate-700/80 space-y-3 shadow-inner">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abonado / Cubierto</span>
+                            <span class="text-sm font-black text-emerald-400 font-mono" id="checkout-left-paid">$0.00</span>
+                        </div>
+                        <!-- Visual Progress Bar -->
+                        <div class="w-full bg-slate-750 bg-slate-700/50 h-2 rounded-full overflow-hidden p-0.5 border border-slate-600/40">
+                            <div id="checkout-payment-bar" class="bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 h-full rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(16,185,129,0.5)]" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-slate-700/60 pt-2.5">
+                            <div>
+                                <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">RESTANTE POR PAGAR</span>
+                                <span class="text-[10px] font-bold text-slate-400 font-mono" id="checkout-left-remaining-ves">Bs 0,00</span>
                             </div>
-                            <div class="flex items-center justify-between border-t border-slate-700/60 pt-2.5">
-                                <div>
-                                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">RESTANTE POR PAGAR</span>
-                                    <span class="text-[10px] font-bold text-slate-400 font-mono" id="checkout-left-remaining-ves">Bs 0,00</span>
-                                </div>
-                                <span class="text-2xl font-black text-amber-400 font-mono" id="checkout-left-remaining">$0.00</span>
-                            </div>
+                            <span class="text-2xl font-black text-amber-400 font-mono" id="checkout-left-remaining">$0.00</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Actions (Exacto / Fiado) -->
-                <div class="relative z-10 pt-6 border-t border-slate-800/80">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3">OPCIONES RÁPIDAS</p>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button id="exact-change-btn" class="py-3 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs transition-all border border-amber-500/50 hover:border-amber-400 flex items-center justify-center gap-2 shadow-sm active:scale-95" title="Pagar monto exacto (Tecla Shift)">
-                            <i class="fas fa-bolt text-amber-400 text-sm"></i> <span>Exacto</span> <kbd class="px-2 py-0.5 text-[10px] font-black bg-slate-800 text-amber-300 rounded border border-amber-500/40">Shift</kbd>
+                <div class="relative z-10 pt-5 mt-4 border-t border-slate-800/80">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-2.5">ACCIONES RÁPIDAS</p>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button id="exact-change-btn" type="button" class="py-3 px-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 font-bold text-xs transition-all border border-amber-500/40 hover:border-amber-400 flex items-center justify-center gap-2 shadow-sm cursor-pointer" title="Pagar monto exacto restante (Tecla Shift)">
+                            <i class="fas fa-bolt text-amber-400 text-sm"></i>
+                            <span>Exacto</span>
+                            <kbd class="px-2 py-0.5 text-[9px] font-black bg-slate-800 text-amber-300 rounded border border-amber-500/40 font-mono">Shift</kbd>
                         </button>
-                        <button id="fiao-payment-btn" class="py-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold text-xs transition-all border border-amber-500/30 hover:border-amber-400 flex items-center justify-center gap-2 shadow-sm">
-                            <i class="fas fa-hand-holding-dollar text-sm"></i> Fiado
+                        <button id="fiao-payment-btn" type="button" class="py-3 px-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 text-amber-400 font-bold text-xs transition-all border border-slate-700 hover:border-amber-500/50 flex items-center justify-center gap-2 shadow-sm cursor-pointer" title="Cargar como venta a crédito / cuenta por cobrar (F9)">
+                            <i class="fas fa-hand-holding-dollar text-sm"></i>
+                            <span>Crédito / Fiado</span>
+                            <kbd class="px-2 py-0.5 text-[9px] font-black bg-slate-800 text-slate-400 rounded border border-slate-600 font-mono">F9</kbd>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- === RIGHT COLUMN: Form & Methods Panel === -->
-            <div class="w-full md:w-7/12 bg-slate-900 p-6 flex flex-col justify-between overflow-y-auto custom-scrollbar">
+            <!-- === RIGHT COLUMN: Payment Methods, Quick Cash & Confirmation === -->
+            <div class="w-full md:w-7/12 bg-slate-900/90 p-6 md:p-8 flex flex-col justify-between overflow-y-auto custom-scrollbar">
 
                 <div>
                     <!-- Header + Close Button -->
                     <div class="flex items-center justify-between mb-5">
-                        <h3 class="text-lg font-black text-white">Selecciona Método de Pago</h3>
-                        <button class="close-checkout-modal w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all">
-                            <i class="fas fa-times text-xs"></i>
+                        <div>
+                            <h3 class="text-xl font-black text-white tracking-tight">Pasarela de Pago</h3>
+                            <p class="text-xs text-slate-400">Selecciona el método de pago e ingresa el monto</p>
+                        </div>
+                        <button type="button" class="close-checkout-modal w-9 h-9 rounded-full bg-slate-800 hover:bg-rose-600/80 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-md" title="Cerrar ventana (Esc)">
+                            <i class="fas fa-times text-sm"></i>
                         </button>
                     </div>
 
-                    <!-- Grid of 5 Payment Methods -->
-                    <div class="grid grid-cols-3 gap-2.5 mb-5">
-                        <button class="payment-tab relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/50 hover:bg-emerald-900/30 hover:border-emerald-500 text-slate-300 transition-all font-bold text-xs" data-method="cash-usd">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700 text-emerald-400 border border-slate-600">F4</span>
-                            <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-black">$</div>
-                            <span>USD ($)</span>
+                    <!-- Modern Grid of 5 Payment Methods -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5" id="checkout-payment-methods-grid">
+                        <!-- 1. USD Cash -->
+                        <button type="button" class="payment-tab group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:bg-emerald-950/40 hover:border-emerald-500 text-slate-300 transition-all font-bold text-xs cursor-pointer active:scale-98" data-method="cash-usd">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700/80 text-emerald-400 border border-slate-600 font-mono">F4</span>
+                            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-110 flex items-center justify-center text-base font-black transition-transform">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <span class="text-slate-200">Efectivo USD</span>
                         </button>
-                        <button class="payment-tab relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/50 hover:bg-blue-900/30 hover:border-blue-500 text-slate-300 transition-all font-bold text-xs" data-method="cash-ves">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700 text-blue-400 border border-slate-600">F6</span>
-                            <div class="w-7 h-7 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-black"><i class="fas fa-money-bill-wave text-xs"></i></div>
-                            <span>VES (Bs)</span>
+
+                        <!-- 2. Pago Móvil -->
+                        <button type="button" class="payment-tab group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:bg-pink-950/40 hover:border-pink-500 text-slate-300 transition-all font-bold text-xs cursor-pointer active:scale-98" data-method="pago-movil">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700/80 text-pink-400 border border-slate-600 font-mono">F5</span>
+                            <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 group-hover:scale-110 flex items-center justify-center text-sm font-black transition-transform">
+                                <i class="fas fa-mobile-screen"></i>
+                            </div>
+                            <span class="text-slate-200">Pago Móvil</span>
                         </button>
-                        <button class="payment-tab relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/50 hover:bg-amber-900/30 hover:border-amber-500 text-slate-300 transition-all font-bold text-xs" data-method="cash-eur">
-                            <div class="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-sm font-black">€</div>
-                            <span>EUR (€)</span>
+
+                        <!-- 3. Punto / Tarjeta -->
+                        <button type="button" class="payment-tab group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:bg-indigo-950/40 hover:border-indigo-500 text-slate-300 transition-all font-bold text-xs cursor-pointer active:scale-98" data-method="card-ves">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700/80 text-indigo-400 border border-slate-600 font-mono">F7</span>
+                            <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 group-hover:scale-110 flex items-center justify-center text-sm font-black transition-transform">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <span class="text-slate-200">Punto Tarjeta</span>
                         </button>
-                        <button class="payment-tab relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/50 hover:bg-indigo-900/30 hover:border-indigo-500 text-slate-300 transition-all font-bold text-xs" data-method="card-ves">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700 text-indigo-400 border border-slate-600">F7</span>
-                            <div class="w-7 h-7 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm"><i class="fas fa-credit-card text-xs"></i></div>
-                            <span>Punto Tarjeta</span>
+
+                        <!-- 4. VES Cash -->
+                        <button type="button" class="payment-tab group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:bg-blue-950/40 hover:border-blue-500 text-slate-300 transition-all font-bold text-xs cursor-pointer active:scale-98" data-method="cash-ves">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700/80 text-blue-400 border border-slate-600 font-mono">F6</span>
+                            <div class="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 group-hover:scale-110 flex items-center justify-center text-sm font-black transition-transform">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <span class="text-slate-200">Efectivo Bs</span>
                         </button>
-                        <button class="payment-tab relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/50 hover:bg-pink-900/30 hover:border-pink-500 text-slate-300 transition-all font-bold text-xs col-span-2" data-method="pago-movil">
-                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700 text-pink-400 border border-slate-600">F5</span>
-                            <div class="w-7 h-7 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-black"><i class="fas fa-mobile-screen text-xs"></i></div>
-                            <span>Pago Móvil</span>
+
+                        <!-- 5. EUR Cash -->
+                        <button type="button" class="payment-tab group relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:bg-amber-950/40 hover:border-amber-500 text-slate-300 transition-all font-bold text-xs cursor-pointer active:scale-98" data-method="cash-eur">
+                            <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-700/80 text-amber-400 border border-slate-600 font-mono">€</span>
+                            <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 group-hover:scale-110 flex items-center justify-center text-base font-black transition-transform">
+                                <i class="fas fa-euro-sign"></i>
+                            </div>
+                            <span class="text-slate-200">Euros (€)</span>
                         </button>
                     </div>
 
                     <!-- Payment Inputs Container -->
-                    <div id="payment-details-container" class="hidden space-y-3 mb-4">
-                        <div id="cash-section">
-                            <p id="label-amount-received" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MONTO ENTREGADO</p>
-
-                            <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-800 border-2 border-slate-700 focus-within:border-brand-500 rounded-xl transition-all">
-                                <span class="text-xs font-bold text-slate-400 min-w-[70px]">Monto:</span>
-                                <div class="relative w-full">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold pointer-events-none text-base" id="currency-input-symbol">$</span>
-                                    <input type="text" inputmode="decimal" id="amount-received" class="w-full bg-transparent outline-none pl-8 pr-2 font-black text-2xl text-white placeholder:text-slate-500 cursor-text" placeholder="0.00" autocomplete="off" autofocus>
+                    <div id="payment-details-container" class="space-y-3.5 mb-4">
+                        <div id="cash-section" class="space-y-3">
+                            
+                            <!-- Billetes Rápidos (Quick Bill Presets) -->
+                            <div id="checkout-quick-bills-container" class="space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLETES RÁPIDOS</span>
+                                    <span class="text-[10px] text-slate-500">1-clic para registrar</span>
+                                </div>
+                                <div class="grid grid-cols-6 gap-1.5" id="quick-bills-row">
+                                    <button type="button" onclick="window.setCheckoutQuickBill(1)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$1</button>
+                                    <button type="button" onclick="window.setCheckoutQuickBill(5)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$5</button>
+                                    <button type="button" onclick="window.setCheckoutQuickBill(10)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$10</button>
+                                    <button type="button" onclick="window.setCheckoutQuickBill(20)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$20</button>
+                                    <button type="button" onclick="window.setCheckoutQuickBill(50)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$50</button>
+                                    <button type="button" onclick="window.setCheckoutQuickBill(100)" class="py-2 rounded-xl bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 text-xs font-black text-slate-200 hover:text-white transition-all cursor-pointer font-mono active:scale-95">$100</button>
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl mt-2" id="ref-container" style="display: none;">
-                                <span class="text-xs font-bold text-slate-400 min-w-[70px]">Ref:</span>
+                            <!-- Input del Monto Recibido -->
+                            <div>
+                                <p id="label-amount-received" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MONTO ENTREGADO</p>
+
+                                <div class="flex items-center gap-2 px-4 py-3 bg-slate-800/90 border-2 border-slate-700 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-2xl transition-all shadow-inner">
+                                    <span class="text-xs font-bold text-slate-400 min-w-[70px]">Monto:</span>
+                                    <div class="relative w-full flex items-center">
+                                        <span class="absolute left-1 text-slate-400 font-bold pointer-events-none text-xl" id="currency-input-symbol">$</span>
+                                        <input type="text" inputmode="decimal" id="amount-received" class="w-full bg-transparent outline-none pl-7 pr-8 font-black text-3xl text-white placeholder:text-slate-600 cursor-text font-mono" placeholder="0.00" autocomplete="off" autofocus>
+                                        <button type="button" onclick="window.clearCheckoutInput()" class="text-slate-500 hover:text-rose-400 p-1 text-xs cursor-pointer transition-colors" title="Borrar monto">
+                                            <i class="fas fa-times-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Referencia Opcional / Requerida -->
+                            <div class="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl" id="ref-container" style="display: none;">
+                                <span class="text-xs font-bold text-slate-400 min-w-[70px]">Referencia:</span>
                                 <input type="text" id="payment-ref-input" class="w-full bg-transparent outline-none font-bold text-sm text-white placeholder:text-slate-600 uppercase" placeholder="Ej: 1234">
                             </div>
 
-                            <button id="add-payment-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-bold text-xs py-3 rounded-xl transition-all border border-slate-700 hover:border-emerald-500 flex items-center justify-center gap-2 mt-3 shadow-sm">
-                                <i class="fas fa-layer-group text-sm"></i> + Añadir a Pago Múltiple / Mixto
+                            <!-- Botón Añadir a Pago Múltiple / Mixto -->
+                            <button id="add-payment-btn" type="button" class="w-full bg-slate-800/90 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-bold text-xs py-3 px-4 rounded-xl transition-all border border-slate-700 hover:border-emerald-500/50 flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+                                <i class="fas fa-layer-group text-sm"></i>
+                                <span>+ Añadir a Pago Múltiple / Mixto</span>
                             </button>
 
-                            <!-- Change Container -->
-                            <div id="change-container" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-rose-900/20 border border-rose-900/50 transition-all mt-3">
-                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CAMBIO / VUELTO</span>
+                            <!-- High-Impact Cambio / Vuelto Card -->
+                            <div id="change-container" class="flex items-center justify-between px-5 py-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 transition-all shadow-sm">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-base border border-emerald-500/20">
+                                        <i class="fas fa-hand-holding-dollar"></i>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block">CAMBIO / VUELTO</span>
+                                        <span class="text-[10px] text-slate-500">A entregar al cliente</span>
+                                    </div>
+                                </div>
                                 <div class="text-right">
-                                    <div class="text-lg font-black text-emerald-400" id="checkout-change">$0.00</div>
-                                    <div class="text-[10px] font-bold text-emerald-600/70" id="checkout-change-secundary"></div>
+                                    <div class="text-2xl font-black text-emerald-400 font-mono tracking-tight" id="checkout-change">$0.00</div>
+                                    <div class="text-xs font-bold text-emerald-500/80 font-mono" id="checkout-change-secundary"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- PM Verification -->
-                    <div id="pm-extra-fields" class="hidden bg-pink-900/20 rounded-2xl border border-pink-900/50 p-3.5 space-y-2.5 mb-3">
-                        <p class="text-xs font-bold uppercase tracking-widest text-pink-400">Verificación Pago Móvil</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <input type="text" id="pm-id" placeholder="Cédula" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:border-pink-500 placeholder:text-slate-500">
-                            <input type="text" id="pm-phone" placeholder="Teléfono" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:border-pink-500 placeholder:text-slate-500">
+                    <!-- Pago Móvil Extra Fields -->
+                    <div id="pm-extra-fields" class="hidden bg-pink-950/20 rounded-2xl border border-pink-800/40 p-4 space-y-3 mb-4 shadow-inner">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-black uppercase tracking-widest text-pink-400 flex items-center gap-2">
+                                <i class="fas fa-shield-halved"></i> Verificación Pago Móvil
+                            </p>
+                            <span class="text-[10px] text-pink-300/70 font-medium">Banesco / BDV / Mercantil</span>
                         </div>
-                        <input type="text" id="pm-ref" placeholder="Ref. últimos 4" maxlength="4" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-black tracking-[0.4em] text-center text-white outline-none focus:border-pink-500 placeholder:text-slate-500">
-                        <p id="pm-validation-hint" class="hidden text-xs font-bold text-red-400 text-center mt-1"></p>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 block mb-1">Cédula del Pagador</label>
+                                <input type="text" id="pm-id" placeholder="V-12345678" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:border-pink-500 placeholder:text-slate-500 font-mono">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 block mb-1">Teléfono Móvil</label>
+                                <input type="text" id="pm-phone" placeholder="04141234567" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:border-pink-500 placeholder:text-slate-500 font-mono">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 block mb-1">Últimos 4 Dígitos de Referencia</label>
+                            <input type="text" id="pm-ref" placeholder="0000" maxlength="4" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-xl text-base font-black tracking-[0.4em] text-center text-white outline-none focus:border-pink-500 placeholder:text-slate-600 font-mono">
+                        </div>
+                        <p id="pm-validation-hint" class="hidden text-xs font-bold text-rose-400 text-center mt-1"></p>
                     </div>
 
                     <!-- Mixed Payments Items List -->
-                    <div id="mixed-payments-list" class="space-y-2 mb-3 empty:hidden bg-slate-800/80 p-2.5 rounded-2xl border border-slate-700/60"></div>
+                    <div id="mixed-payments-list" class="space-y-2 mb-3 empty:hidden bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60 shadow-inner"></div>
 
-                    <!-- SALDO RESTANTE Box -->
-                    <div id="mixed-remaining-container" class="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-amber-900/20 border border-amber-900/50 mb-4 hidden">
-                        <span class="text-xs font-black text-amber-500 uppercase tracking-wider">SALDO RESTANTE</span>
-                        <span class="text-xl font-black text-amber-400 font-mono" id="checkout-remaining-usd">$0.00</span>
+                    <!-- Saldo Restante en Pagos Mixtos -->
+                    <div id="mixed-remaining-container" class="flex items-center justify-between px-4 py-3 rounded-2xl bg-amber-950/30 border border-amber-800/50 mb-4 hidden">
+                        <span class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-hourglass-half"></i> SALDO RESTANTE
+                        </span>
+                        <span class="text-xl font-black text-amber-300 font-mono" id="checkout-remaining-usd">$0.00</span>
+                    </div>
+
+                    <!-- Observaciones opcionales en el ticket -->
+                    <div class="mb-3">
+                        <input type="text" id="checkout-observations" placeholder="Observaciones / Notas para este ticket (opcional)..." class="w-full px-3.5 py-2 bg-slate-800/40 border border-slate-700/60 rounded-xl text-xs text-slate-300 placeholder:text-slate-500 outline-none focus:border-slate-500 transition-colors">
                     </div>
                 </div>
 
-                <!-- Completar Cobro Action Button -->
-                <div class="pt-2">
-                    <button id="confirm-payment-btn" class="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-black text-base transition-all flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/20" disabled>
-                        <i class="fas fa-check-circle text-lg"></i>
-                        <span>Completar Cobro</span>
-                        <kbd class="px-2.5 py-0.5 text-xs font-black bg-emerald-700 text-emerald-100 rounded-lg border border-emerald-400/40">Enter ↵</kbd>
+                <!-- Completar Cobro Action Button (Enter) -->
+                <div class="pt-3">
+                    <button id="confirm-payment-btn" type="button" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] text-white font-black text-base tracking-wide transition-all flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed shadow-xl shadow-emerald-950/40 cursor-pointer" disabled>
+                        <i class="fas fa-check-circle text-xl"></i>
+                        <span>Completar Cobro e Imprimir Ticket</span>
+                        <kbd class="px-2.5 py-1 text-xs font-black bg-emerald-800/80 text-emerald-100 rounded-lg border border-emerald-400/40 font-mono">Enter ↵</kbd>
                     </button>
                 </div>
 

@@ -230,6 +230,11 @@ async function checkLicense(force = false) {
         return { valid: false, reason: localCheck.reason || 'INVALID' };
     }
 
+    // Claves internas / desarrollo (FRESH-*) son perpetuas y no se bloquean offline
+    if (localCheck.isLegacy) {
+        return { valid: true, clientName: stored.clientName || 'Desarrollo', warningDaysLeft: null, daysLeft: 999, storeId: stored.storeId };
+    }
+
     // ── Calcular días restantes ───────────────────────────────
     const now = Date.now();
     let warningDaysLeft = null;

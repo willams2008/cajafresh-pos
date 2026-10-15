@@ -263,7 +263,7 @@ body {
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: radial-gradient(circle at center, #ffffff 0%, #f8fafc 100%);
+    background: #0c121e !important;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -272,7 +272,7 @@ body {
 }
 
 .dark .splash-screen {
-    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    background: #0c121e !important;
 }
 
 .splash-exit {

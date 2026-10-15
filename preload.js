@@ -67,7 +67,13 @@ const dbMethods = {
     deleteIngredient: (storeId, id) => ipcRenderer.invoke('db-delete-ingredient', storeId, id),
     getRecipes: (storeId) => ipcRenderer.invoke('db-get-recipes', storeId),
     saveRecipe: (storeId, recipe) => ipcRenderer.invoke('db-save-recipe', storeId, recipe),
-    deleteRecipe: (storeId, id) => ipcRenderer.invoke('db-delete-recipe', storeId, id)
+    deleteRecipe: (storeId, id) => ipcRenderer.invoke('db-delete-recipe', storeId, id),
+
+    // Stores / Sucursales y Almacenes
+    getStores: () => ipcRenderer.invoke('db-get-stores'),
+    saveStore: (store) => ipcRenderer.invoke('db-save-store', store),
+    deleteStore: (id) => ipcRenderer.invoke('db-delete-store', id),
+    migrateOrphanData: (storeId) => ipcRenderer.invoke('db-migrate-orphan-data', storeId)
 };
 
 // Expose safe APIs to the window object
@@ -136,6 +142,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     on: (channel, callback) => {
         const validChannels = [
+            'product-updated-remote',
             'product-updated-remote-full', 
             'exchange-rate-updated-remote', 
             'remote-price-updated', 
