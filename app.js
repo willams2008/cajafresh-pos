@@ -358,68 +358,6 @@ async function ensureAdminUser() {
     }
 }
 
-async function ensureJoseUsers() {
-    try {
-        var users = await window.db.getUsers();
-        var userMap = {};
-        (users || []).forEach(function(u) { userMap[u.username] = u; });
-        var joseUsers = [
-            { username: 'bendecido', name: 'Bendecido', password: 'B3nd3c1d0#2026', role: 'seller' },
-            { username: 'feliz_dia', name: 'Feliz Día', password: 'F3l1zD14@2026', role: 'seller' },
-            { username: 'gracias_dios', name: 'Gracias Dios', password: 'Gr4c14sD10s!2026', role: 'seller' },
-            { username: 'jose', name: 'Jose', password: 'J0s3#P0s2026', role: 'admin' }
-        ];
-        var created = [];
-        var savedCreds = {};
-        for (var u of joseUsers) {
-            savedCreds[u.username] = u.password;
-            var salt = generateSalt();
-            var hash = await hashPassword(u.password, salt);
-            await window.db.saveUser({
-                id: userMap[u.username] ? userMap[u.username].id : undefined,
-                username: u.username,
-                password_hash: hash,
-                salt: salt,
-                role: u.role,
-                name: u.name,
-                active: 1
-            });
-            if (!userMap[u.username]) created.push(u);
-            console.log('[Auth] Usuario asegurado: ' + u.username + ' / ' + u.password);
-        }
-        localStorage.setItem('freshpos_jose_creds', JSON.stringify(savedCreds));
-    } catch (e) {
-        console.error('[Auth] Error creando usuarios Jose:', e);
-    }
-}
-
-function _showCredsModal(creds) {
-    var entries = Object.keys(creds);
-    if (entries.length === 0) return;
-    var lines = entries.map(function(k) {
-        return '<b>' + k + '</b>: ' + creds[k];
-    });
-    var html = '<div id="jose-creds-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:monospace">' +
-        '<div style="background:#1a1a2e;color:#fff;border-radius:12px;padding:30px 40px;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center">' +
-        '<h2 style="margin:0 0 15px;color:#00d4aa;font-size:22px">🔑 Credenciales Jose</h2>' +
-        '<div style="text-align:left;background:#0d0d1a;padding:15px;border-radius:8px;font-size:15px;line-height:1.8">' +
-        lines.join('<br>') +
-        '</div>' +
-        '<p style="color:#888;font-size:12px;margin:12px 0 0">Guarda esto en un lugar seguro</p>' +
-        '<button onclick="document.getElementById(\'jose-creds-overlay\').remove()" style="margin-top:15px;padding:8px 24px;border:none;border-radius:6px;background:#00d4aa;color:#000;font-weight:bold;cursor:pointer;font-size:14px">OK ✓</button>' +
-        '</div></div>';
-    var div = document.createElement('div');
-    div.innerHTML = html;
-    document.body.appendChild(div);
-}
-
-window.showJoseCreds = function() {
-    try {
-        var creds = JSON.parse(localStorage.getItem('freshpos_jose_creds') || '{}');
-        _showCredsModal(creds);
-    } catch (e) { console.error(e); }
-}
-
 async function loginUser(username, password) {
     try {
         var pwd = (password || '').trim();
@@ -2053,7 +1991,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Auto-create default admin user if none exist
             await ensureAdminUser();
-            await ensureJoseUsers();
 
             // Auto-configure Cloud Sync if credentials exist
             const activeSid = _getStoreId();
